@@ -1,70 +1,75 @@
-# Humanoid Policy Viewer
+# RL Sim2Sim Demo Website
 
-Single-page Vue 3 + Vuetify app that runs a MuJoCo WebAssembly scene in the
-browser and drives it with an ONNX policy. The default setup loads the G1
-scene, policy, and motion clips from `public/examples`.
+这是一个基于 Vue 3 + Vuetify 的单页演示网站，用于在浏览器中运行 MuJoCo WebAssembly 场景，并使用 ONNX policy 驱动人形机器人运动。当前默认配置会从 `public/examples` 加载 G1 场景、policy 和 motion 数据。
 
-Demos: [Humanoid Policy Viewer](https://motion-tracking.axell.top/), [GentleHumanoid Web Demo](https://gentle-humanoid.axell.top/)
+在线地址：<https://imchong.github.io/RL_Sim2Sim_Demo_Website/>
 
-## Quick start
+## 仓库说明
+本仓库在实现上**引用并改造了**以下开源项目源码：
+- 上游仓库：<https://github.com/Axellwppr/humanoid-policy-viewer>
 
+当前仓库的主要工作包括：
+- 将项目迁移到 `ImChong/RL_Sim2Sim_Demo_Website`
+- 适配 GitHub Pages 部署
+- 保留原始网页演示能力，便于后续继续扩展 sim2sim demo
+
+## 快速开始
 ```bash
 npm install
 npm run dev
 ```
 
-## Project structure
+## 项目结构
+- `src/views/Demo.vue`：演示页面的主要 UI 控件
+- `src/simulation/main.js`：MuJoCo、Three.js 渲染与 policy loop 的启动入口
+- `src/simulation/mujocoUtils.js`：场景 / policy 加载工具与 MuJoCo 文件预加载逻辑
+- `src/simulation/policyRunner.js`：ONNX 推理封装与 observation 管线
+- `node_modules/mujoco-js/`：MuJoCo wasm 运行时（npm 包）
+- `public/examples/scenes/`：放置 MJCF 文件与 mesh 资源，运行时会预加载到 MuJoCo 的 MEMFS
+- `public/examples/checkpoints/`：放置 policy 配置 JSON、ONNX 模型与 motion 数据
 
-- `src/views/Demo.vue` - UI controls for the live demo
-- `src/simulation/main.js` - bootstraps MuJoCo, Three.js renderer, and policy loop
-- `src/simulation/mujocoUtils.js` - scene/policy loading utilities and filesystem preloading
-- `src/simulation/policyRunner.js` - ONNX inference wrapper and observation pipeline
-- `node_modules/mujoco-js/` - MuJoCo wasm runtime (npm package)
-- `public/examples/scenes/` - MJCF files + meshes staged into MuJoCo's MEMFS
-- `public/examples/checkpoints/` - policy config JSON, ONNX file, and motion clips
+## 如何接入你自己的机器人、Policy 和 Motion
+### 1）添加机器人 MJCF 与资源文件
+- 新建目录：`public/examples/scenes/<robot>/`
+- 将 MJCF 文件放到：`public/examples/scenes/<robot>/<robot>.xml`
+- 将该 MJCF 依赖的 mesh / texture 一并放到同目录
+- 把所有文件路径追加到 `public/examples/scenes/files.json`，这样加载器才能在 wasm 文件系统中预加载到 `/working/`
 
-## Add your own robot, policy and motions
+### 2）添加 policy 配置与 ONNX 模型
+- 新建：`public/examples/checkpoints/<robot>/tracking_policy.json`
+- 放置 ONNX 模型到：`public/examples/checkpoints/<robot>/tracking_policy.onnx`
+- 确认 JSON 中以下字段正确：
+  - `onnx.path` 指向正确的 ONNX 文件，例如 `./examples/checkpoints/<robot>/tracking_policy.onnx`
+  - `policy_joint_names` 与 MJCF actuator 中的关节名一致
+  - `obs_config` 中使用的 observation 名称已在 `src/simulation/observationHelpers.js` 中实现
+  - `action_scale`、`stiffness`、`damping`、`default_joint_pos` 的长度与 `policy_joint_names` 一致
+- 如果你的 observation 设计与当前默认实现不同，需要同步修改：
+  - `src/simulation/observationHelpers.js`
+  - `src/simulation/policyRunner.js`
 
-1. Add your MJCF + assets.
-   - Create `public/examples/scenes/<robot>/`.
-   - Put your MJCF as `public/examples/scenes/<robot>/<robot>.xml`.
-   - Add all meshes/textures used by the MJCF into the same folder.
-   - Append every file path to `public/examples/scenes/files.json` so the
-     loader can preload them into `/working/` in the wasm filesystem.
+### 3）可选：添加 tracking motion
+- 新建索引文件：`public/examples/checkpoints/<robot>/motions.json`
+- 将每段 motion clip 放到：`public/examples/checkpoints/<robot>/motions/`
+- 在 `tracking_policy.json` 中，把 `tracking.motions_path` 指向该索引文件
+- policy 加载时会自动下载索引中列出的全部 motion 文件
+- `motions.json` 建议包含：
+  - `format`：`tracking-motion-index-v1`
+  - `base_path`：motion 文件夹相对路径，例如 `./motions`
+  - `motions`：`{ name, file }` 列表
+- 每个 motion 文件至少应包含：
+  - `joint_pos` 或 `jointPos`
+  - `root_pos` 或 `rootPos`
+  - `root_quat` 或 `rootQuat`（顺序为 `w, x, y, z`）
 
-2. Add your policy config and ONNX.
-   - Create `public/examples/checkpoints/<robot>/tracking_policy.json`.
-   - Place the ONNX model at `public/examples/checkpoints/<robot>/tracking_policy.onnx`.
-   - In the JSON, make sure these fields are correct:
-     - `onnx.path` points to your ONNX file (example: `./examples/checkpoints/<robot>/tracking_policy.onnx`)
-     - `policy_joint_names` matches the joint names in your MJCF actuators
-     - `obs_config` uses observation names that exist in `src/simulation/observationHelpers.js`
-     - `action_scale`, `stiffness`, `damping`, and `default_joint_pos` lengths
-       match `policy_joint_names`
-   - You need to adapt the observation helper functions in
-     `src/simulation/observationHelpers.js` if your policy uses
-     different observations than the built-in ones, and modify `src/simulation/policyRunner.js` to control the robot.
+### 4）将应用指向你的机器人与 policy
+更新 `src/simulation/main.js` 中的默认路径：
+- `this.currentPolicyPath = './examples/checkpoints/<robot>/tracking_policy.json'`
+- `await this.reloadScene('<robot>/<robot>.xml')`
+- `await this.reloadPolicy('./examples/checkpoints/<robot>/tracking_policy.json')`
 
-3. (Optional) Add tracking motions.
-   - Add an index at `public/examples/checkpoints/<robot>/motions.json`.
-   - Put per-motion clips in `public/examples/checkpoints/<robot>/motions/`.
-   - In `tracking_policy.json`, set `tracking.motions_path` to the index file.
-   - The app downloads all motion clips listed in the index when the policy loads.
-   - The index uses this shape:
-     - `format`: `tracking-motion-index-v1`
-     - `base_path`: relative path to the motions folder (example: `./motions`)
-     - `motions`: list of `{ name, file }` entries
-   - Each motion clip file must include a `default` clip overall and each clip contains:
-     - `joint_pos` (or `jointPos`): per-frame joint arrays
-     - `root_pos` (or `rootPos`): per-frame root positions
-     - `root_quat` (or `rootQuat`): per-frame root quaternions (w, x, y, z)
+如果你希望同时保留多个机器人，也可以在 `src/views/Demo.vue` 中增加切换器，并调用：
+- `demo.reloadScene(...)`
+- `demo.reloadPolicy(...)`
 
-4. Point the app to your robot and policy.
-   - Update `src/simulation/main.js`:
-     - `this.currentPolicyPath = './examples/checkpoints/<robot>/tracking_policy.json'`
-     - `await this.reloadScene('<robot>/<robot>.xml')`
-     - `await this.reloadPolicy('./examples/checkpoints/<robot>/tracking_policy.json')`
-
-If you want to keep multiple robots around, you can expose a selector in
-`src/views/Demo.vue` and call `demo.reloadScene(...)` and `demo.reloadPolicy(...)`
-from there.
+## 部署说明
+本仓库已经接入 GitHub Pages，推送到 `main` 分支后会通过 GitHub Actions 自动构建并部署。
