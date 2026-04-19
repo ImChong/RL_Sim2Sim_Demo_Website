@@ -24,10 +24,23 @@
       Safari has lower memory limits, which can cause WASM to crash.
     </v-alert>
   </div>
-  <div :class="['controls', { 'controls-mobile': isSmallScreen }]">
+  <div :class="['controls', { 'controls-mobile': isSmallScreen, 'controls-mobile-collapsed': isSmallScreen && isMobileControlsCollapsed }]">
     <v-card class="controls-card">
-      <v-card-title>General Tracking Demo</v-card-title>
-      <v-card-text class="py-0 controls-body">
+      <v-card-title :class="['controls-title', { 'controls-title-mobile': isSmallScreen }]">
+        <span>General Tracking Demo</span>
+        <v-btn
+          v-if="isSmallScreen"
+          size="x-small"
+          variant="text"
+          color="primary"
+          class="controls-toggle-btn"
+          :aria-label="isMobileControlsCollapsed ? 'Expand control panel' : 'Collapse control panel'"
+          @click="toggleMobileControls"
+        >
+          {{ isMobileControlsCollapsed ? 'Expand' : 'Collapse' }}
+        </v-btn>
+      </v-card-title>
+      <v-card-text v-show="!isSmallScreen || !isMobileControlsCollapsed" class="py-0 controls-body">
           <v-btn
             href="https://github.com/Axellwppr/humanoid-policy-viewer"
             target="_blank"
@@ -323,6 +336,7 @@ export default {
     renderScale: 2.0,
     simStepHz: 0,
     isSmallScreen: false,
+    isMobileControlsCollapsed: true,
     showSmallScreenAlert: true,
     isSafari: false,
     showSafariAlert: true,
@@ -469,7 +483,16 @@ export default {
       if (!isSmall && this.isSmallScreen) {
         this.showSmallScreenAlert = true;
       }
+      if (isSmall !== this.isSmallScreen) {
+        this.isMobileControlsCollapsed = isSmall;
+      }
       this.isSmallScreen = isSmall;
+    },
+    toggleMobileControls() {
+      if (!this.isSmallScreen) {
+        return;
+      }
+      this.isMobileControlsCollapsed = !this.isMobileControlsCollapsed;
     },
     async init() {
       if (typeof WebAssembly !== 'object' || typeof WebAssembly.instantiate !== 'function') {
@@ -839,6 +862,10 @@ export default {
   max-width: none;
 }
 
+.controls-mobile-collapsed {
+  bottom: 12px;
+}
+
 .global-alerts {
   position: fixed;
   top: calc(var(--header-h, 58px) + 20px);
@@ -864,10 +891,30 @@ export default {
   max-height: calc(100vh - 40px);
 }
 
+.controls-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.controls-title-mobile {
+  padding-right: 12px;
+}
+
+.controls-toggle-btn {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
 .controls-mobile .controls-card {
   max-height: min(52vh, 420px);
   border-radius: 18px;
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.22);
+}
+
+.controls-mobile-collapsed .controls-card {
+  max-height: none;
 }
 
 .controls-body {
@@ -893,6 +940,10 @@ export default {
 
 .controls-mobile :deep(.v-card-actions) {
   padding: 8px 16px 14px;
+}
+
+.controls-mobile-collapsed :deep(.v-card-actions) {
+  display: none;
 }
 
 .controls-mobile :deep(.v-btn) {
