@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { DragStateManager } from './utils/DragStateManager.js';
 import { downloadExampleScenesFolder, getPosition, getQuaternion, toMujocoPos, reloadScene, reloadPolicy } from './mujocoUtils.js';
+import { getSimulationThemeSettings, normalizeSimulationThemeName } from './theme.js';
 
 const defaultPolicy = "./examples/checkpoints/g1/tracking_policy_latest.json";
 
@@ -28,21 +29,25 @@ export class MuJoCoDemo {
 
     this.bodies = {};
     this.lights = {};
+    this.visualThemeName = 'light';
+    this.lightBaseIntensities = new Map();
 
     this.container = document.getElementById('mujoco-container');
 
     this.scene = new THREE.Scene();
     this.scene.name = 'scene';
 
+    this.currentVisualSettings = getSimulationThemeSettings(this.visualThemeName);
+
     this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.001, 100);
     this.camera.name = 'PerspectiveCamera';
     this.camera.position.set(3.0, 2.2, 3.0);
     this.scene.add(this.camera);
 
-    this.scene.background = new THREE.Color(0.15, 0.25, 0.35);
+    this.scene.background = new THREE.Color(...this.currentVisualSettings.backgroundRgb);
     this.scene.fog = null;
 
-    this.ambientLight = new THREE.AmbientLight(0xffffff, 0.1);
+    this.ambientLight = new THREE.AmbientLight(0xffffff, this.currentVisualSettings.ambientIntensity);
     this.ambientLight.name = 'AmbientLight';
     this.scene.add(this.ambientLight);
 
@@ -130,6 +135,38 @@ export class MuJoCoDemo {
       this.followOffset.setLength(this.followDistance);
       this.camera.position.copy(this.controls.target).add(this.followOffset);
       this.controls.update();
+    }
+  }
+
+  setVisualTheme(name) {
+    this.visualThemeName = normalizeSimulationThemeName(name);
+    this.currentVisualSettings = getSimulationThemeSettings(this.visualThemeName);
+    this.applyVisualTheme();
+  }
+
+  applyVisualTheme() {
+    if (!this.currentVisualSettings) {
+      return;
+    }
+
+    if (this.scene?.background) {
+      this.scene.background.setRGB(...this.currentVisualSettings.backgroundRgb);
+    } else if (this.scene) {
+      this.scene.background = new THREE.Color(...this.currentVisualSettings.backgroundRgb);
+    }
+
+    if (this.ambientLight) {
+      this.ambientLight.intensity = this.currentVisualSettings.ambientIntensity;
+    }
+
+    for (const [index, light] of Object.entries(this.lights ?? {})) {
+      if (!light) {
+        continue;
+      }
+      const lightIndex = Number(index);
+      const baseIntensity = this.lightBaseIntensities.get(lightIndex) ?? light.intensity ?? 1;
+      this.lightBaseIntensities.set(lightIndex, baseIntensity);
+      light.intensity = baseIntensity * this.currentVisualSettings.lightIntensityScale;
     }
   }
 

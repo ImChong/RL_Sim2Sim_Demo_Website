@@ -29,7 +29,7 @@
     </header>
 
     <v-main class="app-main">
-      <Demo />
+      <Demo :visual-theme="currentThemeName" />
     </v-main>
   </v-app>
 </template>
@@ -43,6 +43,7 @@ const theme = useTheme()
 const themeStorageKey = 'rl-sim2sim-demo-theme'
 const siteHome = './'
 
+const currentThemeName = computed(() => theme.global.name.value)
 const isDark = computed(() => theme.global.current.value.dark)
 const themeToggleLabel = computed(() => (isDark.value ? '切换到白天模式' : '切换到黑夜模式'))
 
@@ -53,7 +54,7 @@ function applyDocumentTheme(name) {
 
 function toggleTheme() {
   const next = isDark.value ? 'light' : 'dark'
-  theme.global.name.value = next
+  theme.change(next)
   localStorage.setItem(themeStorageKey, next)
   applyDocumentTheme(next)
 }
@@ -62,7 +63,7 @@ onMounted(() => {
   const saved = localStorage.getItem(themeStorageKey)
   const preferDark = window.matchMedia('(prefers-color-scheme: dark)').matches
   const initial = saved || (preferDark ? 'dark' : 'light')
-  theme.global.name.value = initial
+  theme.change(initial)
   applyDocumentTheme(initial)
 })
 

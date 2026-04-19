@@ -85,6 +85,12 @@ export async function reloadScene(mjcf_path) {
 
   [this.model, this.data, this.simulation, this.bodies, this.lights] =
     await loadSceneFromURL(mujoco, mjcf_path, this);
+  this.lightBaseIntensities = new Map(
+    Object.entries(this.lights ?? {}).flatMap(([index, light]) => (
+      light ? [[Number(index), light.intensity ?? 1]] : []
+    ))
+  );
+  this.applyVisualTheme?.();
 
   const textDecoder = new TextDecoder();
   const namesArray = new Uint8Array(this.model.names);

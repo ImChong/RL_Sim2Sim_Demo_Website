@@ -276,6 +276,12 @@ import loadMujoco from 'mujoco-js';
 
 export default {
   name: 'DemoPage',
+  props: {
+    visualTheme: {
+      type: String,
+      default: 'light'
+    }
+  },
   data: () => ({
     state: 0, // 0: loading, 1: running, -1: JS error, -2: wasm unsupported
     extra_error_message: '',
@@ -438,6 +444,14 @@ export default {
       return `${this.simStepHz.toFixed(1)} Hz`;
     }
   },
+  watch: {
+    visualTheme: {
+      immediate: true,
+      handler(value) {
+        this.demo?.setVisualTheme?.(value);
+      }
+    }
+  },
   methods: {
     detectSafari() {
       const ua = navigator.userAgent;
@@ -466,6 +480,7 @@ export default {
       try {
         const mujoco = await loadMujoco();
         this.demo = new MuJoCoDemo(mujoco);
+        this.demo.setVisualTheme?.(this.visualTheme);
         this.demo.setFollowEnabled?.(this.cameraFollowEnabled);
         await this.demo.init();
         this.demo.main_loop();
