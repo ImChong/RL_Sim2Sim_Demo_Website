@@ -42,17 +42,6 @@
       </v-card-title>
       <v-card-text v-show="!isSmallScreen || !isMobileControlsCollapsed" class="py-0 controls-body">
           <v-btn
-            href="https://github.com/Axellwppr/humanoid-policy-viewer"
-            target="_blank"
-            variant="text"
-            size="small"
-            color="primary"
-            class="text-capitalize"
-          >
-            <v-icon icon="mdi-github" class="mr-1"></v-icon>
-            Demo Code
-          </v-btn>
-          <v-btn
             href="https://github.com/Axellwppr/motion_tracking"
             target="_blank"
             variant="text"
