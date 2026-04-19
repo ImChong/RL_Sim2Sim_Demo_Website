@@ -1,0 +1,161 @@
+{
+  "format": "tracking-motion-index-v1",
+  "base_path": "./motions",
+  "motions": [
+    {
+      "name": "dance1_subject1",
+      "file": "dance1_subject1.json",
+      "compliance_suitable": false
+    },
+    {
+      "name": "dance2_subject1",
+      "file": "dance2_subject1.json",
+      "compliance_suitable": false
+    },
+    {
+      "name": "fallAndGetUp1_subject1",
+      "file": "fallAndGetUp1_subject1.json",
+      "compliance_suitable": false
+    },
+    {
+      "name": "fallAndGetUp2_subject2",
+      "file": "fallAndGetUp2_subject2.json",
+      "compliance_suitable": false
+    },
+    {
+      "name": "fight1_subject2",
+      "file": "fight1_subject2.json",
+      "compliance_suitable": false
+    },
+    {
+      "name": "jumps1_subject1",
+      "file": "jumps1_subject1.json",
+      "compliance_suitable": false
+    },
+    {
+      "name": "run1_subject2",
+      "file": "run1_subject2.json",
+      "compliance_suitable": false
+    },
+    {
+      "name": "run2_subject1",
+      "file": "run2_subject1.json",
+      "compliance_suitable": false
+    },
+    {
+      "name": "sprint1_subject2",
+      "file": "sprint1_subject2.json",
+      "compliance_suitable": false
+    },
+    {
+      "name": "walk1_subject1",
+      "file": "walk1_subject1.json",
+      "compliance_suitable": true
+    },
+    {
+      "name": "walk2_subject1",
+      "file": "walk2_subject1.json",
+      "compliance_suitable": true
+    },
+    {
+      "name": "walk3_subject1",
+      "file": "walk3_subject1.json",
+      "compliance_suitable": true
+    },
+    {
+      "name": "default",
+      "file": "default.json",
+      "compliance_suitable": true
+    },
+    {
+      "name": "Balance_CMU_49_18_amass",
+      "file": "49_18.json",
+      "compliance_suitable": false
+    },
+    {
+      "name": "Exercise_CMU_13_29_amass",
+      "file": "13_29.json",
+      "compliance_suitable": false
+    },
+    {
+      "name": "TaiChi_CMU_12_04_amass",
+      "file": "12_04.json",
+      "compliance_suitable": false
+    },
+    {
+      "name": "RunDiveOverRollRun_CMU_127_23_amass",
+      "file": "127_23.json",
+      "compliance_suitable": false
+    },
+    {
+      "name": "RunDiveOverRollRun_CMU_127_24_amass",
+      "file": "127_24.json",
+      "compliance_suitable": false
+    },
+    {
+      "name": "Cartwheel_CMU_49_06_amass",
+      "file": "49_06.json",
+      "compliance_suitable": false
+    },
+    {
+      "name": "Cartwheel_CMU_49_07_amass",
+      "file": "49_07.json",
+      "compliance_suitable": false
+    },
+    {
+      "name": "JumpKick_CMU_75_16_amass",
+      "file": "75_16.json",
+      "compliance_suitable": false
+    },
+    {
+      "name": "Cartwheel_CMU_90_02_amass",
+      "file": "90_02.json",
+      "compliance_suitable": false
+    },
+    {
+      "name": "Cartwheel_CMU_90_04_amass",
+      "file": "90_04.json",
+      "compliance_suitable": false
+    },
+    {
+      "name": "JumpKick_CMU_90_06_amass",
+      "file": "90_06.json",
+      "compliance_suitable": false
+    },
+    {
+      "name": "FrontHandFlip_CMU_90_14_amass",
+      "file": "90_14.json",
+      "compliance_suitable": false
+    },
+    {
+      "name": "MonkeyBackflip_CMU_90_19_amass",
+      "file": "90_19.json",
+      "compliance_suitable": false
+    },
+    {
+      "name": "Hug_gentle",
+      "file": "ghw_hug.json",
+      "compliance_suitable": true
+    },
+    {
+      "name": "DragObject_gentle",
+      "file": "ghw_drag_object_from_video.json",
+      "compliance_suitable": true
+    },
+    {
+      "name": "MoveObject_gentle",
+      "file": "ghw_move_object_from_video.json",
+      "compliance_suitable": true
+    },
+    {
+      "name": "ArmWrestle_gentle",
+      "file": "ghw_arm_wrestle.json",
+      "compliance_suitable": true
+    },
+    {
+      "name": "ShakeHand_gentle",
+      "file": "ghw_shake_hand.json",
+      "compliance_suitable": true
+    }
+  ]
+}
