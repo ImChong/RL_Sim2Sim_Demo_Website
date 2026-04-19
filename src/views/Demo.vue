@@ -4,13 +4,13 @@
     <v-alert
       v-if="isSmallScreen"
       v-model="showSmallScreenAlert"
-      type="warning"
+      type="info"
       variant="flat"
       density="compact"
       closable
       class="small-screen-alert"
     >
-      Screen too small. The control panel is unavailable on small screens. Please use a desktop device.
+      Mobile mode is enabled. The control panel has been compacted and docked to the bottom for touch interaction.
     </v-alert>
     <v-alert
       v-if="isSafari"
@@ -24,7 +24,7 @@
       Safari has lower memory limits, which can cause WASM to crash.
     </v-alert>
   </div>
-  <div v-if="!isSmallScreen" class="controls">
+  <div :class="['controls', { 'controls-mobile': isSmallScreen }]">
     <v-card class="controls-card">
       <v-card-title>General Tracking Demo</v-card-title>
       <v-card-text class="py-0 controls-body">
@@ -830,6 +830,15 @@ export default {
   z-index: 1000;
 }
 
+.controls-mobile {
+  top: auto;
+  right: 12px;
+  left: 12px;
+  bottom: 12px;
+  width: auto;
+  max-width: none;
+}
+
 .global-alerts {
   position: fixed;
   top: calc(var(--header-h, 58px) + 20px);
@@ -855,10 +864,43 @@ export default {
   max-height: calc(100vh - 40px);
 }
 
+.controls-mobile .controls-card {
+  max-height: min(52vh, 420px);
+  border-radius: 18px;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.22);
+}
+
 .controls-body {
   max-height: calc(100vh - 160px);
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+.controls-mobile .controls-body {
+  max-height: min(calc(52vh - 78px), 320px);
+}
+
+.controls-mobile :deep(.v-card-title) {
+  font-size: 0.95rem;
+  line-height: 1.2;
+  padding: 12px 16px 8px;
+}
+
+.controls-mobile :deep(.v-card-text) {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+.controls-mobile :deep(.v-card-actions) {
+  padding: 8px 16px 14px;
+}
+
+.controls-mobile :deep(.v-btn) {
+  min-height: 34px;
+}
+
+.controls-mobile .motion-groups {
+  max-height: 132px;
 }
 
 .motion-status {
@@ -931,5 +973,13 @@ export default {
 .motion-progress-no-animation :deep(.v-progress-linear__background) {
   transition: none !important;
   animation: none !important;
+}
+
+@media (max-width: 640px), (max-height: 760px) {
+  .global-alerts {
+    top: calc(var(--header-h, 58px) + 12px);
+    left: 12px;
+    right: 12px;
+  }
 }
 </style>
