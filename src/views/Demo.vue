@@ -340,7 +340,8 @@ export default {
     showSmallScreenAlert: true,
     isSafari: false,
     showSafariAlert: true,
-    resize_listener: null
+    resize_listener: null,
+    vvp_listener: null
   }),
   computed: {
     shouldShowProgress() {
@@ -487,6 +488,13 @@ export default {
         this.isMobileControlsCollapsed = isSmall;
       }
       this.isSmallScreen = isSmall;
+    },
+    updateVisualViewportOffset() {
+      if (!window.visualViewport) return;
+      const vvp = window.visualViewport;
+      // 布局视口底部与可视视口底部之间的差值，即浏览器底部工具栏高度
+      const offset = Math.max(0, window.innerHeight - (vvp.offsetTop + vvp.height));
+      document.documentElement.style.setProperty('--vvp-offset-bottom', `${offset}px`);
     },
     toggleMobileControls() {
       if (!this.isSmallScreen) {
@@ -822,10 +830,19 @@ export default {
     this.customMotions = {};
     this.isSafari = this.detectSafari();
     this.updateScreenState();
+    this.updateVisualViewportOffset();
     this.resize_listener = () => {
       this.updateScreenState();
+      this.updateVisualViewportOffset();
     };
     window.addEventListener('resize', this.resize_listener);
+    if (window.visualViewport) {
+      this.vvp_listener = () => {
+        this.updateVisualViewportOffset();
+      };
+      window.visualViewport.addEventListener('resize', this.vvp_listener);
+      window.visualViewport.addEventListener('scroll', this.vvp_listener);
+    }
     this.init();
     this.keydown_listener = (event) => {
       if (event.code === 'Backspace') {
@@ -839,6 +856,10 @@ export default {
     document.removeEventListener('keydown', this.keydown_listener);
     if (this.resize_listener) {
       window.removeEventListener('resize', this.resize_listener);
+    }
+    if (this.vvp_listener && window.visualViewport) {
+      window.visualViewport.removeEventListener('resize', this.vvp_listener);
+      window.visualViewport.removeEventListener('scroll', this.vvp_listener);
     }
   }
 };
@@ -857,15 +878,15 @@ export default {
   top: auto;
   right: 12px;
   left: 12px;
-  bottom: calc(12px + constant(safe-area-inset-bottom));
-  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(12px + constant(safe-area-inset-bottom) + var(--vvp-offset-bottom, 0px));
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px) + var(--vvp-offset-bottom, 0px));
   width: auto;
   max-width: none;
 }
 
 .controls-mobile-collapsed {
-  bottom: calc(12px + constant(safe-area-inset-bottom));
-  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(12px + constant(safe-area-inset-bottom) + var(--vvp-offset-bottom, 0px));
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px) + var(--vvp-offset-bottom, 0px));
 }
 
 .global-alerts {
