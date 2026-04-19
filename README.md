@@ -1,5 +1,9 @@
 # RL Sim2Sim Demo Website
 
+[![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-Live-brightgreen?logo=github)](https://imchong.github.io/RL_Sim2Sim_Demo_Website/)
+[![Deploy to GitHub Pages](https://github.com/ImChong/RL_Sim2Sim_Demo_Website/actions/workflows/deploy.yml/badge.svg)](https://github.com/ImChong/RL_Sim2Sim_Demo_Website/actions/workflows/deploy.yml)
+[![License](https://img.shields.io/github/license/ImChong/RL_Sim2Sim_Demo_Website)](LICENSE)
+
 这是一个基于 Vue 3 + Vuetify 的单页演示网站，用于在浏览器中运行 MuJoCo WebAssembly 场景，并使用 ONNX policy 驱动人形机器人运动。当前默认配置会从 `public/examples` 加载 G1 场景、policy 和 motion 数据。
 
 在线地址：<https://imchong.github.io/RL_Sim2Sim_Demo_Website/>
