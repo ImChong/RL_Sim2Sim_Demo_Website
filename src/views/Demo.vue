@@ -809,7 +809,7 @@ export default {
 <style scoped>
 .controls {
   position: fixed;
-  top: 20px;
+  top: calc(var(--header-h, 58px) + 20px);
   right: 20px;
   width: 320px;
   z-index: 1000;
@@ -817,7 +817,7 @@ export default {
 
 .global-alerts {
   position: fixed;
-  top: 20px;
+  top: calc(var(--header-h, 58px) + 20px);
   left: 16px;
   right: 16px;
   max-width: 520px;
