@@ -857,13 +857,15 @@ export default {
   top: auto;
   right: 12px;
   left: 12px;
-  bottom: 12px;
+  bottom: calc(12px + constant(safe-area-inset-bottom));
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   width: auto;
   max-width: none;
 }
 
 .controls-mobile-collapsed {
-  bottom: 12px;
+  bottom: calc(12px + constant(safe-area-inset-bottom));
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
 }
 
 .global-alerts {
@@ -939,7 +941,8 @@ export default {
 }
 
 .controls-mobile :deep(.v-card-actions) {
-  padding: 8px 16px 14px;
+  padding: 8px 16px calc(14px + constant(safe-area-inset-bottom));
+  padding: 8px 16px calc(14px + env(safe-area-inset-bottom, 0px));
 }
 
 .controls-mobile-collapsed :deep(.v-card-actions) {
