@@ -2,8 +2,8 @@
   <v-app>
     <header class="site-header">
       <div class="header-inner">
-        <a :href="siteHome" class="site-title" aria-label="机器人强化学习效果在线演示首页">
-          机器人强化学习效果在线演示 | Robotics RL Sim2Sim Demo
+        <a :href="siteHome" class="site-title" aria-label="Robotics RL Sim2Sim Demo | 机器人强化学习效果在线演示 首页">
+          🤖 Robotics RL Sim2Sim Demo | 机器人强化学习效果在线演示
         </a>
         <div class="header-spacer"></div>
         <div class="header-right">
