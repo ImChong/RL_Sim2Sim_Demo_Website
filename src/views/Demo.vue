@@ -479,11 +479,16 @@ export default {
       this.isSmallScreen = isSmall;
     },
     updateVisualViewportOffset() {
-      if (!window.visualViewport) return;
-      const vvp = window.visualViewport;
-      // 布局视口底部与可视视口底部之间的差值，即浏览器底部工具栏高度
-      const offset = Math.max(0, window.innerHeight - (vvp.offsetTop + vvp.height));
-      document.documentElement.style.setProperty('--vvp-offset-bottom', `${offset}px`);
+      let offset = 0;
+      if (window.visualViewport) {
+        const vvp = window.visualViewport;
+        // 布局视口底部与可视视口底部的差值 = 浏览器底部工具栏高度
+        // 这个值在 Safari 上为 0（Safari 会把 fixed 元素定位在可视视口内）
+        // 在 Chrome iOS 上为工具栏高度（约 44px + home indicator 约 34px = 约 83px）
+        offset = Math.max(0, window.innerHeight - (vvp.offsetTop + vvp.height));
+      }
+      // 统一写入一个变量，CSS 里只用这一个，不再叠加 env(safe-area-inset-bottom)
+      document.documentElement.style.setProperty('--controls-bottom-offset', `${offset}px`);
     },
     toggleMobileControls() {
       if (!this.isSmallScreen) {
@@ -867,15 +872,13 @@ export default {
   top: auto;
   right: 12px;
   left: 12px;
-  bottom: calc(12px + constant(safe-area-inset-bottom) + var(--vvp-offset-bottom, 0px));
-  bottom: calc(12px + env(safe-area-inset-bottom, 0px) + var(--vvp-offset-bottom, 0px));
+  bottom: calc(12px + max(env(safe-area-inset-bottom, 0px), var(--controls-bottom-offset, 0px)));
   width: auto;
   max-width: none;
 }
 
 .controls-mobile-collapsed {
-  bottom: calc(12px + constant(safe-area-inset-bottom) + var(--vvp-offset-bottom, 0px));
-  bottom: calc(12px + env(safe-area-inset-bottom, 0px) + var(--vvp-offset-bottom, 0px));
+  bottom: calc(12px + max(env(safe-area-inset-bottom, 0px), var(--controls-bottom-offset, 0px)));
 }
 
 .global-alerts {
@@ -951,8 +954,7 @@ export default {
 }
 
 .controls-mobile :deep(.v-card-actions) {
-  padding: 8px 16px calc(14px + constant(safe-area-inset-bottom));
-  padding: 8px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+  padding: 8px 16px 14px;
 }
 
 .controls-mobile-collapsed :deep(.v-card-actions) {
