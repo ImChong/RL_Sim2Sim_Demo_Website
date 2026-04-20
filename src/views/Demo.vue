@@ -938,7 +938,7 @@ export default {
 }
 
 .controls-mobile .controls-body {
-  flex: 1 1 0;
+  flex: 1 1 auto;
   min-height: 0;
   max-height: none;
   overflow-y: auto;
@@ -953,7 +953,7 @@ export default {
 
 /* v-card-text 与 .controls-body 是同一元素，占满剩余空间，内容纵向可滚动 */
 .controls-mobile :deep(.v-card-text) {
-  flex: 1 1 0;
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
