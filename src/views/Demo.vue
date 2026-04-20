@@ -24,7 +24,7 @@
       Safari has lower memory limits, which can cause WASM to crash.
     </v-alert>
   </div>
-  <div :class="['controls', { 'controls-mobile': isSmallScreen, 'controls-mobile-collapsed': isSmallScreen && isMobileControlsCollapsed, 'controls-chrome-ios': isChromeIOS }]">
+  <div :class="['controls', { 'controls-mobile': isSmallScreen, 'controls-mobile-collapsed': isSmallScreen && isMobileControlsCollapsed }]">
     <v-card class="controls-card">
       <v-card-title :class="['controls-title', { 'controls-title-mobile': isSmallScreen }]">
         <span>General Tracking Demo</span>
@@ -41,6 +41,17 @@
         </v-btn>
       </v-card-title>
       <v-card-text v-show="!isSmallScreen || !isMobileControlsCollapsed" class="py-0 controls-body">
+          <v-btn
+            href="https://github.com/Axellwppr/humanoid-policy-viewer"
+            target="_blank"
+            variant="text"
+            size="small"
+            color="primary"
+            class="text-capitalize"
+          >
+            <v-icon icon="mdi-github" class="mr-1"></v-icon>
+            Demo Code
+          </v-btn>
           <v-btn
             href="https://github.com/Axellwppr/motion_tracking"
             target="_blank"
@@ -328,9 +339,9 @@ export default {
     isMobileControlsCollapsed: true,
     showSmallScreenAlert: true,
     isSafari: false,
-    isChromeIOS: false,
     showSafariAlert: true,
-    resize_listener: null
+    resize_listener: null,
+    vvp_listener: null
   }),
   computed: {
     shouldShowProgress() {
@@ -468,10 +479,6 @@ export default {
         && !/CriOS\//.test(ua)
         && !/FxiOS\//.test(ua);
     },
-    detectChromeIOS() {
-      // CriOS 是 Chrome for iOS 的 UA 标识
-      return /CriOS\//.test(navigator.userAgent);
-    },
     updateScreenState() {
       const isSmall = window.innerWidth < 500 || window.innerHeight < 700;
       if (!isSmall && this.isSmallScreen) {
@@ -481,6 +488,13 @@ export default {
         this.isMobileControlsCollapsed = isSmall;
       }
       this.isSmallScreen = isSmall;
+    },
+    updateVisualViewportOffset() {
+      if (!window.visualViewport) return;
+      const vvp = window.visualViewport;
+      // 布局视口底部与可视视口底部之间的差值，即浏览器底部工具栏高度
+      const offset = Math.max(0, window.innerHeight - (vvp.offsetTop + vvp.height));
+      document.documentElement.style.setProperty('--vvp-offset-bottom', `${offset}px`);
     },
     toggleMobileControls() {
       if (!this.isSmallScreen) {
@@ -815,12 +829,20 @@ export default {
   mounted() {
     this.customMotions = {};
     this.isSafari = this.detectSafari();
-    this.isChromeIOS = this.detectChromeIOS();
     this.updateScreenState();
+    this.updateVisualViewportOffset();
     this.resize_listener = () => {
       this.updateScreenState();
+      this.updateVisualViewportOffset();
     };
     window.addEventListener('resize', this.resize_listener);
+    if (window.visualViewport) {
+      this.vvp_listener = () => {
+        this.updateVisualViewportOffset();
+      };
+      window.visualViewport.addEventListener('resize', this.vvp_listener);
+      window.visualViewport.addEventListener('scroll', this.vvp_listener);
+    }
     this.init();
     this.keydown_listener = (event) => {
       if (event.code === 'Backspace') {
@@ -834,6 +856,10 @@ export default {
     document.removeEventListener('keydown', this.keydown_listener);
     if (this.resize_listener) {
       window.removeEventListener('resize', this.resize_listener);
+    }
+    if (this.vvp_listener && window.visualViewport) {
+      window.visualViewport.removeEventListener('resize', this.vvp_listener);
+      window.visualViewport.removeEventListener('scroll', this.vvp_listener);
     }
   }
 };
@@ -852,22 +878,15 @@ export default {
   top: auto;
   right: 12px;
   left: 12px;
-  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(12px + constant(safe-area-inset-bottom) + var(--vvp-offset-bottom, 0px));
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px) + var(--vvp-offset-bottom, 0px));
   width: auto;
   max-width: none;
 }
 
 .controls-mobile-collapsed {
-  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-}
-
-/* Chrome iOS 底部有后退/前进/标签栏，高度约 44px，需额外偏移 */
-.controls-mobile.controls-chrome-ios {
-  bottom: calc(12px + env(safe-area-inset-bottom, 0px) + 44px);
-}
-
-.controls-mobile-collapsed.controls-chrome-ios {
-  bottom: calc(12px + env(safe-area-inset-bottom, 0px) + 44px);
+  bottom: calc(12px + constant(safe-area-inset-bottom) + var(--vvp-offset-bottom, 0px));
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px) + var(--vvp-offset-bottom, 0px));
 }
 
 .global-alerts {
@@ -915,8 +934,6 @@ export default {
   max-height: min(52vh, 420px);
   border-radius: 18px;
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.22);
-  display: flex;
-  flex-direction: column;
 }
 
 .controls-mobile-collapsed .controls-card {
@@ -930,33 +947,23 @@ export default {
 }
 
 .controls-mobile .controls-body {
-  flex: 1 1 0;
-  min-height: 0;
-  max-height: none;
-  overflow-y: auto;
+  max-height: min(calc(52vh - 78px), 320px);
 }
 
 .controls-mobile :deep(.v-card-title) {
   font-size: 0.95rem;
   line-height: 1.2;
   padding: 12px 16px 8px;
-  flex-shrink: 0;
 }
 
-/* v-card-text 与 .controls-body 是同一元素，占满剩余空间，内容纵向可滚动 */
 .controls-mobile :deep(.v-card-text) {
-  flex: 1 1 0;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
   padding-left: 16px;
   padding-right: 16px;
 }
 
-/* Reset 按钮固定在卡片底部，不被压缩 */
 .controls-mobile :deep(.v-card-actions) {
-  flex-shrink: 0;
-  padding: 8px 16px 14px;
+  padding: 8px 16px calc(14px + constant(safe-area-inset-bottom));
+  padding: 8px 16px calc(14px + env(safe-area-inset-bottom, 0px));
 }
 
 .controls-mobile-collapsed :deep(.v-card-actions) {
