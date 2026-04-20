@@ -39,7 +39,7 @@ export class MuJoCoDemo {
 
     this.currentVisualSettings = getSimulationThemeSettings(this.visualThemeName);
 
-    this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.001, 100);
+    this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / this.getViewH(), 0.001, 100);
     this.camera.name = 'PerspectiveCamera';
     this.camera.position.set(3.0, 2.2, 3.0);
     this.scene.add(this.camera);
@@ -54,7 +54,7 @@ export class MuJoCoDemo {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderScale = 2.0;
     this.renderer.setPixelRatio(this.renderScale);
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setSize(window.innerWidth, this.getViewH());
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -345,11 +345,16 @@ export class MuJoCoDemo {
     }
   }
 
+  getViewH() {
+    const headerH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--header-h')) || 58;
+    return window.innerHeight - headerH;
+  }
+
   onWindowResize() {
-    this.camera.aspect = window.innerWidth / window.innerHeight;
+    this.camera.aspect = window.innerWidth / this.getViewH();
     this.camera.updateProjectionMatrix();
     this.renderer.setPixelRatio(this.renderScale);
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setSize(window.innerWidth, this.getViewH());
     this._lastRenderTime = 0;
     this.render();
   }
@@ -358,7 +363,7 @@ export class MuJoCoDemo {
     const clamped = Math.max(0.5, Math.min(2.0, scale));
     this.renderScale = clamped;
     this.renderer.setPixelRatio(this.renderScale);
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setSize(window.innerWidth, this.getViewH());
     this._lastRenderTime = 0;
     this.render();
   }
