@@ -850,24 +850,25 @@ export default {
 
 .controls-mobile {
   top: auto;
-  right: 12px;
-  left: 12px;
-  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  right: 0;
+  left: 0;
+  bottom: env(safe-area-inset-bottom, 0px);
   width: auto;
   max-width: none;
+  border-radius: 0;
 }
 
 .controls-mobile-collapsed {
-  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* Chrome iOS 底部有后退/前进/标签栏，高度约 44px，需额外偏移 */
 .controls-mobile.controls-chrome-ios {
-  bottom: calc(12px + env(safe-area-inset-bottom, 0px) + 44px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 44px);
 }
 
 .controls-mobile-collapsed.controls-chrome-ios {
-  bottom: calc(12px + env(safe-area-inset-bottom, 0px) + 44px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 44px);
 }
 
 .global-alerts {
@@ -913,8 +914,8 @@ export default {
 
 .controls-mobile .controls-card {
   max-height: min(52vh, 420px);
-  border-radius: 18px;
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.22);
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.22);
   display: flex;
   flex-direction: column;
 }
@@ -943,13 +944,12 @@ export default {
   flex-shrink: 0;
 }
 
-/* v-card-text 占满剩余空间，内容可滚动 */
+/* v-card-text 与 .controls-body 是同一元素，占满剩余空间，内容纵向可滚动 */
 .controls-mobile :deep(.v-card-text) {
   flex: 1 1 0;
   min-height: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding-left: 16px;
   padding-right: 16px;
 }
