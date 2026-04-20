@@ -915,6 +915,8 @@ export default {
   max-height: min(52vh, 420px);
   border-radius: 18px;
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.22);
+  display: flex;
+  flex-direction: column;
 }
 
 .controls-mobile-collapsed .controls-card {
@@ -928,21 +930,33 @@ export default {
 }
 
 .controls-mobile .controls-body {
-  max-height: min(calc(52vh - 78px), 320px);
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
 }
 
 .controls-mobile :deep(.v-card-title) {
   font-size: 0.95rem;
   line-height: 1.2;
   padding: 12px 16px 8px;
+  flex-shrink: 0;
 }
 
+/* v-card-text 占满剩余空间，内容可滚动 */
 .controls-mobile :deep(.v-card-text) {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   padding-left: 16px;
   padding-right: 16px;
 }
 
+/* Reset 按钮固定在卡片底部，不被压缩 */
 .controls-mobile :deep(.v-card-actions) {
+  flex-shrink: 0;
   padding: 8px 16px 14px;
 }
 
