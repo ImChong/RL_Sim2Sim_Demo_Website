@@ -850,25 +850,24 @@ export default {
 
 .controls-mobile {
   top: auto;
-  right: 0;
-  left: 0;
-  bottom: env(safe-area-inset-bottom, 0px);
+  right: 12px;
+  left: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   width: auto;
   max-width: none;
-  border-radius: 0;
 }
 
 .controls-mobile-collapsed {
-  bottom: env(safe-area-inset-bottom, 0px);
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
 }
 
 /* Chrome iOS 底部有后退/前进/标签栏，高度约 44px，需额外偏移 */
 .controls-mobile.controls-chrome-ios {
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 44px);
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px) + 44px);
 }
 
 .controls-mobile-collapsed.controls-chrome-ios {
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 44px);
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px) + 44px);
 }
 
 .global-alerts {
@@ -914,8 +913,8 @@ export default {
 
 .controls-mobile .controls-card {
   max-height: min(52vh, 420px);
-  border-radius: 18px 18px 0 0;
-  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.22);
+  border-radius: 18px;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.22);
   display: flex;
   flex-direction: column;
 }
