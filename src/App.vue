@@ -2,9 +2,9 @@
   <v-app>
     <header class="site-header">
       <div class="header-inner">
-        <a :href="siteHome" class="site-title" aria-label="Robotics RL Sim2Sim Demo | 机器人强化学习效果在线演示 首页">
+        <div class="site-title" aria-label="Robotics RL Sim2Sim Demo | 机器人强化学习效果在线演示">
           🤖 Robotics RL Sim2Sim Demo | 机器人强化学习效果在线演示
-        </a>
+        </div>
         <div class="header-spacer"></div>
         <div class="header-right">
           <a
@@ -41,8 +41,6 @@ import Demo from '@/views/Demo.vue'
 
 const theme = useTheme()
 const themeStorageKey = 'rl-sim2sim-demo-theme'
-const siteHome = './'
-
 const currentThemeName = computed(() => theme.global.name.value)
 const isDark = computed(() => theme.global.current.value.dark)
 const themeToggleLabel = computed(() => (isDark.value ? '切换到白天模式' : '切换到黑夜模式'))
@@ -178,11 +176,6 @@ body {
   line-height: 1.2;
   flex-shrink: 1;
   min-width: 0;
-}
-
-.site-title:hover {
-  color: var(--accent);
-  text-decoration: none;
 }
 
 .header-spacer {
