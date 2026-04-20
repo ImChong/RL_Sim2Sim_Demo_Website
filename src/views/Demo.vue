@@ -24,7 +24,7 @@
       Safari has lower memory limits, which can cause WASM to crash.
     </v-alert>
   </div>
-  <div :class="['controls', { 'controls-mobile': isSmallScreen, 'controls-mobile-collapsed': isSmallScreen && isMobileControlsCollapsed }]">
+  <div :class="['controls', { 'controls-mobile': isSmallScreen, 'controls-mobile-collapsed': isSmallScreen && isMobileControlsCollapsed, 'controls-chrome-ios': isChromeIOS }]">
     <v-card class="controls-card">
       <v-card-title :class="['controls-title', { 'controls-title-mobile': isSmallScreen }]">
         <span>General Tracking Demo</span>
@@ -328,9 +328,9 @@ export default {
     isMobileControlsCollapsed: true,
     showSmallScreenAlert: true,
     isSafari: false,
+    isChromeIOS: false,
     showSafariAlert: true,
-    resize_listener: null,
-    vvp_listener: null
+    resize_listener: null
   }),
   computed: {
     shouldShowProgress() {
@@ -468,6 +468,10 @@ export default {
         && !/CriOS\//.test(ua)
         && !/FxiOS\//.test(ua);
     },
+    detectChromeIOS() {
+      // CriOS 是 Chrome for iOS 的 UA 标识
+      return /CriOS\//.test(navigator.userAgent);
+    },
     updateScreenState() {
       const isSmall = window.innerWidth < 500 || window.innerHeight < 700;
       if (!isSmall && this.isSmallScreen) {
@@ -477,18 +481,6 @@ export default {
         this.isMobileControlsCollapsed = isSmall;
       }
       this.isSmallScreen = isSmall;
-    },
-    updateVisualViewportOffset() {
-      let offset = 0;
-      if (window.visualViewport) {
-        const vvp = window.visualViewport;
-        // 布局视口底部与可视视口底部的差值 = 浏览器底部工具栏高度
-        // 这个值在 Safari 上为 0（Safari 会把 fixed 元素定位在可视视口内）
-        // 在 Chrome iOS 上为工具栏高度（约 44px + home indicator 约 34px = 约 83px）
-        offset = Math.max(0, window.innerHeight - (vvp.offsetTop + vvp.height));
-      }
-      // 统一写入一个变量，CSS 里只用这一个，不再叠加 env(safe-area-inset-bottom)
-      document.documentElement.style.setProperty('--controls-bottom-offset', `${offset}px`);
     },
     toggleMobileControls() {
       if (!this.isSmallScreen) {
@@ -823,20 +815,12 @@ export default {
   mounted() {
     this.customMotions = {};
     this.isSafari = this.detectSafari();
+    this.isChromeIOS = this.detectChromeIOS();
     this.updateScreenState();
-    this.updateVisualViewportOffset();
     this.resize_listener = () => {
       this.updateScreenState();
-      this.updateVisualViewportOffset();
     };
     window.addEventListener('resize', this.resize_listener);
-    if (window.visualViewport) {
-      this.vvp_listener = () => {
-        this.updateVisualViewportOffset();
-      };
-      window.visualViewport.addEventListener('resize', this.vvp_listener);
-      window.visualViewport.addEventListener('scroll', this.vvp_listener);
-    }
     this.init();
     this.keydown_listener = (event) => {
       if (event.code === 'Backspace') {
@@ -850,10 +834,6 @@ export default {
     document.removeEventListener('keydown', this.keydown_listener);
     if (this.resize_listener) {
       window.removeEventListener('resize', this.resize_listener);
-    }
-    if (this.vvp_listener && window.visualViewport) {
-      window.visualViewport.removeEventListener('resize', this.vvp_listener);
-      window.visualViewport.removeEventListener('scroll', this.vvp_listener);
     }
   }
 };
@@ -872,13 +852,22 @@ export default {
   top: auto;
   right: 12px;
   left: 12px;
-  bottom: calc(12px + max(env(safe-area-inset-bottom, 0px), var(--controls-bottom-offset, 0px)));
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   width: auto;
   max-width: none;
 }
 
 .controls-mobile-collapsed {
-  bottom: calc(12px + max(env(safe-area-inset-bottom, 0px), var(--controls-bottom-offset, 0px)));
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Chrome iOS 底部有后退/前进/标签栏，高度约 44px，需额外偏移 */
+.controls-mobile.controls-chrome-ios {
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px) + 44px);
+}
+
+.controls-mobile-collapsed.controls-chrome-ios {
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px) + 44px);
 }
 
 .global-alerts {
