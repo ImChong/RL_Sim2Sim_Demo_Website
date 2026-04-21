@@ -24,6 +24,9 @@
     - [ ] 将训练好的模型导出为 ONNX 格式并在本项目中运行。
 
 ## 🛠 系统优化
+- [ ] **参数化控制频率 (Control Frequency)**
+    - [ ] 修改 `src/simulation/main.js`，支持从 `tracking_policy.json` 读取 `control_dt` 或 `decimation`。
+    - [ ] 确保仿真频率 (`timestep`) 与模型推理频率 的同步逻辑可配置，以匹配 `unitree_rl_mjlab` 的训练设置。
 - [ ] **仿真性能优化**
     - [ ] [建议] 针对移动端优化 WebAssembly 的内存占用。
     - [ ] [建议] 优化 ONNX 推理频率与物理仿真频率的同步逻辑。
