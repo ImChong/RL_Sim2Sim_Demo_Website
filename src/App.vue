@@ -55,7 +55,7 @@ const currentThemeName = computed(() => theme.global.name.value)
 const isDark = computed(() => theme.global.current.value.dark)
 const currentLanguage = ref('en')
 const themeToggleLabel = computed(() => (isDark.value ? '切换到白天模式' : '切换到黑夜模式'))
-const languageToggleText = computed(() => (currentLanguage.value === 'zh' ? 'EN' : '中文'))
+const languageToggleText = computed(() => (currentLanguage.value === 'zh' ? 'English' : '中文'))
 const languageToggleLabel = computed(() => (
   currentLanguage.value === 'zh' ? 'Switch control panel to English' : '将控制面板切换为中文'
 ))
