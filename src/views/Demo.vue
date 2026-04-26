@@ -60,6 +60,7 @@
           :items="policyItems"
           class="mt-2"
           :label="t.selectPolicy"
+          :aria-label="t.selectPolicy"
           density="compact"
           hide-details
           item-title="title"
@@ -73,6 +74,7 @@
           height="4"
           color="primary"
           class="mt-2"
+          :aria-label="t.policy"
         ></v-progress-linear>
         <v-alert
           v-if="policyLoadError"
@@ -105,12 +107,13 @@
           step="0.1"
           density="compact"
           hide-details
+          :aria-label="t.threshold"
           :disabled="state !== 1 || !complianceEnabled"
           @update:modelValue="onComplianceThresholdChange"
         ></v-slider>
 
         <v-divider class="my-2"/>
-        <div class="motion-status" v-if="trackingState">
+        <div class="motion-status" v-if="trackingState" role="status" aria-live="polite">
           <div class="status-legend" v-if="trackingState.available">
             <span class="status-name">{{ t.currentMotion }}: {{ trackingState.currentName }}</span>
           </div>
@@ -123,6 +126,7 @@
             color="primary"
             rounded
             class="mt-3 motion-progress-no-animation"
+            aria-label="Motion progress"
           ></v-progress-linear>
         <v-alert
           v-if="showBackToDefault"
@@ -158,6 +162,8 @@
               :variant="currentMotion === item.value ? 'flat' : 'tonal'"
               class="motion-chip"
               size="x-small"
+              role="button"
+              :aria-label="item.title"
               @click="onMotionChange(item.value)"
             >
               {{ item.title }}
@@ -240,6 +246,7 @@
           step="0.1"
           density="compact"
           hide-details
+          :aria-label="t.renderScale"
           @update:modelValue="onRenderScaleChange"
         ></v-slider>
       </v-card-text>
@@ -251,7 +258,7 @@
   <v-dialog :model-value="state === 0" persistent max-width="600px" scrollable>
     <v-card :title="t.loadingSimulationTitle">
       <v-card-text>
-        <v-progress-linear indeterminate color="primary"></v-progress-linear>
+        <v-progress-linear indeterminate color="primary" :aria-label="t.loadingSimulationTitle"></v-progress-linear>
         {{ t.loadingSimulationBody }}
       </v-card-text>
     </v-card>

@@ -2,9 +2,9 @@
   <v-app>
     <header class="site-header">
       <div class="header-inner">
-        <div class="site-title" aria-label="Robotics RL Sim2Sim Demo | 机器人强化学习效果在线演示">
+        <h1 class="site-title" aria-label="Robotics RL Sim2Sim Demo | 机器人强化学习效果在线演示">
           🤖 Robotics RL Sim2Sim Demo | 机器人强化学习效果在线演示
-        </div>
+        </h1>
         <div class="header-spacer"></div>
         <div class="header-right">
           <a
@@ -202,6 +202,7 @@ body {
   line-height: 1.2;
   flex-shrink: 1;
   min-width: 0;
+  margin: 0;
 }
 
 .header-spacer {
