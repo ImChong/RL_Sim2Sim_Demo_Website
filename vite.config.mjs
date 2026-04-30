@@ -30,8 +30,8 @@ export default defineConfig({
         families: [
           {
             name: 'Roboto',
-            weights: [100, 300, 400, 500, 700, 900],
-            styles: ['normal', 'italic'],
+            weights: [300, 400, 500, 700],
+            subsets: ['latin'],
           },
         ],
       },
@@ -41,6 +41,21 @@ export default defineConfig({
     exclude: ['vuetify', 'onnxruntime-web'],
   },
   define: { 'process.env': {} },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('vuetify')) return 'vendor-vuetify';
+            if (id.includes('three')) return 'vendor-three';
+            if (id.includes('onnxruntime-web')) return 'vendor-onnx';
+            if (id.includes('mujoco-js')) return 'vendor-mujoco';
+            return 'vendor';
+          }
+        }
+      }
+    }
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

@@ -2,9 +2,9 @@
   <v-app>
     <header class="site-header">
       <div class="header-inner">
-        <div class="site-title" aria-label="Robotics RL Sim2Sim Demo | 机器人强化学习效果在线演示">
+        <h1 class="site-title" aria-label="Robotics RL Sim2Sim Demo | 机器人强化学习效果在线演示">
           🤖 Robotics RL Sim2Sim Demo | 机器人强化学习效果在线演示
-        </div>
+        </h1>
         <div class="header-spacer"></div>
         <div class="header-right">
           <a
@@ -13,6 +13,15 @@
             target="_blank"
             rel="noopener noreferrer"
           >GitHub</a>
+          <button
+            class="language-toggle"
+            :aria-label="languageToggleLabel"
+            :title="languageToggleLabel"
+            type="button"
+            @click="toggleLanguage"
+          >
+            {{ languageToggleText }}
+          </button>
           <button
             id="themeToggle"
             class="theme-toggle"
@@ -29,21 +38,27 @@
     </header>
 
     <v-main class="app-main">
-      <Demo :visual-theme="currentThemeName" />
+      <Demo :visual-theme="currentThemeName" :language="currentLanguage" />
     </v-main>
   </v-app>
 </template>
 
 <script setup>
-import { computed, onMounted, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useTheme } from 'vuetify'
 import Demo from '@/views/Demo.vue'
 
 const theme = useTheme()
 const themeStorageKey = 'rl-sim2sim-demo-theme'
+const languageStorageKey = 'rl-sim2sim-demo-language'
 const currentThemeName = computed(() => theme.global.name.value)
 const isDark = computed(() => theme.global.current.value.dark)
+const currentLanguage = ref('en')
 const themeToggleLabel = computed(() => (isDark.value ? '切换到白天模式' : '切换到黑夜模式'))
+const languageToggleText = computed(() => (currentLanguage.value === 'zh' ? 'English' : '中文'))
+const languageToggleLabel = computed(() => (
+  currentLanguage.value === 'zh' ? 'Switch control panel to English' : '将控制面板切换为中文'
+))
 
 function applyDocumentTheme(name) {
   const dark = name === 'dark'
@@ -57,12 +72,23 @@ function toggleTheme() {
   applyDocumentTheme(next)
 }
 
+function setLanguage(language) {
+  currentLanguage.value = language === 'zh' ? 'zh' : 'en'
+  document.documentElement.setAttribute('lang', currentLanguage.value === 'zh' ? 'zh-CN' : 'en')
+  localStorage.setItem(languageStorageKey, currentLanguage.value)
+}
+
+function toggleLanguage() {
+  setLanguage(currentLanguage.value === 'zh' ? 'en' : 'zh')
+}
+
 onMounted(() => {
   const saved = localStorage.getItem(themeStorageKey)
   const preferDark = window.matchMedia('(prefers-color-scheme: dark)').matches
   const initial = saved || (preferDark ? 'dark' : 'light')
   theme.change(initial)
   applyDocumentTheme(initial)
+  setLanguage(localStorage.getItem(languageStorageKey) || 'en')
 })
 
 watch(
@@ -176,6 +202,7 @@ body {
   line-height: 1.2;
   flex-shrink: 1;
   min-width: 0;
+  margin: 0;
 }
 
 .header-spacer {
@@ -205,7 +232,8 @@ body {
   text-decoration: none;
 }
 
-.theme-toggle {
+.theme-toggle,
+.language-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -222,7 +250,13 @@ body {
   color: var(--text);
 }
 
-.theme-toggle:hover {
+.language-toggle {
+  min-width: 48px;
+  font-weight: 600;
+}
+
+.theme-toggle:hover,
+.language-toggle:hover {
   border-color: var(--accent);
   color: var(--accent);
 }

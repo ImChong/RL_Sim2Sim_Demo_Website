@@ -10,7 +10,7 @@
       closable
       class="small-screen-alert"
     >
-      Mobile mode is enabled. The control panel has been compacted and docked to the bottom for touch interaction.
+      {{ t.mobileModeAlert }}
     </v-alert>
     <v-alert
       v-if="isSafari"
@@ -21,23 +21,23 @@
       closable
       class="safari-alert"
     >
-      Safari has lower memory limits, which can cause WASM to crash.
+      {{ t.safariAlert }}
     </v-alert>
   </div>
   <div :class="['controls', { 'controls-mobile': isSmallScreen, 'controls-mobile-collapsed': isSmallScreen && isMobileControlsCollapsed }]">
     <v-card class="controls-card">
       <v-card-title :class="['controls-title', { 'controls-title-mobile': isSmallScreen }]">
-        <span>General Tracking Demo</span>
+        <span>{{ t.panelTitle }}</span>
         <v-btn
           v-if="isSmallScreen"
           size="x-small"
           variant="text"
           color="primary"
           class="controls-toggle-btn"
-          :aria-label="isMobileControlsCollapsed ? 'Expand control panel' : 'Collapse control panel'"
+          :aria-label="isMobileControlsCollapsed ? t.expandControlPanel : t.collapseControlPanel"
           @click="toggleMobileControls"
         >
-          {{ isMobileControlsCollapsed ? 'Expand' : 'Collapse' }}
+          {{ isMobileControlsCollapsed ? t.expand : t.collapse }}
         </v-btn>
       </v-card-title>
       <v-card-text v-show="!isSmallScreen || !isMobileControlsCollapsed" class="py-0 controls-body">
@@ -50,16 +50,17 @@
             class="text-capitalize"
           >
             <v-icon icon="mdi-github" class="mr-1"></v-icon>
-            Training Code
+            {{ t.trainingCode }}
           </v-btn>
         <v-divider class="my-2"/>
-        <span class="status-name">Policy</span>
+        <span class="status-name">{{ t.policy }}</span>
         <div v-if="policyDescription" class="text-caption">{{ policyDescription }}</div>
         <v-select
           v-model="currentPolicy"
           :items="policyItems"
           class="mt-2"
-          label="Select policy"
+          :label="t.selectPolicy"
+          :aria-label="t.selectPolicy"
           density="compact"
           hide-details
           item-title="title"
@@ -73,6 +74,7 @@
           height="4"
           color="primary"
           class="mt-2"
+          :aria-label="t.policy"
         ></v-progress-linear>
         <v-alert
           v-if="policyLoadError"
@@ -85,7 +87,7 @@
         </v-alert>
 
         <div class="status-legend follow-controls mt-2">
-          <span class="status-name">Compliance</span>
+          <span class="status-name">{{ t.compliance }}</span>
           <v-btn
             size="x-small"
             variant="tonal"
@@ -93,9 +95,9 @@
             :disabled="state !== 1"
             @click="toggleCompliance"
           >
-            {{ complianceEnabled ? 'On' : 'Off' }}
+            {{ complianceEnabled ? t.on : t.off }}
           </v-btn>
-          <span class="status-name">threshold</span>
+          <span class="status-name">{{ t.threshold }}</span>
           <span class="text-caption">{{ complianceThresholdLabel }}</span>
         </div>
         <v-slider
@@ -105,14 +107,15 @@
           step="0.1"
           density="compact"
           hide-details
+          :aria-label="t.threshold"
           :disabled="state !== 1 || !complianceEnabled"
           @update:modelValue="onComplianceThresholdChange"
         ></v-slider>
 
         <v-divider class="my-2"/>
-        <div class="motion-status" v-if="trackingState">
+        <div class="motion-status" v-if="trackingState" role="status" aria-live="polite">
           <div class="status-legend" v-if="trackingState.available">
-            <span class="status-name">Current motion: {{ trackingState.currentName }}</span>
+            <span class="status-name">{{ t.currentMotion }}: {{ trackingState.currentName }}</span>
           </div>
         </div>
 
@@ -123,6 +126,7 @@
             color="primary"
             rounded
             class="mt-3 motion-progress-no-animation"
+            aria-label="Motion progress"
           ></v-progress-linear>
         <v-alert
           v-if="showBackToDefault"
@@ -131,9 +135,9 @@
           density="compact"
           class="mt-3"
         >
-          Motion "{{ trackingState.currentName }}" finished. Return to the default pose before starting another clip.
+          {{ formatMessage(t.motionFinished, { name: trackingState.currentName }) }}
           <v-btn color="primary" block density="compact" @click="backToDefault">
-            Back to default pose
+            {{ t.backToDefaultPose }}
           </v-btn>
         </v-alert>
 
@@ -144,7 +148,7 @@
           density="compact"
           class="mt-3"
         >
-          "{{ trackingState.currentName }}" is still playing. Wait until it finishes and returns to default pose before switching.
+          {{ formatMessage(t.motionLocked, { name: trackingState.currentName }) }}
         </v-alert>
 
         <div v-if="showMotionSelect" class="motion-groups">
@@ -158,6 +162,8 @@
               :variant="currentMotion === item.value ? 'flat' : 'tonal'"
               class="motion-chip"
               size="x-small"
+              role="button"
+              :aria-label="item.title"
               @click="onMotionChange(item.value)"
             >
               {{ item.title }}
@@ -171,7 +177,7 @@
           variant="tonal"
           density="compact"
         >
-          Loading motion presets…
+          {{ t.loadingMotionPresets }}
         </v-alert>
 
         <v-divider class="my-2"/>
@@ -184,13 +190,13 @@
             class="upload-toggle"
             @click="showUploadOptions = true"
           >
-            Want to use customized motions?
+            {{ t.useCustomizedMotions }}
           </v-btn>
           <template v-else>
-            <span class="status-name">Custom motions</span>
+            <span class="status-name">{{ t.customMotions }}</span>
             <v-file-input
               v-model="motionUploadFiles"
-              label="Upload motion JSON"
+              :label="t.uploadMotionJson"
               density="compact"
               hide-details
               accept=".json,application/json"
@@ -201,8 +207,7 @@
               @update:modelValue="onMotionUpload"
             ></v-file-input>
             <div class="text-caption">
-              Read <a target="_blank" href="https://github.com/Axellwppr/humanoid-policy-viewer?tab=readme-ov-file#add-your-own-robot-policy-and-motions">readme</a> to learn how to create motion JSON files from GMR.<br/>
-              Each file should be a single clip (same schema as motions/default.json). File name becomes the motion name (prefixed with [new]). Duplicate names are ignored.
+              <span v-html="t.motionUploadHelp"></span>
             </div>
             <v-alert
               v-if="motionUploadMessage"
@@ -217,7 +222,7 @@
 
         <v-divider class="my-2"/>
         <div class="status-legend follow-controls">
-          <span class="status-name">Camera follow</span>
+          <span class="status-name">{{ t.cameraFollow }}</span>
           <v-btn
             size="x-small"
             variant="tonal"
@@ -225,13 +230,13 @@
             :disabled="state !== 1"
             @click="toggleCameraFollow"
           >
-            {{ cameraFollowEnabled ? 'On' : 'Off' }}
+            {{ cameraFollowEnabled ? t.on : t.off }}
           </v-btn>
         </div>
         <div class="status-legend">
-          <span class="status-name">Render scale</span>
+          <span class="status-name">{{ t.renderScale }}</span>
           <span class="text-caption">{{ renderScaleLabel }}</span>
-          <span class="status-name">Sim Freq</span>
+          <span class="status-name">{{ t.simFreq }}</span>
           <span class="text-caption">{{ simStepLabel }}</span>
         </div>
         <v-slider
@@ -241,31 +246,32 @@
           step="0.1"
           density="compact"
           hide-details
+          :aria-label="t.renderScale"
           @update:modelValue="onRenderScaleChange"
         ></v-slider>
       </v-card-text>
       <v-card-actions>
-        <v-btn color="primary" block @click="reset">Reset</v-btn>
+        <v-btn color="primary" block @click="reset">{{ t.reset }}</v-btn>
       </v-card-actions>
     </v-card>
   </div>
   <v-dialog :model-value="state === 0" persistent max-width="600px" scrollable>
-    <v-card title="Loading Simulation Environment">
+    <v-card :title="t.loadingSimulationTitle">
       <v-card-text>
-        <v-progress-linear indeterminate color="primary"></v-progress-linear>
-        Loading MuJoCo and ONNX policy, please wait
+        <v-progress-linear indeterminate color="primary" :aria-label="t.loadingSimulationTitle"></v-progress-linear>
+        {{ t.loadingSimulationBody }}
       </v-card-text>
     </v-card>
   </v-dialog>
   <v-dialog :model-value="state < 0" persistent max-width="600px" scrollable>
-    <v-card title="Simulation Environment Loading Error">
+    <v-card :title="t.loadingErrorTitle">
       <v-card-text>
         <span v-if="state === -1">
-          Unexpected runtime error, please refresh the page.<br />
+          {{ t.runtimeError }}<br />
           {{ extra_error_message }}
         </span>
         <span v-else-if="state === -2">
-          Your browser does not support WebAssembly. Please use a recent version of Chrome, Edge, or Firefox.
+          {{ t.webAssemblyUnsupported }}
         </span>
       </v-card-text>
     </v-card>
@@ -276,12 +282,101 @@
 import { MuJoCoDemo } from '@/simulation/main.js';
 import loadMujoco from 'mujoco-js';
 
+const translations = {
+  en: {
+    mobileModeAlert: 'Mobile mode is enabled. The control panel has been compacted and docked to the bottom for touch interaction.',
+    safariAlert: 'Safari has lower memory limits, which can cause WASM to crash.',
+    panelTitle: 'General Tracking Demo',
+    expandControlPanel: 'Expand control panel',
+    collapseControlPanel: 'Collapse control panel',
+    expand: 'Expand',
+    collapse: 'Collapse',
+    trainingCode: 'Training Code',
+    policy: 'Policy',
+    selectPolicy: 'Select policy',
+    compliance: 'Compliance',
+    threshold: 'threshold',
+    on: 'On',
+    off: 'Off',
+    currentMotion: 'Current motion',
+    motionFinished: 'Motion "{name}" finished. Return to the default pose before starting another clip.',
+    backToDefaultPose: 'Back to default pose',
+    motionLocked: '"{name}" is still playing. Wait until it finishes and returns to default pose before switching.',
+    loadingMotionPresets: 'Loading motion presets...',
+    useCustomizedMotions: 'Want to use customized motions?',
+    customMotions: 'Custom motions',
+    uploadMotionJson: 'Upload motion JSON',
+    motionUploadHelp: 'Read <a target="_blank" rel="noopener noreferrer" href="https://github.com/Axellwppr/humanoid-policy-viewer?tab=readme-ov-file#add-your-own-robot-policy-and-motions">readme</a> to learn how to create motion JSON files from GMR.<br>Each file should be a single clip (same schema as motions/default.json). File name becomes the motion name (prefixed with [new]). Duplicate names are ignored.',
+    cameraFollow: 'Camera follow',
+    renderScale: 'Render scale',
+    simFreq: 'Sim Freq',
+    reset: 'Reset',
+    loadingSimulationTitle: 'Loading Simulation Environment',
+    loadingSimulationBody: 'Loading MuJoCo and ONNX policy, please wait',
+    loadingErrorTitle: 'Simulation Environment Loading Error',
+    runtimeError: 'Unexpected runtime error, please refresh the page.',
+    webAssemblyUnsupported: 'Your browser does not support WebAssembly. Please use a recent version of Chrome, Edge, or Firefox.',
+    policyDescription: 'Tracking policy with compliance input enabled.',
+    customizedGroup: 'Customized',
+    demoNotReady: 'Demo not ready yet. Please wait for loading to finish.',
+    addedMotions: 'Added {count} motion{plural}',
+    skippedDuplicates: 'Skipped {count} duplicate{plural}',
+    ignoredInvalid: 'Ignored {count} invalid file{plural}',
+    noMotionsAdded: 'No motions were added.'
+  },
+  zh: {
+    mobileModeAlert: '已启用移动端模式，控制面板已精简并停靠到底部，便于触控操作。',
+    safariAlert: 'Safari 的内存限制较低，可能导致 WASM 崩溃。',
+    panelTitle: '通用跟踪演示',
+    expandControlPanel: '展开控制面板',
+    collapseControlPanel: '收起控制面板',
+    expand: '展开',
+    collapse: '收起',
+    trainingCode: '训练代码',
+    policy: '策略',
+    selectPolicy: '选择策略',
+    compliance: '顺应性',
+    threshold: '阈值',
+    on: '开',
+    off: '关',
+    currentMotion: '当前动作',
+    motionFinished: '动作“{name}”已结束。开始其他片段前，请先回到默认姿态。',
+    backToDefaultPose: '回到默认姿态',
+    motionLocked: '动作“{name}”仍在播放。请等待播放结束并回到默认姿态后再切换。',
+    loadingMotionPresets: '正在加载动作预设...',
+    useCustomizedMotions: '想使用自定义动作？',
+    customMotions: '自定义动作',
+    uploadMotionJson: '上传动作 JSON',
+    motionUploadHelp: '阅读 <a target="_blank" rel="noopener noreferrer" href="https://github.com/Axellwppr/humanoid-policy-viewer?tab=readme-ov-file#add-your-own-robot-policy-and-motions">readme</a> 了解如何从 GMR 创建动作 JSON 文件。<br>每个文件应只包含一个片段（结构与 motions/default.json 一致）。文件名会作为动作名称（自动添加 [new] 前缀），重复名称会被忽略。',
+    cameraFollow: '相机跟随',
+    renderScale: '渲染倍率',
+    simFreq: '仿真频率',
+    reset: '重置',
+    loadingSimulationTitle: '正在加载仿真环境',
+    loadingSimulationBody: '正在加载 MuJoCo 和 ONNX 策略，请稍候',
+    loadingErrorTitle: '仿真环境加载错误',
+    runtimeError: '发生意外运行时错误，请刷新页面。',
+    webAssemblyUnsupported: '当前浏览器不支持 WebAssembly。请使用较新版本的 Chrome、Edge 或 Firefox。',
+    policyDescription: '已启用顺应性输入的跟踪策略。',
+    customizedGroup: '自定义',
+    demoNotReady: '演示尚未就绪，请等待加载完成。',
+    addedMotions: '已添加 {count} 个动作',
+    skippedDuplicates: '已跳过 {count} 个重复项',
+    ignoredInvalid: '已忽略 {count} 个无效文件',
+    noMotionsAdded: '没有添加任何动作。'
+  }
+};
+
 export default {
   name: 'DemoPage',
   props: {
     visualTheme: {
       type: String,
       default: 'light'
+    },
+    language: {
+      type: String,
+      default: 'en'
     }
   },
   data: () => ({
@@ -307,6 +402,7 @@ export default {
         value: 'g1-tracking-latest',
         title: 'G1 Tracking',
         description: 'Tracking policy with compliance input enabled.',
+        descriptionKey: 'policyDescription',
         policyPath: './examples/checkpoints/g1/tracking_policy_latest.json',
         onnxPath: './examples/checkpoints/g1/policy_latest.onnx'
       }
@@ -419,7 +515,7 @@ export default {
         groups.push({ title: 'GentleHumanoid', items: gentleHumanoid });
       }
       if (customized.length > 0) {
-        groups.push({ title: 'Customized', items: customized });
+        groups.push({ title: this.t.customizedGroup, items: customized });
       }
       return groups;
     },
@@ -433,7 +529,12 @@ export default {
       return this.policies.find((policy) => policy.value === this.currentPolicy) ?? null;
     },
     policyDescription() {
-      return this.selectedPolicy?.description ?? '';
+      if (!this.selectedPolicy) {
+        return '';
+      }
+      return this.selectedPolicy.descriptionKey
+        ? this.t[this.selectedPolicy.descriptionKey]
+        : this.selectedPolicy.description ?? '';
     },
     renderScaleLabel() {
       return `${this.renderScale.toFixed(2)}x`;
@@ -446,6 +547,9 @@ export default {
         return '—';
       }
       return `${this.simStepHz.toFixed(1)} Hz`;
+    },
+    t() {
+      return translations[this.language] ?? translations.en;
     }
   },
   watch: {
@@ -490,6 +594,18 @@ export default {
         return;
       }
       this.isMobileControlsCollapsed = !this.isMobileControlsCollapsed;
+    },
+    formatMessage(template, values = {}) {
+      return Object.entries(values).reduce(
+        (message, [key, value]) => message.replaceAll(`{${key}}`, value),
+        template
+      );
+    },
+    formatCount(template, count) {
+      return this.formatMessage(template, {
+        count,
+        plural: count === 1 ? '' : 's'
+      });
     },
     async init() {
       if (typeof WebAssembly !== 'object' || typeof WebAssembly.instantiate !== 'function') {
@@ -551,7 +667,7 @@ export default {
         return;
       }
       if (!this.demo) {
-        this.motionUploadMessage = 'Demo not ready yet. Please wait for loading to finish.';
+        this.motionUploadMessage = this.t.demoNotReady;
         this.motionUploadType = 'warning';
         this.motionUploadFiles = [];
         return;
@@ -605,17 +721,17 @@ export default {
 
       const parts = [];
       if (added > 0) {
-        parts.push(`Added ${added} motion${added === 1 ? '' : 's'}`);
+        parts.push(this.formatCount(this.t.addedMotions, added));
       }
       if (skipped > 0) {
-        parts.push(`Skipped ${skipped} duplicate${skipped === 1 ? '' : 's'}`);
+        parts.push(this.formatCount(this.t.skippedDuplicates, skipped));
       }
       const badCount = invalid + failed;
       if (badCount > 0) {
-        parts.push(`Ignored ${badCount} invalid file${badCount === 1 ? '' : 's'}`);
+        parts.push(this.formatCount(this.t.ignoredInvalid, badCount));
       }
       if (parts.length === 0) {
-        this.motionUploadMessage = 'No motions were added.';
+        this.motionUploadMessage = this.t.noMotionsAdded;
         this.motionUploadType = 'info';
       } else {
         this.motionUploadMessage = `${parts.join('. ')}.`;
