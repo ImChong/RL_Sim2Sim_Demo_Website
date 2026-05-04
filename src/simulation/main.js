@@ -121,9 +121,8 @@ export class MuJoCoDemo {
     this.timestep = this.model.opt.timestep;
     this.decimation = Math.max(1, Math.round(0.02 / this.timestep));
 
-    console.log('timestep:', this.timestep, 'decimation:', this.decimation);
-
     await this.reloadPolicy(this.currentPolicyPath ?? defaultPolicy);
+    console.log('timestep:', this.timestep, 'decimation:', this.decimation);
     this.alive = true;
   }
 
@@ -405,12 +404,51 @@ export class MuJoCoDemo {
     };
   }
 
+  applyPolicyInitialState() {
+    const initialState = this.policyInitialState;
+    if (!initialState || !this.simulation || !this.qpos_adr_policy) {
+      return;
+    }
+
+    const rootPos = initialState.root_pos;
+    if (Array.isArray(rootPos) && rootPos.length >= 3) {
+      this.simulation.qpos[0] = Number(rootPos[0]) || 0.0;
+      this.simulation.qpos[1] = Number(rootPos[1]) || 0.0;
+      this.simulation.qpos[2] = Number(rootPos[2]) || 0.0;
+    }
+
+    const rootQuat = initialState.root_quat;
+    if (Array.isArray(rootQuat) && rootQuat.length >= 4) {
+      this.simulation.qpos[3] = Number(rootQuat[0]) || 1.0;
+      this.simulation.qpos[4] = Number(rootQuat[1]) || 0.0;
+      this.simulation.qpos[5] = Number(rootQuat[2]) || 0.0;
+      this.simulation.qpos[6] = Number(rootQuat[3]) || 0.0;
+    }
+
+    const jointRules = initialState.joint_pos ?? {};
+    for (let i = 0; i < this.numActions; i++) {
+      const jointName = this.policyJointNames[i];
+      for (const [pattern, value] of Object.entries(jointRules)) {
+        const regex = new RegExp(`^${pattern}$`);
+        if (regex.test(jointName)) {
+          this.simulation.qpos[this.qpos_adr_policy[i]] = Number(value) || 0.0;
+        }
+      }
+    }
+
+    for (let i = 0; i < this.simulation.qvel.length; i++) {
+      this.simulation.qvel[i] = 0.0;
+    }
+    this.simulation.forward();
+  }
+
   resetSimulation() {
     if (!this.simulation) {
       return;
     }
     this.params.paused = true;
     this.simulation.resetData();
+    this.applyPolicyInitialState();
     this.simulation.forward();
     this.actionTarget = null;
     if (this.policyRunner) {

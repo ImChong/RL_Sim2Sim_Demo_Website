@@ -41,6 +41,7 @@
         </v-btn>
       </v-card-title>
       <v-card-text v-show="!isSmallScreen || !isMobileControlsCollapsed" class="py-0 controls-body">
+        <div class="training-links">
           <v-btn
             href="https://github.com/Axellwppr/motion_tracking"
             target="_blank"
@@ -50,8 +51,20 @@
             class="text-capitalize"
           >
             <v-icon icon="mdi-github" class="mr-1"></v-icon>
-            {{ t.trainingCode }}
+            G1 Tracking Training Code
           </v-btn>
+          <v-btn
+            href="https://github.com/ccrpRepo/AMP_mjlab"
+            target="_blank"
+            variant="text"
+            size="small"
+            color="primary"
+            class="text-capitalize"
+          >
+            <v-icon icon="mdi-github" class="mr-1"></v-icon>
+            G1 AMP Walk/Run/Getup Training Code
+          </v-btn>
+        </div>
 
         <div v-if="currentPolicy === 'g1-amp-50000'" class="mt-4">
           <div class="status-legend follow-controls mt-2">
@@ -1114,6 +1127,13 @@ export default {
   max-height: calc(100vh - 160px);
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+.training-links {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
 }
 
 .controls-mobile .controls-body {

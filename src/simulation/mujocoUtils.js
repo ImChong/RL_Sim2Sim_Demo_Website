@@ -115,6 +115,7 @@ export async function reloadScene(mjcf_path) {
 
   this.timestep = this.model.opt.timestep;
   this.decimation = Math.max(1, Math.round(0.02 / this.timestep));
+  this.policyInitialState = null;
 }
 
 export async function reloadPolicy(policy_path, options = {}) {
@@ -176,12 +177,20 @@ export async function reloadPolicy(policy_path, options = {}) {
   this.kpPolicy = toFloatArray(config.stiffness, this.numActions, 0.0);
   this.kdPolicy = toFloatArray(config.damping, this.numActions, 0.0);
   this.control_type = config.control_type ?? 'joint_position';
+  this.policyInitialState = config.initial_state ?? null;
+
+  const simConfig = config.sim ?? {};
+  const controlDt = Number(
+    simConfig.control_dt ?? (simConfig.timestep && simConfig.decimation ? simConfig.timestep * simConfig.decimation : 0.02)
+  );
+  this.decimation = Math.max(1, Math.round(controlDt / this.timestep));
 
   if (trackingConfig) {
     trackingConfig.policy_joint_names = policyJointNames.slice();
   }
 
   this.simulation.resetData();
+  this.applyPolicyInitialState?.();
   this.simulation.forward();
   this.policyRunner = new PolicyRunner(
     {
