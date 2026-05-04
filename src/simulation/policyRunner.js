@@ -16,7 +16,7 @@ export class PolicyRunner {
     this.actionScale = toFloatArray(options.actionScale ?? config.action_scale, this.numActions, 1.0);
     this.defaultJointPos = toFloatArray(options.defaultJointPos ?? [], this.numActions, 0.0);
     this.actionClip = typeof config.action_clip === 'number' ? config.action_clip : 10.0;
-    this.obsJointPosRelative = config.obs_joint_pos_relative !== false;
+    this.obsJointPosRelative = config.obs_joint_pos_relative === true;
 
     this.module = new ONNXModule(config.onnx);
     this.inputDict = {};
