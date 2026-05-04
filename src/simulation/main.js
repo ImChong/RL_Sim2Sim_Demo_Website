@@ -236,7 +236,28 @@ export class MuJoCoDemo {
               const targetJpos = this.actionTarget ? this.actionTarget[i] : 0.0;
               const kp = this.kpPolicy ? this.kpPolicy[i] : 0.0;
               const kd = this.kdPolicy ? this.kdPolicy[i] : 0.0;
-              const torque = kp * (targetJpos - this.simulation.qpos[qpos_adr]) + kd * (0 - this.simulation.qvel[qvel_adr]);
+              const qpos = this.simulation.qpos[qpos_adr];
+              const qvel = this.simulation.qvel[qvel_adr];
+              let torque = kp * (targetJpos - qpos) + kd * (0 - qvel);
+              if (this.control_type === 'unitree_position') {
+                const sameDirection = qvel * torque > 0;
+                const y1 = this.Y1Policy ? this.Y1Policy[i] : Infinity;
+                const y2 = this.Y2Policy ? this.Y2Policy[i] : y1;
+                const effortLimit = this.effortLimitPolicy ? this.effortLimitPolicy[i] : Infinity;
+                let maxEffort = Math.min(sameDirection ? y1 : y2, effortLimit);
+                const x1 = this.X1Policy ? this.X1Policy[i] : Infinity;
+                const x2 = this.X2Policy ? this.X2Policy[i] : Infinity;
+                const absVel = Math.abs(qvel);
+                if (Number.isFinite(x1) && Number.isFinite(x2) && absVel >= x1) {
+                  const denom = Math.max(x2 - x1, 1e-6);
+                  maxEffort = Math.max((-maxEffort / denom) * (absVel - x1) + maxEffort, 0.0);
+                }
+                torque = Math.max(-maxEffort, Math.min(maxEffort, torque));
+                const fs = this.frictionStaticPolicy ? this.frictionStaticPolicy[i] : 0.0;
+                const fd = this.frictionDynamicPolicy ? this.frictionDynamicPolicy[i] : 0.0;
+                const va = this.frictionActivationVelPolicy ? Math.max(this.frictionActivationVelPolicy[i], 1e-6) : 0.01;
+                torque -= fs * Math.tanh(qvel / va) + fd * qvel;
+              }
               let ctrlValue = torque;
               const ctrlRange = this.model?.actuator_ctrlrange;
               if (ctrlRange && ctrlRange.length >= (ctrl_adr + 1) * 2) {
@@ -425,13 +446,20 @@ export class MuJoCoDemo {
       this.simulation.qpos[6] = Number(rootQuat[3]) || 0.0;
     }
 
-    const jointRules = initialState.joint_pos ?? {};
-    for (let i = 0; i < this.numActions; i++) {
-      const jointName = this.policyJointNames[i];
-      for (const [pattern, value] of Object.entries(jointRules)) {
-        const regex = new RegExp(`^${pattern}$`);
-        if (regex.test(jointName)) {
-          this.simulation.qpos[this.qpos_adr_policy[i]] = Number(value) || 0.0;
+    const jointPosArray = initialState.joint_pos_array;
+    if (Array.isArray(jointPosArray) && jointPosArray.length === this.numActions) {
+      for (let i = 0; i < this.numActions; i++) {
+        this.simulation.qpos[this.qpos_adr_policy[i]] = Number(jointPosArray[i]) || 0.0;
+      }
+    } else {
+      const jointRules = initialState.joint_pos ?? {};
+      for (let i = 0; i < this.numActions; i++) {
+        const jointName = this.policyJointNames[i];
+        for (const [pattern, value] of Object.entries(jointRules)) {
+          const regex = new RegExp(`^${pattern}$`);
+          if (regex.test(jointName)) {
+            this.simulation.qpos[this.qpos_adr_policy[i]] = Number(value) || 0.0;
+          }
         }
       }
     }

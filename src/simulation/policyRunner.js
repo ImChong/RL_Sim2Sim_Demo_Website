@@ -16,6 +16,7 @@ export class PolicyRunner {
     this.actionScale = toFloatArray(options.actionScale ?? config.action_scale, this.numActions, 1.0);
     this.defaultJointPos = toFloatArray(options.defaultJointPos ?? [], this.numActions, 0.0);
     this.actionClip = typeof config.action_clip === 'number' ? config.action_clip : 10.0;
+    this.obsJointPosRelative = config.obs_joint_pos_relative !== false;
 
     this.module = new ONNXModule(config.onnx);
     this.inputDict = {};
@@ -54,6 +55,25 @@ export class PolicyRunner {
     });
   }
 
+  makePolicyState(state) {
+    if (!state) {
+      return state;
+    }
+    if (!this.obsJointPosRelative) {
+      return state;
+    }
+    const jointPosAbs = state.jointPos ?? new Float32Array(this.numActions);
+    const jointPosRel = new Float32Array(this.numActions);
+    for (let i = 0; i < this.numActions; i++) {
+      jointPosRel[i] = jointPosAbs[i] - this.defaultJointPos[i];
+    }
+    return {
+      ...state,
+      jointPosAbs,
+      jointPos: jointPosRel
+    };
+  }
+
   reset(state = null) {
     this.inputDict = this.module.initInput() ?? {};
     this.lastActions.fill(0.0);
@@ -61,9 +81,10 @@ export class PolicyRunner {
     if (this.tracking) {
       this.tracking.reset(state);
     }
+    const policyState = this.makePolicyState(state);
     for (const obs of this.obsModules) {
       if (typeof obs.reset === 'function') {
-        obs.reset(state);
+        obs.reset(policyState);
       }
     }
   }
@@ -82,14 +103,15 @@ export class PolicyRunner {
       if (this.tracking) {
         this.tracking.advance();
       }
+      const policyState = this.makePolicyState(state);
 
       const obsForPolicy = new Float32Array(this.numObs);
       let offset = 0;
       for (const obs of this.obsModules) {
         if (typeof obs.update === 'function') {
-          obs.update(state);
+          obs.update(policyState);
         }
-        const obsValue = obs.compute(state);
+        const obsValue = obs.compute(policyState);
         const obsArray = ArrayBuffer.isView(obsValue) ? obsValue : Float32Array.from(obsValue);
         obsForPolicy.set(obsArray, offset);
         offset += obsArray.length;

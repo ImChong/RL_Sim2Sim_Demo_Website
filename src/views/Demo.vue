@@ -66,7 +66,32 @@
           </v-btn>
         </div>
 
-        <div v-if="currentPolicy === 'g1-amp-50000'" class="mt-4">
+        <v-divider class="my-2"/>
+        <span class="status-name">{{ t.policy }}</span>
+        <div v-if="policyDescription" class="text-caption">{{ policyDescription }}</div>
+        <v-select
+          v-model="currentPolicy"
+          :items="policyItems"
+          class="mt-2"
+          :label="t.selectPolicy"
+          :aria-label="t.selectPolicy"
+          density="compact"
+          hide-details
+          item-title="title"
+          item-value="value"
+          :disabled="isPolicyLoading || state !== 1"
+          @update:modelValue="onPolicyChange"
+        ></v-select>
+        <v-progress-linear
+          v-if="isPolicyLoading"
+          indeterminate
+          height="4"
+          color="primary"
+          class="mt-2"
+          :aria-label="t.policy"
+        ></v-progress-linear>
+
+        <div v-if="isAmpPolicy" class="mt-4">
           <div class="status-legend follow-controls mt-2">
             <span class="status-name">Velocity X</span>
             <span class="text-caption">{{ cmdX.toFixed(2) }}</span>
@@ -108,30 +133,6 @@
           ></v-slider>
         </div>
 
-        <v-divider class="my-2"/>
-        <span class="status-name">{{ t.policy }}</span>
-        <div v-if="policyDescription" class="text-caption">{{ policyDescription }}</div>
-        <v-select
-          v-model="currentPolicy"
-          :items="policyItems"
-          class="mt-2"
-          :label="t.selectPolicy"
-          :aria-label="t.selectPolicy"
-          density="compact"
-          hide-details
-          item-title="title"
-          item-value="value"
-          :disabled="isPolicyLoading || state !== 1"
-          @update:modelValue="onPolicyChange"
-        ></v-select>
-        <v-progress-linear
-          v-if="isPolicyLoading"
-          indeterminate
-          height="4"
-          color="primary"
-          class="mt-2"
-          :aria-label="t.policy"
-        ></v-progress-linear>
         <v-alert
           v-if="policyLoadError"
           type="error"
@@ -142,7 +143,7 @@
           {{ policyLoadError }}
         </v-alert>
 
-        <div class="status-legend follow-controls mt-2">
+        <div v-if="!isAmpPolicy" class="status-legend follow-controls mt-2">
           <span class="status-name">{{ t.compliance }}</span>
           <v-btn
             size="x-small"
@@ -157,6 +158,7 @@
           <span class="text-caption">{{ complianceThresholdLabel }}</span>
         </div>
         <v-slider
+          v-if="!isAmpPolicy"
           v-model="complianceThreshold"
           min="10"
           max="20"
@@ -168,6 +170,7 @@
           @update:modelValue="onComplianceThresholdChange"
         ></v-slider>
 
+        <template v-if="!isAmpPolicy">
         <v-divider class="my-2"/>
         <div class="motion-status" v-if="trackingState" role="status" aria-live="polite">
           <div class="status-legend" v-if="trackingState.available">
@@ -275,6 +278,8 @@
             </v-alert>
           </template>
         </div>
+
+        </template>
 
         <v-divider class="my-2"/>
         <div class="status-legend follow-controls">
@@ -595,6 +600,9 @@ export default {
     selectedPolicy() {
       return this.policies.find((policy) => policy.value === this.currentPolicy) ?? null;
     },
+    isAmpPolicy() {
+      return this.currentPolicy === 'g1-amp-50000';
+    },
     policyDescription() {
       if (!this.selectedPolicy) {
         return '';
@@ -899,6 +907,9 @@ export default {
         await this.demo.reloadPolicy(selected.policyPath, {
           onnxPath: selected.onnxPath || undefined
         });
+        if (this.isAmpPolicy) {
+          this.resetAmpCommandSliders();
+        }
         this.policyLabel = selected.policyPath?.split('/').pop() ?? this.policyLabel;
         this.reapplyCustomMotions();
         this.availableMotions = this.getAvailableMotions();
@@ -912,9 +923,18 @@ export default {
         this.demo.params.paused = wasPaused;
       }
     },
+    resetAmpCommandSliders() {
+      this.cmdX = 0.0;
+      this.cmdY = 0.0;
+      this.cmdYaw = 0.0;
+      this.onCmdChange();
+    },
     reset() {
       if (!this.demo) {
         return;
+      }
+      if (this.isAmpPolicy) {
+        this.resetAmpCommandSliders();
       }
       this.demo.resetSimulation();
       this.availableMotions = this.getAvailableMotions();

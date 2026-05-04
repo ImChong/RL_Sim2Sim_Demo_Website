@@ -176,6 +176,14 @@ export async function reloadPolicy(policy_path, options = {}) {
   }
   this.kpPolicy = toFloatArray(config.stiffness, this.numActions, 0.0);
   this.kdPolicy = toFloatArray(config.damping, this.numActions, 0.0);
+  this.effortLimitPolicy = toFloatArray(config.effort_limit, this.numActions, Infinity);
+  this.X1Policy = toFloatArray(config.X1, this.numActions, Infinity);
+  this.X2Policy = toFloatArray(config.X2, this.numActions, Infinity);
+  this.Y1Policy = toFloatArray(config.Y1, this.numActions, Infinity);
+  this.Y2Policy = toFloatArray(config.Y2, this.numActions, Infinity);
+  this.frictionStaticPolicy = toFloatArray(config.Fs, this.numActions, 0.0);
+  this.frictionDynamicPolicy = toFloatArray(config.Fd, this.numActions, 0.0);
+  this.frictionActivationVelPolicy = toFloatArray(config.Va, this.numActions, 0.01);
   this.control_type = config.control_type ?? 'joint_position';
   this.policyInitialState = config.initial_state ?? null;
 
