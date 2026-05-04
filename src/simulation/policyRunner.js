@@ -32,6 +32,8 @@ export class PolicyRunner {
 
     this.obsModules = this._buildObsModules(config.obs_config);
     this.numObs = this.obsModules.reduce((sum, obs) => sum + (obs.size ?? 0), 0);
+    this.historyLength = config.obs_config?.history_length || 1;
+    this.obsHistory = [];
   }
 
   async init() {
@@ -55,6 +57,7 @@ export class PolicyRunner {
   reset(state = null) {
     this.inputDict = this.module.initInput() ?? {};
     this.lastActions.fill(0.0);
+    this.obsHistory = [];
     if (this.tracking) {
       this.tracking.reset(state);
     }
@@ -92,7 +95,21 @@ export class PolicyRunner {
         offset += obsArray.length;
       }
 
-      this.inputDict['policy'] = new ort.Tensor('float32', obsForPolicy, [1, obsForPolicy.length]);
+      if (this.historyLength > 1) {
+        this.obsHistory.push(obsForPolicy);
+        if (this.obsHistory.length > this.historyLength) {
+          this.obsHistory.shift();
+        }
+
+        const fullObs = new Float32Array(this.numObs * this.historyLength);
+        for (let i = 0; i < this.historyLength; i++) {
+          const idx = Math.max(0, this.obsHistory.length - this.historyLength + i);
+          fullObs.set(this.obsHistory[idx], i * this.numObs);
+        }
+        this.inputDict['policy'] = new ort.Tensor('float32', fullObs, [1, fullObs.length]);
+      } else {
+        this.inputDict['policy'] = new ort.Tensor('float32', obsForPolicy, [1, obsForPolicy.length]);
+      }
 
       const [result, carry] = await this.module.runInference(this.inputDict);
       this.inputDict = { ...this.inputDict, ...carry };

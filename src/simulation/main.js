@@ -16,7 +16,10 @@ export class MuJoCoDemo {
       paused: true,
       current_motion: 'default',
       compliance_enabled: false,
-      compliance_threshold: 10.0
+      compliance_threshold: 10.0,
+      cmdX: 0.0,
+      cmdY: 0.0,
+      cmdYaw: 0.0
     };
     this.policyRunner = null;
     this.kpPolicy = null;
@@ -396,7 +399,9 @@ export class MuJoCoDemo {
       rootQuat,
       rootAngVel,
       complianceEnabled,
-      complianceThreshold
+      complianceThreshold,
+      qvel_base: rootAngVel,
+      cmd: [this.params.cmdX, this.params.cmdY, this.params.cmdYaw]
     };
   }
 

@@ -52,6 +52,49 @@
             <v-icon icon="mdi-github" class="mr-1"></v-icon>
             {{ t.trainingCode }}
           </v-btn>
+
+        <div v-if="currentPolicy === 'g1-amp-50000'" class="mt-4">
+          <div class="status-legend follow-controls mt-2">
+            <span class="status-name">Velocity X</span>
+            <span class="text-caption">{{ cmdX.toFixed(2) }}</span>
+          </div>
+          <v-slider
+            v-model="cmdX"
+            min="-1.5"
+            max="3.0"
+            step="0.1"
+            density="compact"
+            hide-details
+            @update:modelValue="onCmdChange"
+          ></v-slider>
+          <div class="status-legend follow-controls mt-2">
+            <span class="status-name">Velocity Y</span>
+            <span class="text-caption">{{ cmdY.toFixed(2) }}</span>
+          </div>
+          <v-slider
+            v-model="cmdY"
+            min="-1.0"
+            max="1.0"
+            step="0.1"
+            density="compact"
+            hide-details
+            @update:modelValue="onCmdChange"
+          ></v-slider>
+          <div class="status-legend follow-controls mt-2">
+            <span class="status-name">Yaw Rate</span>
+            <span class="text-caption">{{ cmdYaw.toFixed(2) }}</span>
+          </div>
+          <v-slider
+            v-model="cmdYaw"
+            min="-1.57"
+            max="1.57"
+            step="0.1"
+            density="compact"
+            hide-details
+            @update:modelValue="onCmdChange"
+          ></v-slider>
+        </div>
+
         <v-divider class="my-2"/>
         <span class="status-name">{{ t.policy }}</span>
         <div v-if="policyDescription" class="text-caption">{{ policyDescription }}</div>
@@ -405,6 +448,14 @@ export default {
         descriptionKey: 'policyDescription',
         policyPath: './examples/checkpoints/g1/tracking_policy_latest.json',
         onnxPath: './examples/checkpoints/g1/policy_latest.onnx'
+      },
+      {
+        value: 'g1-amp-50000',
+        title: 'G1 AMP Walk/Run/Getup',
+        description: 'AMP policy for walk, run, and getup.',
+        descriptionKey: 'ampPolicyDescription',
+        policyPath: './examples/checkpoints/g1/amp_policy.json',
+        onnxPath: './examples/checkpoints/g1/walk_run_getup/model_50000.onnx'
       }
     ],
     currentPolicy: 'g1-tracking-latest',
@@ -418,6 +469,9 @@ export default {
     cameraFollowEnabled: true,
     complianceEnabled: false,
     complianceThreshold: 10.0,
+    cmdX: 0.0,
+    cmdY: 0.0,
+    cmdYaw: 0.0,
     renderScale: 2.0,
     simStepHz: 0,
     isSmallScreen: false,
@@ -755,6 +809,15 @@ export default {
       }
       this.complianceEnabled = nextEnabled;
       this.applyComplianceSettings();
+    },
+
+    onCmdChange() {
+      if (!this.demo) {
+        return;
+      }
+      this.demo.params.cmdX = this.cmdX;
+      this.demo.params.cmdY = this.cmdY;
+      this.demo.params.cmdYaw = this.cmdYaw;
     },
     onComplianceThresholdChange(value) {
       const numeric = Number(value);
