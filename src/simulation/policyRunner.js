@@ -35,6 +35,9 @@ export class PolicyRunner {
     this.numObs = this.obsModules.reduce((sum, obs) => sum + (obs.size ?? 0), 0);
     this.historyLength = config.obs_config?.history_length || 1;
     this.obsHistory = [];
+    this.fullObs = new Float32Array(this.numObs * this.historyLength);
+    this.obsForPolicy = new Float32Array(this.numObs);
+    this.target = new Float32Array(this.numActions);
   }
 
   async init() {
@@ -105,7 +108,7 @@ export class PolicyRunner {
       }
       const policyState = this.makePolicyState(state);
 
-      const obsForPolicy = new Float32Array(this.numObs);
+      const obsForPolicy = this.obsForPolicy;
       let offset = 0;
       for (const obs of this.obsModules) {
         if (typeof obs.update === 'function') {
@@ -118,12 +121,12 @@ export class PolicyRunner {
       }
 
       if (this.historyLength > 1) {
-        this.obsHistory.push(obsForPolicy);
+        this.obsHistory.push(new Float32Array(obsForPolicy));
         if (this.obsHistory.length > this.historyLength) {
           this.obsHistory.shift();
         }
 
-        const fullObs = new Float32Array(this.numObs * this.historyLength);
+        const fullObs = this.fullObs;
         for (let i = 0; i < this.historyLength; i++) {
           const idx = Math.max(0, this.obsHistory.length - this.historyLength + i);
           fullObs.set(this.obsHistory[idx], i * this.numObs);
@@ -148,7 +151,7 @@ export class PolicyRunner {
         this.lastActions[i] = clamped;
       }
 
-      const target = new Float32Array(this.numActions);
+      const target = this.target;
       for (let i = 0; i < this.numActions; i++) {
         target[i] = this.defaultJointPos[i] + this.actionScale[i] * this.lastActions[i];
       }
