@@ -266,7 +266,13 @@
               @update:modelValue="onMotionUpload"
             ></v-file-input>
             <div class="text-caption">
-              <span v-html="t.motionUploadHelp"></span>
+              <span>
+                {{ t.motionUploadHelpRead }}
+                <a target="_blank" rel="noopener noreferrer" href="https://github.com/Axellwppr/humanoid-policy-viewer?tab=readme-ov-file#add-your-own-robot-policy-and-motions">{{ t.motionUploadHelpLink }}</a>
+                {{ t.motionUploadHelpInstructions }}
+                <br>
+                {{ t.motionUploadHelpDetails }}
+              </span>
             </div>
             <v-alert
               v-if="motionUploadMessage"
@@ -367,7 +373,10 @@ const translations = {
     useCustomizedMotions: 'Want to use customized motions?',
     customMotions: 'Custom motions',
     uploadMotionJson: 'Upload motion JSON',
-    motionUploadHelp: 'Read <a target="_blank" rel="noopener noreferrer" href="https://github.com/Axellwppr/humanoid-policy-viewer?tab=readme-ov-file#add-your-own-robot-policy-and-motions">readme</a> to learn how to create motion JSON files from GMR.<br>Each file should be a single clip (same schema as motions/default.json). File name becomes the motion name (prefixed with [new]). Duplicate names are ignored.',
+    motionUploadHelpRead: 'Read ',
+    motionUploadHelpLink: 'readme',
+    motionUploadHelpInstructions: ' to learn how to create motion JSON files from GMR.',
+    motionUploadHelpDetails: 'Each file should be a single clip (same schema as motions/default.json). File name becomes the motion name (prefixed with [new]). Duplicate names are ignored.',
     cameraFollow: 'Camera follow',
     renderScale: 'Render scale',
     simFreq: 'Sim Freq',
@@ -408,7 +417,10 @@ const translations = {
     useCustomizedMotions: '想使用自定义动作？',
     customMotions: '自定义动作',
     uploadMotionJson: '上传动作 JSON',
-    motionUploadHelp: '阅读 <a target="_blank" rel="noopener noreferrer" href="https://github.com/Axellwppr/humanoid-policy-viewer?tab=readme-ov-file#add-your-own-robot-policy-and-motions">readme</a> 了解如何从 GMR 创建动作 JSON 文件。<br>每个文件应只包含一个片段（结构与 motions/default.json 一致）。文件名会作为动作名称（自动添加 [new] 前缀），重复名称会被忽略。',
+    motionUploadHelpRead: '阅读 ',
+    motionUploadHelpLink: 'readme',
+    motionUploadHelpInstructions: ' 了解如何从 GMR 创建动作 JSON 文件。',
+    motionUploadHelpDetails: '每个文件应只包含一个片段（结构与 motions/default.json 一致）。文件名会作为动作名称（自动添加 [new] 前缀），重复名称会被忽略。',
     cameraFollow: '相机跟随',
     renderScale: '渲染倍率',
     simFreq: '仿真频率',
