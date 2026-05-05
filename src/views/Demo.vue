@@ -45,6 +45,7 @@
           <v-btn
             href="https://github.com/Axellwppr/motion_tracking"
             target="_blank"
+            rel="noopener noreferrer"
             variant="text"
             size="small"
             color="primary"
@@ -56,6 +57,7 @@
           <v-btn
             href="https://github.com/ccrpRepo/AMP_mjlab"
             target="_blank"
+            rel="noopener noreferrer"
             variant="text"
             size="small"
             color="primary"
