@@ -4,8 +4,6 @@ import {
 	Mesh,
 	PerspectiveCamera,
 	Plane,
-	ShaderMaterial,
-	UniformsUtils,
 	Vector3,
 	Vector4,
 	WebGLRenderTarget,
