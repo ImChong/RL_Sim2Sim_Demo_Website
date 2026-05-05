@@ -1,6 +1,8 @@
 export function normalizeQuat(quat) {
   const [w, x, y, z] = quat;
-  const n = Math.hypot(w, x, y, z);
+  // Math.hypot has overhead due to overflow/underflow checking.
+  // Using Math.sqrt is significantly faster.
+  const n = Math.sqrt(w * w + x * x + y * y + z * z);
   if (n < 1e-9) {
     return [1, 0, 0, 0];
   }
