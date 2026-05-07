@@ -44,6 +44,7 @@
           <v-btn
             href="https://github.com/Axellwppr/motion_tracking"
             target="_blank"
+            rel="noopener noreferrer"
             variant="text"
             size="small"
             color="primary"
