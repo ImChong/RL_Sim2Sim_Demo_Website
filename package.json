@@ -3,30 +3,28 @@
   "private": true,
   "type": "module",
   "version": "0.0.0",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test tests/*.test.mjs",
+    "verify:e2e-knockdown": "node scripts/verify-knockdown-button.mjs"
   },
   "dependencies": {
     "@fontsource/roboto": "5.2.5",
     "@mdi/font": "7.4.47",
-    "chart.js": "^4.4.9",
-    "katex": "^0.13.24",
-    "mathjax-vue3": "^1.0.1",
     "mujoco-js": "^0.0.7",
     "onnxruntime-web": "^1.21.1",
     "three": "0.151.3",
-    "vatex": "^0.1.0",
     "vue": "^3.5.13",
-    "vue-chartjs": "^5.3.2",
-    "vue-mathjax": "^0.0.11",
-    "vue-mathjax-next": "^0.0.6",
     "vuetify": "^3.8.1"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.2.3",
-    "globals": "^16.0.0",
+    "puppeteer-core": "^24.43.0",
     "sass-embedded": "^1.86.3",
     "unplugin-fonts": "^1.3.1",
     "unplugin-vue-components": "^28.4.1",

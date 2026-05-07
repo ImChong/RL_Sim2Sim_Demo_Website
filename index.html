@@ -9,8 +9,8 @@
     default-src 'self';
     script-src 'self' 'wasm-unsafe-eval' 'sha256-l7K7NN8vsw70V28teHrdKLoziGZ4bcAXf92+fkYdal4=' https://www.googletagmanager.com;
     style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-    font-src 'self' https://fonts.gstatic.com;
-    img-src 'self' data: blob:;
+    font-src 'self' https://fonts.gstatic.com data:;
+    img-src 'self' data: blob: https://www.google-analytics.com;
     connect-src 'self' https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://region1.google-analytics.com;
     worker-src 'self' blob:;
     base-uri 'self';

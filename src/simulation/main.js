@@ -6,6 +6,9 @@ import { getSimulationThemeSettings, normalizeSimulationThemeName } from './them
 
 const defaultPolicy = "./examples/checkpoints/g1/tracking_policy_latest.json";
 
+/** Horizontal knockdown push magnitude (N), applied in world XY; local Z (vertical) force component is zero. */
+const KNOCKDOWN_FORCE_XY_MAG = 3400;
+
 export class MuJoCoDemo {
   constructor(mujoco) {
     this.mujoco = mujoco;
@@ -16,7 +19,10 @@ export class MuJoCoDemo {
       paused: true,
       current_motion: 'default',
       compliance_enabled: false,
-      compliance_threshold: 10.0
+      compliance_threshold: 10.0,
+      cmdX: 0.0,
+      cmdY: 0.0,
+      cmdYaw: 0.0
     };
     this.policyRunner = null;
     this.kpPolicy = null;
@@ -62,6 +68,11 @@ export class MuJoCoDemo {
     this._stepFrameCount = 0;
     this._stepLastTime = performance.now();
     this._lastRenderTime = 0;
+    /** @type {number} remaining physics substeps for AMP knockdown disturbance */
+    this._knockdownSubstepsRemaining = 0;
+    /** Unit direction in world XY for the current knockdown burst (set when queued). */
+    this._knockdownDirX = 1;
+    this._knockdownDirY = 0;
 
     this.container.appendChild(this.renderer.domElement);
 
@@ -104,11 +115,29 @@ export class MuJoCoDemo {
     this.reloadPolicy = reloadPolicy.bind(this);
   }
 
-  async init() {
-    await downloadExampleScenesFolder(this.mujoco);
+  async init(onProgress) {
+    const report = (t) => {
+      if (typeof onProgress === 'function') {
+        onProgress(Math.min(1, Math.max(0, t)));
+      }
+    };
+    const sceneDownload = 0.52;
+    const sceneBuild = 0.13;
+    const policy = 0.35;
+
+    await downloadExampleScenesFolder(this.mujoco, (p) => {
+      report(sceneDownload * p);
+    });
+    report(sceneDownload);
     await this.reloadScene('g1/g1.xml');
     this.updateFollowBodyId();
-    await this.reloadPolicy(defaultPolicy);
+    report(sceneDownload + sceneBuild);
+    await this.reloadPolicy(defaultPolicy, {
+      onInitProgress: (p) => {
+        report(sceneDownload + sceneBuild + policy * p);
+      }
+    });
+    report(1);
     this.alive = true;
   }
 
@@ -118,9 +147,8 @@ export class MuJoCoDemo {
     this.timestep = this.model.opt.timestep;
     this.decimation = Math.max(1, Math.round(0.02 / this.timestep));
 
-    console.log('timestep:', this.timestep, 'decimation:', this.decimation);
-
     await this.reloadPolicy(this.currentPolicyPath ?? defaultPolicy);
+    console.log('timestep:', this.timestep, 'decimation:', this.decimation);
     this.alive = true;
   }
 
@@ -205,6 +233,72 @@ export class MuJoCoDemo {
     this.camera.position.add(this.followDelta);
   }
 
+  applyJointPositionControl() {
+    for (let i = 0; i < this.numActions; i++) {
+      const qpos_adr = this.qpos_adr_policy[i];
+      const qvel_adr = this.qvel_adr_policy[i];
+      const ctrl_adr = this.ctrl_adr_policy[i];
+
+      const targetJpos = this.actionTarget ? this.actionTarget[i] : 0.0;
+      const kp = this.kpPolicy ? this.kpPolicy[i] : 0.0;
+      const kd = this.kdPolicy ? this.kdPolicy[i] : 0.0;
+      const torque = kp * (targetJpos - this.simulation.qpos[qpos_adr]) + kd * (0 - this.simulation.qvel[qvel_adr]);
+      let ctrlValue = torque;
+      const ctrlRange = this.model?.actuator_ctrlrange;
+      if (ctrlRange && ctrlRange.length >= (ctrl_adr + 1) * 2) {
+        const min = ctrlRange[ctrl_adr * 2];
+        const max = ctrlRange[(ctrl_adr * 2) + 1];
+        if (Number.isFinite(min) && Number.isFinite(max) && min < max) {
+          ctrlValue = Math.min(Math.max(ctrlValue, min), max);
+        }
+      }
+      this.simulation.ctrl[ctrl_adr] = ctrlValue;
+    }
+  }
+
+  applyUnitreePositionControl() {
+    for (let i = 0; i < this.numActions; i++) {
+      const qpos_adr = this.qpos_adr_policy[i];
+      const qvel_adr = this.qvel_adr_policy[i];
+      const ctrl_adr = this.ctrl_adr_policy[i];
+
+      const targetJpos = this.actionTarget ? this.actionTarget[i] : 0.0;
+      const kp = this.kpPolicy ? this.kpPolicy[i] : 0.0;
+      const kd = this.kdPolicy ? this.kdPolicy[i] : 0.0;
+      const qpos = this.simulation.qpos[qpos_adr];
+      const qvel = this.simulation.qvel[qvel_adr];
+      let torque = kp * (targetJpos - qpos) + kd * (0 - qvel);
+      const sameDirection = qvel * torque > 0;
+      const y1 = this.Y1Policy ? this.Y1Policy[i] : Infinity;
+      const y2 = this.Y2Policy ? this.Y2Policy[i] : y1;
+      const effortLimit = this.effortLimitPolicy ? this.effortLimitPolicy[i] : Infinity;
+      let maxEffort = Math.min(sameDirection ? y1 : y2, effortLimit);
+      const x1 = this.X1Policy ? this.X1Policy[i] : Infinity;
+      const x2 = this.X2Policy ? this.X2Policy[i] : Infinity;
+      const absVel = Math.abs(qvel);
+      if (Number.isFinite(x1) && Number.isFinite(x2) && absVel >= x1) {
+        const denom = Math.max(x2 - x1, 1e-6);
+        maxEffort = Math.max((-maxEffort / denom) * (absVel - x1) + maxEffort, 0.0);
+      }
+      torque = Math.max(-maxEffort, Math.min(maxEffort, torque));
+      const fs = this.frictionStaticPolicy ? this.frictionStaticPolicy[i] : 0.0;
+      const fd = this.frictionDynamicPolicy ? this.frictionDynamicPolicy[i] : 0.0;
+      const va = this.frictionActivationVelPolicy ? Math.max(this.frictionActivationVelPolicy[i], 1e-6) : 0.01;
+      torque -= fs * Math.tanh(qvel / va) + fd * qvel;
+
+      let ctrlValue = torque;
+      const ctrlRange = this.model?.actuator_ctrlrange;
+      if (ctrlRange && ctrlRange.length >= (ctrl_adr + 1) * 2) {
+        const min = ctrlRange[ctrl_adr * 2];
+        const max = ctrlRange[(ctrl_adr * 2) + 1];
+        if (Number.isFinite(min) && Number.isFinite(max) && min < max) {
+          ctrlValue = Math.min(Math.max(ctrlValue, min), max);
+        }
+      }
+      this.simulation.ctrl[ctrl_adr] = ctrlValue;
+    }
+  }
+
   async main_loop() {
     if (!this.policyRunner) {
       return;
@@ -226,26 +320,9 @@ export class MuJoCoDemo {
 
         for (let substep = 0; substep < this.decimation; substep++) {
           if (this.control_type === 'joint_position') {
-            for (let i = 0; i < this.numActions; i++) {
-              const qpos_adr = this.qpos_adr_policy[i];
-              const qvel_adr = this.qvel_adr_policy[i];
-              const ctrl_adr = this.ctrl_adr_policy[i];
-
-              const targetJpos = this.actionTarget ? this.actionTarget[i] : 0.0;
-              const kp = this.kpPolicy ? this.kpPolicy[i] : 0.0;
-              const kd = this.kdPolicy ? this.kdPolicy[i] : 0.0;
-              const torque = kp * (targetJpos - this.simulation.qpos[qpos_adr]) + kd * (0 - this.simulation.qvel[qvel_adr]);
-              let ctrlValue = torque;
-              const ctrlRange = this.model?.actuator_ctrlrange;
-              if (ctrlRange && ctrlRange.length >= (ctrl_adr + 1) * 2) {
-                const min = ctrlRange[ctrl_adr * 2];
-                const max = ctrlRange[(ctrl_adr * 2) + 1];
-                if (Number.isFinite(min) && Number.isFinite(max) && min < max) {
-                  ctrlValue = Math.min(Math.max(ctrlValue, min), max);
-                }
-              }
-              this.simulation.ctrl[ctrl_adr] = ctrlValue;
-            }
+            this.applyJointPositionControl();
+          } else if (this.control_type === 'unitree_position') {
+            this.applyUnitreePositionControl();
           } else if (this.control_type === 'torque') {
             console.error('Torque control not implemented yet.');
           }
@@ -253,6 +330,11 @@ export class MuJoCoDemo {
           const applied = this.simulation.qfrc_applied;
           for (let i = 0; i < applied.length; i++) {
             applied[i] = 0.0;
+          }
+
+          if (this._knockdownSubstepsRemaining > 0) {
+            this.applyPelvisKnockdownForceXYPlane();
+            this._knockdownSubstepsRemaining -= 1;
           }
 
           const dragged = this.dragStateManager.physicsObject;
@@ -372,6 +454,60 @@ export class MuJoCoDemo {
     return this.simStepHz;
   }
 
+  /**
+   * Queue several physics substeps of large wrench on the pelvis (AMP-only UI)
+   * to knock the robot down for get-up / recovery testing.
+   */
+  queueKnockdownDisturbance() {
+    if (!this.simulation || !this.model) {
+      return;
+    }
+    const theta = Math.random() * Math.PI * 2;
+    this._knockdownDirX = Math.cos(theta);
+    this._knockdownDirY = Math.sin(theta);
+    this._knockdownSubstepsRemaining = 14;
+  }
+
+  /**
+   * Floating-base pelvis id for wrenches (never world body 0).
+   */
+  resolvePelvisBodyId() {
+    const map = this.bodyIdByName;
+    if (map && Number.isInteger(map.pelvis) && map.pelvis > 0) {
+      return map.pelvis;
+    }
+    if (map && Number.isInteger(map.base) && map.base > 0) {
+      return map.base;
+    }
+    if (Number.isInteger(this.pelvis_body_id) && this.pelvis_body_id > 0) {
+      return this.pelvis_body_id;
+    }
+    if (Number.isInteger(this.followBodyId) && this.followBodyId > 0) {
+      return this.followBodyId;
+    }
+    return 1;
+  }
+
+  /**
+   * Applies a horizontal-only force on the pelvis at its current body origin (world xpos).
+   * Does not modify qpos — disturbance is purely physical (mj_applyFT).
+   */
+  applyPelvisKnockdownForceXYPlane() {
+    const bodyId = this.resolvePelvisBodyId();
+    if (!Number.isInteger(bodyId) || bodyId < 1) {
+      return;
+    }
+    const xp = this.simulation.xpos;
+    const idx = bodyId * 3;
+    const px = xp[idx];
+    const py = xp[idx + 1];
+    const pz = xp[idx + 2];
+    const fx = KNOCKDOWN_FORCE_XY_MAG * this._knockdownDirX;
+    const fy = KNOCKDOWN_FORCE_XY_MAG * this._knockdownDirY;
+    const fz = 0;
+    this.simulation.applyForce(fx, fy, fz, 0, 0, 0, px, py, pz, bodyId);
+  }
+
   readPolicyState() {
     const qpos = this.simulation.qpos;
     const qvel = this.simulation.qvel;
@@ -396,16 +532,65 @@ export class MuJoCoDemo {
       rootQuat,
       rootAngVel,
       complianceEnabled,
-      complianceThreshold
+      complianceThreshold,
+      qvel_base: rootAngVel,
+      cmd: [this.params.cmdX, this.params.cmdY, this.params.cmdYaw]
     };
+  }
+
+  applyPolicyInitialState() {
+    const initialState = this.policyInitialState;
+    if (!initialState || !this.simulation || !this.qpos_adr_policy) {
+      return;
+    }
+
+    const rootPos = initialState.root_pos;
+    if (Array.isArray(rootPos) && rootPos.length >= 3) {
+      this.simulation.qpos[0] = Number(rootPos[0]) || 0.0;
+      this.simulation.qpos[1] = Number(rootPos[1]) || 0.0;
+      this.simulation.qpos[2] = Number(rootPos[2]) || 0.0;
+    }
+
+    const rootQuat = initialState.root_quat;
+    if (Array.isArray(rootQuat) && rootQuat.length >= 4) {
+      this.simulation.qpos[3] = Number(rootQuat[0]) || 1.0;
+      this.simulation.qpos[4] = Number(rootQuat[1]) || 0.0;
+      this.simulation.qpos[5] = Number(rootQuat[2]) || 0.0;
+      this.simulation.qpos[6] = Number(rootQuat[3]) || 0.0;
+    }
+
+    const jointPosArray = initialState.joint_pos_array;
+    if (Array.isArray(jointPosArray) && jointPosArray.length === this.numActions) {
+      for (let i = 0; i < this.numActions; i++) {
+        this.simulation.qpos[this.qpos_adr_policy[i]] = Number(jointPosArray[i]) || 0.0;
+      }
+    } else {
+      const jointRules = initialState.joint_pos ?? {};
+      for (let i = 0; i < this.numActions; i++) {
+        const jointName = this.policyJointNames[i];
+        for (const [pattern, value] of Object.entries(jointRules)) {
+          const regex = new RegExp(`^${pattern}$`);
+          if (regex.test(jointName)) {
+            this.simulation.qpos[this.qpos_adr_policy[i]] = Number(value) || 0.0;
+          }
+        }
+      }
+    }
+
+    for (let i = 0; i < this.simulation.qvel.length; i++) {
+      this.simulation.qvel[i] = 0.0;
+    }
+    this.simulation.forward();
   }
 
   resetSimulation() {
     if (!this.simulation) {
       return;
     }
+    this._knockdownSubstepsRemaining = 0;
     this.params.paused = true;
     this.simulation.resetData();
+    this.applyPolicyInitialState();
     this.simulation.forward();
     this.actionTarget = null;
     if (this.policyRunner) {

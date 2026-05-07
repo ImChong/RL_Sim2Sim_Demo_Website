@@ -16,6 +16,7 @@ export class PolicyRunner {
     this.actionScale = toFloatArray(options.actionScale ?? config.action_scale, this.numActions, 1.0);
     this.defaultJointPos = toFloatArray(options.defaultJointPos ?? [], this.numActions, 0.0);
     this.actionClip = typeof config.action_clip === 'number' ? config.action_clip : 10.0;
+    this.obsJointPosRelative = config.obs_joint_pos_relative === true;
 
     this.module = new ONNXModule(config.onnx);
     this.inputDict = {};
@@ -32,10 +33,18 @@ export class PolicyRunner {
 
     this.obsModules = this._buildObsModules(config.obs_config);
     this.numObs = this.obsModules.reduce((sum, obs) => sum + (obs.size ?? 0), 0);
+    this.historyLength = config.obs_config?.history_length || 1;
+    this.obsHistory = [];
+    this.fullObs = new Float32Array(this.numObs * this.historyLength);
+    this.obsForPolicy = new Float32Array(this.numObs);
+    this.target = new Float32Array(this.numActions);
+    this.onModuleInitProgress = typeof options.onInitProgress === 'function'
+      ? options.onInitProgress
+      : null;
   }
 
   async init() {
-    await this.module.init();
+    await this.module.init((r) => this.onModuleInitProgress?.(r));
     this.reset();
   }
 
@@ -52,15 +61,36 @@ export class PolicyRunner {
     });
   }
 
+  makePolicyState(state) {
+    if (!state) {
+      return state;
+    }
+    if (!this.obsJointPosRelative) {
+      return state;
+    }
+    const jointPosAbs = state.jointPos ?? new Float32Array(this.numActions);
+    const jointPosRel = new Float32Array(this.numActions);
+    for (let i = 0; i < this.numActions; i++) {
+      jointPosRel[i] = jointPosAbs[i] - this.defaultJointPos[i];
+    }
+    return {
+      ...state,
+      jointPosAbs,
+      jointPos: jointPosRel
+    };
+  }
+
   reset(state = null) {
     this.inputDict = this.module.initInput() ?? {};
     this.lastActions.fill(0.0);
+    this.obsHistory = [];
     if (this.tracking) {
       this.tracking.reset(state);
     }
+    const policyState = this.makePolicyState(state);
     for (const obs of this.obsModules) {
       if (typeof obs.reset === 'function') {
-        obs.reset(state);
+        obs.reset(policyState);
       }
     }
   }
@@ -79,20 +109,35 @@ export class PolicyRunner {
       if (this.tracking) {
         this.tracking.advance();
       }
+      const policyState = this.makePolicyState(state);
 
-      const obsForPolicy = new Float32Array(this.numObs);
+      const obsForPolicy = this.obsForPolicy;
       let offset = 0;
       for (const obs of this.obsModules) {
         if (typeof obs.update === 'function') {
-          obs.update(state);
+          obs.update(policyState);
         }
-        const obsValue = obs.compute(state);
+        const obsValue = obs.compute(policyState);
         const obsArray = ArrayBuffer.isView(obsValue) ? obsValue : Float32Array.from(obsValue);
         obsForPolicy.set(obsArray, offset);
         offset += obsArray.length;
       }
 
-      this.inputDict['policy'] = new ort.Tensor('float32', obsForPolicy, [1, obsForPolicy.length]);
+      if (this.historyLength > 1) {
+        this.obsHistory.push(new Float32Array(obsForPolicy));
+        if (this.obsHistory.length > this.historyLength) {
+          this.obsHistory.shift();
+        }
+
+        const fullObs = this.fullObs;
+        for (let i = 0; i < this.historyLength; i++) {
+          const idx = Math.max(0, this.obsHistory.length - this.historyLength + i);
+          fullObs.set(this.obsHistory[idx], i * this.numObs);
+        }
+        this.inputDict['policy'] = new ort.Tensor('float32', fullObs, [1, fullObs.length]);
+      } else {
+        this.inputDict['policy'] = new ort.Tensor('float32', obsForPolicy, [1, obsForPolicy.length]);
+      }
 
       const [result, carry] = await this.module.runInference(this.inputDict);
       this.inputDict = { ...this.inputDict, ...carry };
@@ -109,7 +154,7 @@ export class PolicyRunner {
         this.lastActions[i] = clamped;
       }
 
-      const target = new Float32Array(this.numActions);
+      const target = this.target;
       for (let i = 0; i < this.numActions; i++) {
         target[i] = this.defaultJointPos[i] + this.actionScale[i] * this.lastActions[i];
       }

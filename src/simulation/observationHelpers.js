@@ -290,8 +290,61 @@ class PrevActions {
 }
 
 
+
+class JointVel {
+  constructor(policy, kwargs = {}) {
+    const { vel_steps = [0] } = kwargs;
+    this.velSteps = vel_steps.slice();
+    this.numJoints = policy.numActions;
+
+    this.maxStep = Math.max(...this.velSteps);
+    this.history = Array.from({ length: this.maxStep + 1 }, () => new Float32Array(this.numJoints));
+  }
+
+  get size() {
+    return this.velSteps.length * this.numJoints;
+  }
+
+  reset(state) {
+    const source = state?.jointVel ?? new Float32Array(this.numJoints);
+    this.history[0].set(source);
+    for (let i = 1; i < this.history.length; i++) {
+      this.history[i].set(this.history[0]);
+    }
+  }
+
+  update(state) {
+    for (let i = this.history.length - 1; i > 0; i--) {
+      this.history[i].set(this.history[i - 1]);
+    }
+    this.history[0].set(state.jointVel);
+  }
+
+  compute() {
+    const out = new Float32Array(this.velSteps.length * this.numJoints);
+    for (let i = 0; i < this.velSteps.length; i++) {
+      const step = this.velSteps[i];
+      out.set(this.history[step], i * this.numJoints);
+    }
+    return out;
+  }
+}
+
+class Command {
+  get size() {
+    return 3;
+  }
+
+  compute(state) {
+    const cmd = state?.cmd ?? [0, 0, 0];
+    return new Float32Array([cmd[0], cmd[1], cmd[2]]);
+  }
+}
+
 // Export a dictionary of all observation classes
 export const Observations = {
+  Command,
+  JointVel,
   PrevActions,
   BootIndicator,
   ComplianceFlagObs,

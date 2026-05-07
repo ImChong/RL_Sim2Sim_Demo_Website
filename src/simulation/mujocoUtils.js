@@ -2,6 +2,11 @@ import * as THREE from 'three';
 import { Reflector } from './utils/Reflector.js';
 import { PolicyRunner } from './policyRunner.js';
 import { toFloatArray } from './utils/math.js';
+import {
+  createWeightedProgressReporter,
+  fetchTextWithProgress,
+  readResponseBodyWithProgress
+} from './fetchWithProgress.js';
 
 const MOTION_INDEX_FORMAT = 'tracking-motion-index-v1';
 
@@ -42,9 +47,10 @@ function parseMotionIndex(payload) {
   };
 }
 
-async function loadMotionIndex(indexPayload, motionsUrl) {
+async function loadMotionIndex(indexPayload, motionsUrl, onProgress) {
   const index = parseMotionIndex(indexPayload);
   if (!index) {
+    onProgress?.(1);
     return null;
   }
 
@@ -57,8 +63,10 @@ async function loadMotionIndex(indexPayload, motionsUrl) {
   const motions = {};
   const motionMeta = {};
   const entries = index.motions.map((entry) => normalizeMotionEntry(entry));
+  const weights = entries.map((entry) => (entry && entry.file && entry.name ? 1 : 0));
+  const reporter = createWeightedProgressReporter(weights, onProgress);
 
-  const requests = entries.map(async (entry) => {
+  const requests = entries.map(async (entry, i) => {
     if (!entry || !entry.file || !entry.name) {
       throw new Error('Motion index entries must include a name and file path.');
     }
@@ -67,7 +75,8 @@ async function loadMotionIndex(indexPayload, motionsUrl) {
     if (!response.ok) {
       throw new Error(`Failed to load motion clip from ${clipUrl}: ${response.status}`);
     }
-    const clip = await response.json();
+    const bytes = await readResponseBodyWithProgress(response, (r) => reporter(i, r));
+    const clip = JSON.parse(new TextDecoder('utf-8').decode(bytes));
     motions[entry.name] = clip;
     if (typeof entry.complianceSuitable === 'boolean') {
       motionMeta[entry.name] = { compliance_suitable: entry.complianceSuitable };
@@ -75,6 +84,7 @@ async function loadMotionIndex(indexPayload, motionsUrl) {
   });
 
   await Promise.all(requests);
+  onProgress?.(1);
   return { motions, motionMeta };
 }
 
@@ -115,6 +125,7 @@ export async function reloadScene(mjcf_path) {
 
   this.timestep = this.model.opt.timestep;
   this.decimation = Math.max(1, Math.round(0.02 / this.timestep));
+  this.policyInitialState = null;
 }
 
 export async function reloadPolicy(policy_path, options = {}) {
@@ -125,11 +136,16 @@ export async function reloadPolicy(policy_path, options = {}) {
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
 
-  const response = await fetch(policy_path);
-  if (!response.ok) {
-    throw new Error(`Failed to load policy config from ${policy_path}: ${response.status}`);
-  }
-  const config = await response.json();
+  const reportInit = (t) => {
+    if (typeof options.onInitProgress === 'function') {
+      options.onInitProgress(Math.min(1, Math.max(0, t)));
+    }
+  };
+
+  const policyJsonText = await fetchTextWithProgress(policy_path, (r) => {
+    reportInit(0.12 * r);
+  });
+  const config = JSON.parse(policyJsonText);
   if (options?.onnxPath) {
     config.onnx = { ...(config.onnx ?? {}), path: options.onnxPath };
   }
@@ -139,19 +155,25 @@ export async function reloadPolicy(policy_path, options = {}) {
     trackingConfig = { ...config.tracking };
     if (trackingConfig.motions_path && !trackingConfig.motions) {
       const motionsUrl = new URL(trackingConfig.motions_path, window.location.href);
-      const response = await fetch(motionsUrl);
-      if (!response.ok) {
-        throw new Error(`Failed to load tracking motions from ${motionsUrl}: ${response.status}`);
-      }
-      const payload = await response.json();
-      const indexedMotions = await loadMotionIndex(payload, motionsUrl);
+      const motionIndexText = await fetchTextWithProgress(motionsUrl.toString(), (r) => {
+        reportInit(0.12 + 0.1 * r);
+      });
+      const payload = JSON.parse(motionIndexText);
+      const indexedMotions = await loadMotionIndex(payload, motionsUrl, (r) => {
+        reportInit(0.22 + 0.38 * r);
+      });
       if (indexedMotions) {
         trackingConfig.motions = indexedMotions.motions;
         trackingConfig.motion_meta = indexedMotions.motionMeta;
       } else {
         trackingConfig.motions = payload;
       }
+      reportInit(0.6);
+    } else {
+      reportInit(0.6);
     }
+  } else {
+    reportInit(0.6);
   }
 
   const policyJointNames = Array.isArray(config.policy_joint_names)
@@ -175,13 +197,29 @@ export async function reloadPolicy(policy_path, options = {}) {
   }
   this.kpPolicy = toFloatArray(config.stiffness, this.numActions, 0.0);
   this.kdPolicy = toFloatArray(config.damping, this.numActions, 0.0);
+  this.effortLimitPolicy = toFloatArray(config.effort_limit, this.numActions, Infinity);
+  this.X1Policy = toFloatArray(config.X1, this.numActions, Infinity);
+  this.X2Policy = toFloatArray(config.X2, this.numActions, Infinity);
+  this.Y1Policy = toFloatArray(config.Y1, this.numActions, Infinity);
+  this.Y2Policy = toFloatArray(config.Y2, this.numActions, Infinity);
+  this.frictionStaticPolicy = toFloatArray(config.Fs, this.numActions, 0.0);
+  this.frictionDynamicPolicy = toFloatArray(config.Fd, this.numActions, 0.0);
+  this.frictionActivationVelPolicy = toFloatArray(config.Va, this.numActions, 0.01);
   this.control_type = config.control_type ?? 'joint_position';
+  this.policyInitialState = config.initial_state ?? null;
+
+  const simConfig = config.sim ?? {};
+  const controlDt = Number(
+    simConfig.control_dt ?? (simConfig.timestep && simConfig.decimation ? simConfig.timestep * simConfig.decimation : 0.02)
+  );
+  this.decimation = Math.max(1, Math.round(controlDt / this.timestep));
 
   if (trackingConfig) {
     trackingConfig.policy_joint_names = policyJointNames.slice();
   }
 
   this.simulation.resetData();
+  this.applyPolicyInitialState?.();
   this.simulation.forward();
   this.policyRunner = new PolicyRunner(
     {
@@ -194,10 +232,14 @@ export async function reloadPolicy(policy_path, options = {}) {
     {
       policyJointNames,
       actionScale: config.action_scale,
-      defaultJointPos: this.defaultJposPolicy
+      defaultJointPos: this.defaultJposPolicy,
+      onInitProgress: (r) => {
+        reportInit(0.6 + 0.4 * r);
+      }
     }
   );
   await this.policyRunner.init();
+  reportInit(1);
 
   const state = this.readPolicyState?.();
   if (state) {
@@ -233,6 +275,7 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
   const bodies = {};
   const meshes = {};
   const lights = [];
+  parent.bodyIdByName = Object.create(null);
 
   let material = new THREE.MeshPhysicalMaterial();
   material.color = new THREE.Color(1, 1, 1);
@@ -258,11 +301,12 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
       }
       let name_buffer = names_array.subarray(start_idx, end_idx);
       bodies[b].name = textDecoder.decode(name_buffer);
+      parent.bodyIdByName[bodies[b].name] = b;
 
       bodies[b].bodyID = b;
       bodies[b].has_custom_mesh = false;
 
-      if (bodies[b].name === 'base') {
+      if (bodies[b].name === 'base' || bodies[b].name === 'pelvis') {
         parent.pelvis_body_id = b;
       }
     }
@@ -549,15 +593,26 @@ function configureJointMappings(demo, jointNames) {
   demo.defaultJposPolicy.fill(0.0);
 }
 
-export async function downloadExampleScenesFolder(mujoco) {
-  const response = await fetch('./examples/scenes/files.json');
-  const allFiles = await response.json();
+export async function downloadExampleScenesFolder(mujoco, onProgress) {
+  const listUrl = './examples/scenes/files.json';
+  const listResponse = await fetch(listUrl);
+  if (!listResponse.ok) {
+    throw new Error(`Failed to load scene file list: ${listResponse.status}`);
+  }
+  const allFiles = JSON.parse(
+    new TextDecoder('utf-8').decode(await readResponseBodyWithProgress(listResponse, (r) => {
+      onProgress?.(0.02 * r);
+    }))
+  );
 
-  const requests = allFiles.map((url) => fetch('./examples/scenes/' + url));
-  const responses = await Promise.all(requests);
+  const base = './examples/scenes/';
+  const weights = allFiles.map(() => 1);
+  const reporter = createWeightedProgressReporter(weights, (overall) => {
+    onProgress?.(0.02 + 0.98 * overall);
+  });
 
-  for (let i = 0; i < responses.length; i++) {
-    let split = allFiles[i].split('/');
+  const writeToFs = (relativePath, data) => {
+    const split = relativePath.split('/');
     let working = '/working/';
     for (let f = 0; f < split.length - 1; f++) {
       working += split[f];
@@ -566,13 +621,26 @@ export async function downloadExampleScenesFolder(mujoco) {
       }
       working += '/';
     }
+    mujoco.FS.writeFile('/working/' + relativePath, data);
+  };
 
-    if (allFiles[i].match(/\.(png|stl|skn)$/i)) {
-      mujoco.FS.writeFile('/working/' + allFiles[i], new Uint8Array(await responses[i].arrayBuffer()));
-    } else {
-      mujoco.FS.writeFile('/working/' + allFiles[i], await responses[i].text());
-    }
-  }
+  await Promise.all(
+    allFiles.map(async (rel, i) => {
+      const url = base + rel;
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to load scene asset ${url}: ${response.status}`);
+      }
+      if (rel.match(/\.(png|stl|skn)$/i)) {
+        const buf = await readResponseBodyWithProgress(response, (r) => reporter(i, r));
+        writeToFs(rel, new Uint8Array(buf));
+      } else {
+        const buf = await readResponseBodyWithProgress(response, (r) => reporter(i, r));
+        writeToFs(rel, new TextDecoder('utf-8').decode(buf));
+      }
+    })
+  );
+  onProgress?.(1);
 }
 
 export function getPosition(buffer, index, target, swizzle = true) {

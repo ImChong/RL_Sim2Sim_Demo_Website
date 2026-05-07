@@ -41,6 +41,7 @@
         </v-btn>
       </v-card-title>
       <v-card-text v-show="!isSmallScreen || !isMobileControlsCollapsed" class="py-0 controls-body">
+        <div class="training-links">
           <v-btn
             href="https://github.com/Axellwppr/motion_tracking"
             target="_blank"
@@ -51,8 +52,22 @@
             class="text-capitalize"
           >
             <v-icon icon="mdi-github" class="mr-1"></v-icon>
-            {{ t.trainingCode }}
+            G1 Tracking Training Code
           </v-btn>
+          <v-btn
+            href="https://github.com/ccrpRepo/AMP_mjlab"
+            target="_blank"
+            rel="noopener noreferrer"
+            variant="text"
+            size="small"
+            color="primary"
+            class="text-capitalize"
+          >
+            <v-icon icon="mdi-github" class="mr-1"></v-icon>
+            G1 AMP Walk/Run/Getup Training Code
+          </v-btn>
+        </div>
+
         <v-divider class="my-2"/>
         <span class="status-name">{{ t.policy }}</span>
         <div v-if="policyDescription" class="text-caption">{{ policyDescription }}</div>
@@ -77,6 +92,65 @@
           class="mt-2"
           :aria-label="t.policy"
         ></v-progress-linear>
+
+        <div v-if="isAmpPolicy" class="mt-4">
+          <div class="status-legend follow-controls mt-2">
+            <span class="status-name">{{ t.velocityX }}</span>
+            <span class="text-caption">{{ cmdX.toFixed(2) }}</span>
+          </div>
+          <v-slider
+            v-model="cmdX"
+            min="-1.5"
+            max="3.0"
+            step="0.1"
+            density="compact"
+            hide-details
+            :aria-label="t.velocityX"
+            @update:modelValue="onCmdChange"
+          ></v-slider>
+          <div class="status-legend follow-controls mt-2">
+            <span class="status-name">{{ t.velocityY }}</span>
+            <span class="text-caption">{{ cmdY.toFixed(2) }}</span>
+          </div>
+          <v-slider
+            v-model="cmdY"
+            min="-1.0"
+            max="1.0"
+            step="0.1"
+            density="compact"
+            hide-details
+            :aria-label="t.velocityY"
+            @update:modelValue="onCmdChange"
+          ></v-slider>
+          <div class="status-legend follow-controls mt-2">
+            <span class="status-name">{{ t.yawRate }}</span>
+            <span class="text-caption">{{ cmdYaw.toFixed(2) }}</span>
+          </div>
+          <v-slider
+            v-model="cmdYaw"
+            min="-1.57"
+            max="1.57"
+            step="0.1"
+            density="compact"
+            hide-details
+            :aria-label="t.yawRate"
+            @update:modelValue="onCmdChange"
+          ></v-slider>
+          <v-btn
+            class="mt-3"
+            color="secondary"
+            variant="tonal"
+            block
+            size="small"
+            data-test="knockdown-test"
+            :disabled="state !== 1"
+            @click.stop="onKnockdownTest"
+          >
+            {{ t.knockdownTest }}
+          </v-btn>
+          <div class="text-caption mt-1">{{ t.knockdownTestHint }}</div>
+        </div>
+
         <v-alert
           v-if="policyLoadError"
           type="error"
@@ -87,7 +161,7 @@
           {{ policyLoadError }}
         </v-alert>
 
-        <div class="status-legend follow-controls mt-2">
+        <div v-if="!isAmpPolicy" class="status-legend follow-controls mt-2">
           <span class="status-name">{{ t.compliance }}</span>
           <v-btn
             size="x-small"
@@ -102,6 +176,7 @@
           <span class="text-caption">{{ complianceThresholdLabel }}</span>
         </div>
         <v-slider
+          v-if="!isAmpPolicy"
           v-model="complianceThreshold"
           min="10"
           max="20"
@@ -113,6 +188,7 @@
           @update:modelValue="onComplianceThresholdChange"
         ></v-slider>
 
+        <template v-if="!isAmpPolicy">
         <v-divider class="my-2"/>
         <div class="motion-status" v-if="trackingState" role="status" aria-live="polite">
           <div class="status-legend" v-if="trackingState.available">
@@ -208,7 +284,13 @@
               @update:modelValue="onMotionUpload"
             ></v-file-input>
             <div class="text-caption">
-              <span v-html="t.motionUploadHelp"></span>
+              <span>
+                {{ t.motionUploadHelpRead }}
+                <a target="_blank" rel="noopener noreferrer" href="https://github.com/Axellwppr/humanoid-policy-viewer?tab=readme-ov-file#add-your-own-robot-policy-and-motions">{{ t.motionUploadHelpLink }}</a>
+                {{ t.motionUploadHelpInstructions }}
+                <br>
+                {{ t.motionUploadHelpDetails }}
+              </span>
             </div>
             <v-alert
               v-if="motionUploadMessage"
@@ -220,6 +302,8 @@
             </v-alert>
           </template>
         </div>
+
+        </template>
 
         <v-divider class="my-2"/>
         <div class="status-legend follow-controls">
@@ -259,8 +343,20 @@
   <v-dialog :model-value="state === 0" persistent max-width="600px" scrollable>
     <v-card :title="t.loadingSimulationTitle">
       <v-card-text>
-        <v-progress-linear indeterminate color="primary" :aria-label="t.loadingSimulationTitle"></v-progress-linear>
-        {{ t.loadingSimulationBody }}
+        <p class="text-body-2 mb-3">{{ t.loadingSimulationBody }}</p>
+        <v-progress-linear
+          :model-value="simulationLoadProgress"
+          height="10"
+          color="primary"
+          rounded
+          class="loading-simulation-progress"
+          :aria-label="t.loadingSimulationTitle"
+          :aria-valuenow="simulationLoadProgress"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          role="progressbar"
+        ></v-progress-linear>
+        <div class="text-caption text-medium-emphasis mt-2 text-end">{{ simulationLoadProgress }}%</div>
       </v-card-text>
     </v-card>
   </v-dialog>
@@ -307,8 +403,14 @@ const translations = {
     useCustomizedMotions: 'Want to use customized motions?',
     customMotions: 'Custom motions',
     uploadMotionJson: 'Upload motion JSON',
-    motionUploadHelp: 'Read <a target="_blank" rel="noopener noreferrer" href="https://github.com/Axellwppr/humanoid-policy-viewer?tab=readme-ov-file#add-your-own-robot-policy-and-motions">readme</a> to learn how to create motion JSON files from GMR.<br>Each file should be a single clip (same schema as motions/default.json). File name becomes the motion name (prefixed with [new]). Duplicate names are ignored.',
+    motionUploadHelpRead: 'Read ',
+    motionUploadHelpLink: 'readme',
+    motionUploadHelpInstructions: ' to learn how to create motion JSON files from GMR.',
+    motionUploadHelpDetails: 'Each file should be a single clip (same schema as motions/default.json). File name becomes the motion name (prefixed with [new]). Duplicate names are ignored.',
     cameraFollow: 'Camera follow',
+    velocityX: 'Velocity X',
+    velocityY: 'Velocity Y',
+    yawRate: 'Yaw Rate',
     renderScale: 'Render scale',
     simFreq: 'Sim Freq',
     reset: 'Reset',
@@ -323,7 +425,10 @@ const translations = {
     addedMotions: 'Added {count} motion{plural}',
     skippedDuplicates: 'Skipped {count} duplicate{plural}',
     ignoredInvalid: 'Ignored {count} invalid file{plural}',
-    noMotionsAdded: 'No motions were added.'
+    noMotionsAdded: 'No motions were added.',
+    knockdownTest: 'Knockdown test',
+    knockdownTestHint: 'Applies a strong horizontal impulse on the pelvis in a random XY direction (fixed magnitude) for get-up testing.',
+    ampPolicyDescription: 'Final AMP policy for walk, run, and get-up trained on RTX4090 to 60000 iterations.'
   },
   zh: {
     mobileModeAlert: '已启用移动端模式，控制面板已精简并停靠到底部，便于触控操作。',
@@ -348,8 +453,14 @@ const translations = {
     useCustomizedMotions: '想使用自定义动作？',
     customMotions: '自定义动作',
     uploadMotionJson: '上传动作 JSON',
-    motionUploadHelp: '阅读 <a target="_blank" rel="noopener noreferrer" href="https://github.com/Axellwppr/humanoid-policy-viewer?tab=readme-ov-file#add-your-own-robot-policy-and-motions">readme</a> 了解如何从 GMR 创建动作 JSON 文件。<br>每个文件应只包含一个片段（结构与 motions/default.json 一致）。文件名会作为动作名称（自动添加 [new] 前缀），重复名称会被忽略。',
+    motionUploadHelpRead: '阅读 ',
+    motionUploadHelpLink: 'readme',
+    motionUploadHelpInstructions: ' 了解如何从 GMR 创建动作 JSON 文件。',
+    motionUploadHelpDetails: '每个文件应只包含一个片段（结构与 motions/default.json 一致）。文件名会作为动作名称（自动添加 [new] 前缀），重复名称会被忽略。',
     cameraFollow: '相机跟随',
+    velocityX: 'X 方向速度',
+    velocityY: 'Y 方向速度',
+    yawRate: '偏航角速度',
     renderScale: '渲染倍率',
     simFreq: '仿真频率',
     reset: '重置',
@@ -364,7 +475,10 @@ const translations = {
     addedMotions: '已添加 {count} 个动作',
     skippedDuplicates: '已跳过 {count} 个重复项',
     ignoredInvalid: '已忽略 {count} 个无效文件',
-    noMotionsAdded: '没有添加任何动作。'
+    noMotionsAdded: '没有添加任何动作。',
+    knockdownTest: '击倒测试',
+    knockdownTestHint: '在骨盆上沿水平面（XY）随机方向施加一次固定大小的强冲击，用于测试倒地起身。',
+    ampPolicyDescription: '用于行走、奔跑与起身的最终 AMP 策略（RTX4090 训练至 60000 iteration）。'
   }
 };
 
@@ -406,6 +520,14 @@ export default {
         descriptionKey: 'policyDescription',
         policyPath: './examples/checkpoints/g1/tracking_policy_latest.json',
         onnxPath: './examples/checkpoints/g1/policy_latest.onnx'
+      },
+      {
+        value: 'g1-amp-rtx4090-59999',
+        title: 'G1 AMP Walk/Run/Getup RTX4090 Final',
+        description: 'Final AMP policy for walk, run, and getup trained on RTX4090 to 60000 iterations.',
+        descriptionKey: 'ampPolicyDescription',
+        policyPath: './examples/checkpoints/g1/amp_policy.json',
+        onnxPath: './examples/checkpoints/g1/walk_run_getup_rtx4090_59999/model_59999.onnx'
       }
     ],
     currentPolicy: 'g1-tracking-latest',
@@ -419,6 +541,9 @@ export default {
     cameraFollowEnabled: true,
     complianceEnabled: false,
     complianceThreshold: 10.0,
+    cmdX: 0.0,
+    cmdY: 0.0,
+    cmdYaw: 0.0,
     renderScale: 2.0,
     simStepHz: 0,
     isSmallScreen: false,
@@ -427,7 +552,8 @@ export default {
     isSafari: false,
     showSafariAlert: true,
     resize_listener: null,
-    vvp_listener: null
+    vvp_listener: null,
+    simulationLoadProgress: 0
   }),
   computed: {
     shouldShowProgress() {
@@ -529,6 +655,9 @@ export default {
     selectedPolicy() {
       return this.policies.find((policy) => policy.value === this.currentPolicy) ?? null;
     },
+    isAmpPolicy() {
+      return this.currentPolicy === 'g1-amp-rtx4090-59999';
+    },
     policyDescription() {
       if (!this.selectedPolicy) {
         return '';
@@ -614,12 +743,21 @@ export default {
         return;
       }
 
+      const setLoadProgress = (ratio) => {
+        this.simulationLoadProgress = Math.round(Math.min(100, Math.max(0, ratio * 100)));
+      };
+
       try {
+        setLoadProgress(0.02);
         const mujoco = await loadMujoco();
+        setLoadProgress(0.10);
         this.demo = new MuJoCoDemo(mujoco);
         this.demo.setVisualTheme?.(this.visualTheme);
         this.demo.setFollowEnabled?.(this.cameraFollowEnabled);
-        await this.demo.init();
+        await this.demo.init((r) => {
+          setLoadProgress(0.10 + 0.90 * r);
+        });
+        setLoadProgress(1);
         this.demo.main_loop();
         this.demo.params.paused = false;
         this.reapplyCustomMotions();
@@ -757,6 +895,21 @@ export default {
       this.complianceEnabled = nextEnabled;
       this.applyComplianceSettings();
     },
+
+    onCmdChange() {
+      if (!this.demo) {
+        return;
+      }
+      this.demo.params.cmdX = this.cmdX;
+      this.demo.params.cmdY = this.cmdY;
+      this.demo.params.cmdYaw = this.cmdYaw;
+    },
+    onKnockdownTest() {
+      if (!this.demo || this.state !== 1) {
+        return;
+      }
+      this.demo.queueKnockdownDisturbance();
+    },
     onComplianceThresholdChange(value) {
       const numeric = Number(value);
       if (!Number.isFinite(numeric)) {
@@ -824,6 +977,9 @@ export default {
         await this.demo.reloadPolicy(selected.policyPath, {
           onnxPath: selected.onnxPath || undefined
         });
+        if (this.isAmpPolicy) {
+          this.resetAmpCommandSliders();
+        }
         this.policyLabel = selected.policyPath?.split('/').pop() ?? this.policyLabel;
         this.reapplyCustomMotions();
         this.availableMotions = this.getAvailableMotions();
@@ -837,9 +993,18 @@ export default {
         this.demo.params.paused = wasPaused;
       }
     },
+    resetAmpCommandSliders() {
+      this.cmdX = 0.0;
+      this.cmdY = 0.0;
+      this.cmdYaw = 0.0;
+      this.onCmdChange();
+    },
     reset() {
       if (!this.demo) {
         return;
+      }
+      if (this.isAmpPolicy) {
+        this.resetAmpCommandSliders();
       }
       this.demo.resetSimulation();
       this.availableMotions = this.getAvailableMotions();
@@ -1054,6 +1219,13 @@ export default {
   overscroll-behavior: contain;
 }
 
+.training-links {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
 .controls-mobile .controls-body {
   flex: 1 1 auto;
   min-height: 0;
@@ -1165,6 +1337,20 @@ export default {
 .motion-progress-no-animation :deep(.v-progress-linear__determinate),
 .motion-progress-no-animation :deep(.v-progress-linear__indeterminate),
 .motion-progress-no-animation :deep(.v-progress-linear__background) {
+  transition: none !important;
+  animation: none !important;
+}
+
+.loading-simulation-progress,
+.loading-simulation-progress *,
+.loading-simulation-progress::before,
+.loading-simulation-progress::after {
+  transition: none !important;
+  animation: none !important;
+}
+
+.loading-simulation-progress :deep(.v-progress-linear__determinate),
+.loading-simulation-progress :deep(.v-progress-linear__background) {
   transition: none !important;
   animation: none !important;
 }
