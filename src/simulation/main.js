@@ -8,9 +8,6 @@ const defaultPolicy = "./examples/checkpoints/g1/tracking_policy_latest.json";
 
 /** Horizontal knockdown push magnitude (N), applied in world XY; local Z (vertical) force component is zero. */
 const KNOCKDOWN_FORCE_XY_MAG = 3400;
-/** Unit direction in the horizontal plane (world X/Y), MuJoCo Z-up for G1. */
-const KNOCKDOWN_XY_DIR_X = 0.8191520442889918;
-const KNOCKDOWN_XY_DIR_Y = -0.573576436351046;
 
 export class MuJoCoDemo {
   constructor(mujoco) {
@@ -73,6 +70,9 @@ export class MuJoCoDemo {
     this._lastRenderTime = 0;
     /** @type {number} remaining physics substeps for AMP knockdown disturbance */
     this._knockdownSubstepsRemaining = 0;
+    /** Unit direction in world XY for the current knockdown burst (set when queued). */
+    this._knockdownDirX = 1;
+    this._knockdownDirY = 0;
 
     this.container.appendChild(this.renderer.domElement);
 
@@ -462,6 +462,9 @@ export class MuJoCoDemo {
     if (!this.simulation || !this.model) {
       return;
     }
+    const theta = Math.random() * Math.PI * 2;
+    this._knockdownDirX = Math.cos(theta);
+    this._knockdownDirY = Math.sin(theta);
     this._knockdownSubstepsRemaining = 14;
   }
 
@@ -499,8 +502,8 @@ export class MuJoCoDemo {
     const px = xp[idx];
     const py = xp[idx + 1];
     const pz = xp[idx + 2];
-    const fx = KNOCKDOWN_FORCE_XY_MAG * KNOCKDOWN_XY_DIR_X;
-    const fy = KNOCKDOWN_FORCE_XY_MAG * KNOCKDOWN_XY_DIR_Y;
+    const fx = KNOCKDOWN_FORCE_XY_MAG * this._knockdownDirX;
+    const fy = KNOCKDOWN_FORCE_XY_MAG * this._knockdownDirY;
     const fz = 0;
     this.simulation.applyForce(fx, fy, fz, 0, 0, 0, px, py, pz, bodyId);
   }

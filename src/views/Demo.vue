@@ -427,7 +427,7 @@ const translations = {
     ignoredInvalid: 'Ignored {count} invalid file{plural}',
     noMotionsAdded: 'No motions were added.',
     knockdownTest: 'Knockdown test',
-    knockdownTestHint: 'Applies a strong horizontal impulse on the pelvis (XY) for get-up testing.',
+    knockdownTestHint: 'Applies a strong horizontal impulse on the pelvis in a random XY direction (fixed magnitude) for get-up testing.',
     ampPolicyDescription: 'Final AMP policy for walk, run, and get-up trained on RTX4090 to 60000 iterations.'
   },
   zh: {
@@ -477,7 +477,7 @@ const translations = {
     ignoredInvalid: '已忽略 {count} 个无效文件',
     noMotionsAdded: '没有添加任何动作。',
     knockdownTest: '击倒测试',
-    knockdownTestHint: '在骨盆上施加一次水平面（XY）强冲击，用于测试倒地起身。',
+    knockdownTestHint: '在骨盆上沿水平面（XY）随机方向施加一次固定大小的强冲击，用于测试倒地起身。',
     ampPolicyDescription: '用于行走、奔跑与起身的最终 AMP 策略（RTX4090 训练至 60000 iteration）。'
   }
 };
