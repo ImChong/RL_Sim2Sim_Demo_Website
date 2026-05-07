@@ -250,6 +250,7 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
   const bodies = {};
   const meshes = {};
   const lights = [];
+  parent.bodyIdByName = Object.create(null);
 
   let material = new THREE.MeshPhysicalMaterial();
   material.color = new THREE.Color(1, 1, 1);
@@ -275,6 +276,7 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
       }
       let name_buffer = names_array.subarray(start_idx, end_idx);
       bodies[b].name = textDecoder.decode(name_buffer);
+      parent.bodyIdByName[bodies[b].name] = b;
 
       bodies[b].bodyID = b;
       bodies[b].has_custom_mesh = false;
