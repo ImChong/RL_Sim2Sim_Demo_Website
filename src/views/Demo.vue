@@ -95,7 +95,7 @@
 
         <div v-if="isAmpPolicy" class="mt-4">
           <div class="status-legend follow-controls mt-2">
-            <span class="status-name">Velocity X</span>
+            <span class="status-name">{{ t.velocityX }}</span>
             <span class="text-caption">{{ cmdX.toFixed(2) }}</span>
           </div>
           <v-slider
@@ -105,10 +105,11 @@
             step="0.1"
             density="compact"
             hide-details
+            :aria-label="t.velocityX"
             @update:modelValue="onCmdChange"
           ></v-slider>
           <div class="status-legend follow-controls mt-2">
-            <span class="status-name">Velocity Y</span>
+            <span class="status-name">{{ t.velocityY }}</span>
             <span class="text-caption">{{ cmdY.toFixed(2) }}</span>
           </div>
           <v-slider
@@ -118,10 +119,11 @@
             step="0.1"
             density="compact"
             hide-details
+            :aria-label="t.velocityY"
             @update:modelValue="onCmdChange"
           ></v-slider>
           <div class="status-legend follow-controls mt-2">
-            <span class="status-name">Yaw Rate</span>
+            <span class="status-name">{{ t.yawRate }}</span>
             <span class="text-caption">{{ cmdYaw.toFixed(2) }}</span>
           </div>
           <v-slider
@@ -131,6 +133,7 @@
             step="0.1"
             density="compact"
             hide-details
+            :aria-label="t.yawRate"
             @update:modelValue="onCmdChange"
           ></v-slider>
           <v-btn
@@ -393,6 +396,9 @@ const translations = {
     motionUploadHelpInstructions: ' to learn how to create motion JSON files from GMR.',
     motionUploadHelpDetails: 'Each file should be a single clip (same schema as motions/default.json). File name becomes the motion name (prefixed with [new]). Duplicate names are ignored.',
     cameraFollow: 'Camera follow',
+    velocityX: 'Velocity X',
+    velocityY: 'Velocity Y',
+    yawRate: 'Yaw Rate',
     renderScale: 'Render scale',
     simFreq: 'Sim Freq',
     reset: 'Reset',
@@ -440,6 +446,9 @@ const translations = {
     motionUploadHelpInstructions: ' 了解如何从 GMR 创建动作 JSON 文件。',
     motionUploadHelpDetails: '每个文件应只包含一个片段（结构与 motions/default.json 一致）。文件名会作为动作名称（自动添加 [new] 前缀），重复名称会被忽略。',
     cameraFollow: '相机跟随',
+    velocityX: 'X 方向速度',
+    velocityY: 'Y 方向速度',
+    yawRate: '偏航角速度',
     renderScale: '渲染倍率',
     simFreq: '仿真频率',
     reset: '重置',
