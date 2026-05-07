@@ -115,11 +115,29 @@ export class MuJoCoDemo {
     this.reloadPolicy = reloadPolicy.bind(this);
   }
 
-  async init() {
-    await downloadExampleScenesFolder(this.mujoco);
+  async init(onProgress) {
+    const report = (t) => {
+      if (typeof onProgress === 'function') {
+        onProgress(Math.min(1, Math.max(0, t)));
+      }
+    };
+    const sceneDownload = 0.52;
+    const sceneBuild = 0.13;
+    const policy = 0.35;
+
+    await downloadExampleScenesFolder(this.mujoco, (p) => {
+      report(sceneDownload * p);
+    });
+    report(sceneDownload);
     await this.reloadScene('g1/g1.xml');
     this.updateFollowBodyId();
-    await this.reloadPolicy(defaultPolicy);
+    report(sceneDownload + sceneBuild);
+    await this.reloadPolicy(defaultPolicy, {
+      onInitProgress: (p) => {
+        report(sceneDownload + sceneBuild + policy * p);
+      }
+    });
+    report(1);
     this.alive = true;
   }
 

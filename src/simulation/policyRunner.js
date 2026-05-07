@@ -38,10 +38,13 @@ export class PolicyRunner {
     this.fullObs = new Float32Array(this.numObs * this.historyLength);
     this.obsForPolicy = new Float32Array(this.numObs);
     this.target = new Float32Array(this.numActions);
+    this.onModuleInitProgress = typeof options.onInitProgress === 'function'
+      ? options.onInitProgress
+      : null;
   }
 
   async init() {
-    await this.module.init();
+    await this.module.init((r) => this.onModuleInitProgress?.(r));
     this.reset();
   }
 

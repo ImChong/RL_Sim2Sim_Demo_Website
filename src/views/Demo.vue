@@ -343,8 +343,20 @@
   <v-dialog :model-value="state === 0" persistent max-width="600px" scrollable>
     <v-card :title="t.loadingSimulationTitle">
       <v-card-text>
-        <v-progress-linear indeterminate color="primary" :aria-label="t.loadingSimulationTitle"></v-progress-linear>
-        {{ t.loadingSimulationBody }}
+        <p class="text-body-2 mb-3">{{ t.loadingSimulationBody }}</p>
+        <v-progress-linear
+          :model-value="simulationLoadProgress"
+          height="10"
+          color="primary"
+          rounded
+          class="loading-simulation-progress"
+          :aria-label="t.loadingSimulationTitle"
+          :aria-valuenow="simulationLoadProgress"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          role="progressbar"
+        ></v-progress-linear>
+        <div class="text-caption text-medium-emphasis mt-2 text-end">{{ simulationLoadProgress }}%</div>
       </v-card-text>
     </v-card>
   </v-dialog>
@@ -540,7 +552,8 @@ export default {
     isSafari: false,
     showSafariAlert: true,
     resize_listener: null,
-    vvp_listener: null
+    vvp_listener: null,
+    simulationLoadProgress: 0
   }),
   computed: {
     shouldShowProgress() {
@@ -730,12 +743,21 @@ export default {
         return;
       }
 
+      const setLoadProgress = (ratio) => {
+        this.simulationLoadProgress = Math.round(Math.min(100, Math.max(0, ratio * 100)));
+      };
+
       try {
+        setLoadProgress(0.02);
         const mujoco = await loadMujoco();
+        setLoadProgress(0.10);
         this.demo = new MuJoCoDemo(mujoco);
         this.demo.setVisualTheme?.(this.visualTheme);
         this.demo.setFollowEnabled?.(this.cameraFollowEnabled);
-        await this.demo.init();
+        await this.demo.init((r) => {
+          setLoadProgress(0.10 + 0.90 * r);
+        });
+        setLoadProgress(1);
         this.demo.main_loop();
         this.demo.params.paused = false;
         this.reapplyCustomMotions();
@@ -1315,6 +1337,20 @@ export default {
 .motion-progress-no-animation :deep(.v-progress-linear__determinate),
 .motion-progress-no-animation :deep(.v-progress-linear__indeterminate),
 .motion-progress-no-animation :deep(.v-progress-linear__background) {
+  transition: none !important;
+  animation: none !important;
+}
+
+.loading-simulation-progress,
+.loading-simulation-progress *,
+.loading-simulation-progress::before,
+.loading-simulation-progress::after {
+  transition: none !important;
+  animation: none !important;
+}
+
+.loading-simulation-progress :deep(.v-progress-linear__determinate),
+.loading-simulation-progress :deep(.v-progress-linear__background) {
   transition: none !important;
   animation: none !important;
 }
