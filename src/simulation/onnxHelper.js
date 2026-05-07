@@ -1,4 +1,5 @@
 import * as ort from 'onnxruntime-web';
+import { readResponseBodyWithProgress } from './fetchWithProgress.js';
 
 export class ONNXModule {
   constructor(config) {
@@ -8,19 +9,28 @@ export class ONNXModule {
     console.log("isRecurrent", this.isRecurrent);
   }
 
-  async init() {
-    // Load the ONNX model
+  /**
+   * @param {(ratio: number) => void} [onProgress] ratio in [0,1] for download + WASM session init
+   */
+  async init(onProgress) {
     const modelResponse = await fetch(this.modelPath);
-    const modelArrayBuffer = await modelResponse.arrayBuffer();
+    if (!modelResponse.ok) {
+      throw new Error(`Failed to fetch ONNX model ${this.modelPath}: ${modelResponse.status}`);
+    }
+    const bytes = await readResponseBodyWithProgress(modelResponse, (r) => {
+      onProgress?.(0.82 * r);
+    });
+    const modelArrayBuffer = bytes.slice().buffer;
 
     this.inKeys = this.metaData["in_keys"];
     this.outKeys = this.metaData["out_keys"];
 
-    // Create session from the array buffer
+    onProgress?.(0.88);
     this.session = await ort.InferenceSession.create(modelArrayBuffer, {
       executionProviders: ['wasm'],
       graphOptimizationLevel: 'all'
     });
+    onProgress?.(1);
 
     console.log('ONNX model loaded successfully');
     console.log("inKeys", this.inKeys);
