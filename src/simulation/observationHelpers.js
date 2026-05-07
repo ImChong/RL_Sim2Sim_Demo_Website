@@ -9,16 +9,25 @@ import {
 } from './utils/math.js';
 
 class BootIndicator {
+  constructor() {
+    this.out = new Float32Array(1);
+  }
+
   get size() {
     return 1;
   }
 
   compute() {
-    return new Float32Array([0.0]);
+    this.out[0] = 0.0;
+    return this.out;
   }
 }
 
 class ComplianceFlagObs {
+  constructor() {
+    this.out = new Float32Array(3);
+  }
+
   get size() {
     return 3;
   }
@@ -28,23 +37,34 @@ class ComplianceFlagObs {
     const rawThreshold = Number(state?.complianceThreshold);
     const threshold = Number.isFinite(rawThreshold) ? rawThreshold : 0.0;
     const kp = threshold / 0.05;
-    return new Float32Array([enabled, enabled * threshold, enabled * kp]);
+    this.out[0] = enabled;
+    this.out[1] = enabled * threshold;
+    this.out[2] = enabled * kp;
+    return this.out;
   }
 }
 
 class RootAngVelB {
+  constructor() {
+    this.out = new Float32Array(3);
+  }
+
   get size() {
     return 3;
   }
 
   compute(state) {
-    return new Float32Array(state.rootAngVel);
+    this.out[0] = state.rootAngVel[0];
+    this.out[1] = state.rootAngVel[1];
+    this.out[2] = state.rootAngVel[2];
+    return this.out;
   }
 }
 
 class ProjectedGravityB {
   constructor() {
-    this.gravity = new THREE.Vector3(0, 0, -1);
+    this.gravity = [0.0, 0.0, -1.0];
+    this.out = new Float32Array(3);
   }
 
   get size() {
@@ -52,10 +72,12 @@ class ProjectedGravityB {
   }
 
   compute(state) {
-    const quat = state.rootQuat;
-    const quatObj = new THREE.Quaternion(quat[1], quat[2], quat[3], quat[0]);
-    const gravityLocal = this.gravity.clone().applyQuaternion(quatObj.clone().invert());
-    return new Float32Array([gravityLocal.x, gravityLocal.y, gravityLocal.z]);
+    const quat = normalizeQuat(state.rootQuat);
+    const gLocal = quatApplyInv(quat, this.gravity);
+    this.out[0] = gLocal[0];
+    this.out[1] = gLocal[1];
+    this.out[2] = gLocal[2];
+    return this.out;
   }
 }
 
@@ -67,6 +89,7 @@ class JointPos {
 
     this.maxStep = Math.max(...this.posSteps);
     this.history = Array.from({ length: this.maxStep + 1 }, () => new Float32Array(this.numJoints));
+    this.out = new Float32Array(this.posSteps.length * this.numJoints);
   }
 
   get size() {
@@ -89,14 +112,13 @@ class JointPos {
   }
 
   compute() {
-    const out = new Float32Array(this.posSteps.length * this.numJoints);
     let offset = 0;
     for (const step of this.posSteps) {
       const idx = Math.min(step, this.history.length - 1);
-      out.set(this.history[idx], offset);
+      this.out.set(this.history[idx], offset);
       offset += this.numJoints;
     }
-    return out;
+    return this.out;
   }
 }
 
@@ -106,6 +128,7 @@ class TrackingCommandObsRaw {
     this.futureSteps = kwargs.future_steps ?? [0, 2, 4, 8, 16];
     const nFut = this.futureSteps.length;
     this.outputLength = (nFut - 1) * 3 + nFut * 6;
+    this.out = new Float32Array(this.outputLength);
   }
 
   get size() {
@@ -115,7 +138,8 @@ class TrackingCommandObsRaw {
   compute(state) {
     const tracking = this.policy.tracking;
     if (!tracking || !tracking.isReady()) {
-      return new Float32Array(this.outputLength);
+      this.out.fill(0.0);
+      return this.out;
     }
 
     const baseIdx = tracking.refIdx;
@@ -125,26 +149,32 @@ class TrackingCommandObsRaw {
     const basePos = tracking.refRootPos[indices[0]];
     const baseQuat = normalizeQuat(tracking.refRootQuat[indices[0]]);
 
-    const posDiff = [];
+    let offset = 0;
     for (let i = 1; i < indices.length; i++) {
       const pos = tracking.refRootPos[indices[i]];
       const diff = [pos[0] - basePos[0], pos[1] - basePos[1], pos[2] - basePos[2]];
       const diffB = quatApplyInv(baseQuat, diff);
-      posDiff.push(diffB[0], diffB[1], diffB[2]);
+      this.out[offset++] = diffB[0];
+      this.out[offset++] = diffB[1];
+      this.out[offset++] = diffB[2];
     }
 
     const qCur = normalizeQuat(state.rootQuat);
     const qCurInv = quatInverse(qCur);
 
-    const rot6d = [];
     for (let i = 0; i < indices.length; i++) {
       const refQuat = normalizeQuat(tracking.refRootQuat[indices[i]]);
       const rel = quatMultiply(qCurInv, refQuat);
       const r6 = quatToRot6d(rel);
-      rot6d.push(r6[0], r6[1], r6[2], r6[3], r6[4], r6[5]);
+      this.out[offset++] = r6[0];
+      this.out[offset++] = r6[1];
+      this.out[offset++] = r6[2];
+      this.out[offset++] = r6[3];
+      this.out[offset++] = r6[4];
+      this.out[offset++] = r6[5];
     }
 
-    return Float32Array.from([...posDiff, ...rot6d]);
+    return this.out;
   }
 }
 
@@ -152,6 +182,7 @@ class TargetRootZObs {
   constructor(policy, kwargs = {}) {
     this.policy = policy;
     this.futureSteps = kwargs.future_steps ?? [0, 2, 4, 8, 16];
+    this.out = new Float32Array(this.size);
   }
 
   get size() {
@@ -161,14 +192,14 @@ class TargetRootZObs {
   compute() {
     const tracking = this.policy.tracking;
     if (!tracking || !tracking.isReady()) {
-      return new Float32Array(this.size);
+      this.out.fill(0.0);
+      return this.out;
     }
     const indices = clampFutureIndices(tracking.refIdx, this.futureSteps, tracking.refLen);
-    const out = new Float32Array(indices.length);
     for (let i = 0; i < indices.length; i++) {
-      out[i] = tracking.refRootPos[indices[i]][2] + 0.035;
+      this.out[i] = tracking.refRootPos[indices[i]][2] + 0.035;
     }
-    return out;
+    return this.out;
   }
 }
 
@@ -176,6 +207,9 @@ class TargetJointPosObs {
   constructor(policy, kwargs = {}) {
     this.policy = policy;
     this.futureSteps = kwargs.future_steps ?? [0, 2, 4, 8, 16];
+
+    // We lazily allocate this since size depends on policy.tracking.nJoints
+    this.out = null;
   }
 
   get size() {
@@ -184,27 +218,30 @@ class TargetJointPosObs {
   }
 
   compute(state) {
+    if (!this.out && this.size > 0) {
+      this.out = new Float32Array(this.size);
+    }
+
     const tracking = this.policy.tracking;
     if (!tracking || !tracking.isReady()) {
-      return new Float32Array(this.size);
+      if (this.out) this.out.fill(0.0);
+      return this.out ?? new Float32Array(0);
     }
+
     const indices = clampFutureIndices(tracking.refIdx, this.futureSteps, tracking.refLen);
-    const out = new Float32Array(indices.length * tracking.nJoints);
-    const outDiff = new Float32Array(indices.length * tracking.nJoints);
     const current = state?.jointPos ?? new Float32Array(tracking.nJoints);
     let offset = 0;
+    const halfLen = indices.length * tracking.nJoints;
+
     for (const idx of indices) {
       const target = tracking.refJointPos[idx];
-      out.set(target, offset);
+      this.out.set(target, offset);
       for (let j = 0; j < tracking.nJoints; j++) {
-        outDiff[offset + j] = target[j] - (current[j] ?? 0.0);
+        this.out[halfLen + offset + j] = target[j] - (current[j] ?? 0.0);
       }
       offset += tracking.nJoints;
     }
-    const merged = new Float32Array(out.length + outDiff.length);
-    merged.set(out, 0);
-    merged.set(outDiff, out.length);
-    return merged;
+    return this.out;
   }
 }
 
@@ -212,6 +249,7 @@ class TargetProjectedGravityBObs {
   constructor(policy, kwargs = {}) {
     this.policy = policy;
     this.futureSteps = kwargs.future_steps ?? [0, 2, 4, 8, 16];
+    this.out = new Float32Array(this.size);
   }
 
   get size() {
@@ -221,20 +259,20 @@ class TargetProjectedGravityBObs {
   compute() {
     const tracking = this.policy.tracking;
     if (!tracking || !tracking.isReady()) {
-      return new Float32Array(this.size);
+      this.out.fill(0.0);
+      return this.out;
     }
     const indices = clampFutureIndices(tracking.refIdx, this.futureSteps, tracking.refLen);
-    const out = new Float32Array(indices.length * 3);
     const g = [0.0, 0.0, -1.0];
     let offset = 0;
     for (const idx of indices) {
       const quat = normalizeQuat(tracking.refRootQuat[idx]);
       const gLocal = quatApplyInv(quat, g);
-      out[offset++] = gLocal[0];
-      out[offset++] = gLocal[1];
-      out[offset++] = gLocal[2];
+      this.out[offset++] = gLocal[0];
+      this.out[offset++] = gLocal[1];
+      this.out[offset++] = gLocal[2];
     }
-    return out;
+    return this.out;
   }
 }
 
@@ -253,6 +291,7 @@ class PrevActions {
     this.steps = Math.max(1, Math.floor(history_steps));
     this.numActions = policy.numActions;
     this.actionBuffer = Array.from({ length: this.steps }, () => new Float32Array(this.numActions));
+    this.out = new Float32Array(this.steps * this.numActions);
   }
 
   /**
@@ -261,13 +300,12 @@ class PrevActions {
    * @returns {Float32Array}
    */
   compute() {
-    const flattened = new Float32Array(this.steps * this.numActions);
+    let offset = 0;
     for (let i = 0; i < this.steps; i++) {
-      for (let j = 0; j < this.numActions; j++) {
-        flattened[i * this.numActions + j] = this.actionBuffer[i][j];
-      }
+      this.out.set(this.actionBuffer[i], offset);
+      offset += this.numActions;
     }
-    return flattened;
+    return this.out;
   }
 
   reset() {
@@ -299,6 +337,7 @@ class JointVel {
 
     this.maxStep = Math.max(...this.velSteps);
     this.history = Array.from({ length: this.maxStep + 1 }, () => new Float32Array(this.numJoints));
+    this.out = new Float32Array(this.velSteps.length * this.numJoints);
   }
 
   get size() {
@@ -321,23 +360,29 @@ class JointVel {
   }
 
   compute() {
-    const out = new Float32Array(this.velSteps.length * this.numJoints);
     for (let i = 0; i < this.velSteps.length; i++) {
       const step = this.velSteps[i];
-      out.set(this.history[step], i * this.numJoints);
+      this.out.set(this.history[step], i * this.numJoints);
     }
-    return out;
+    return this.out;
   }
 }
 
 class Command {
+  constructor() {
+    this.out = new Float32Array(3);
+  }
+
   get size() {
     return 3;
   }
 
   compute(state) {
     const cmd = state?.cmd ?? [0, 0, 0];
-    return new Float32Array([cmd[0], cmd[1], cmd[2]]);
+    this.out[0] = cmd[0];
+    this.out[1] = cmd[1];
+    this.out[2] = cmd[2];
+    return this.out;
   }
 }
 
