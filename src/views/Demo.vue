@@ -408,7 +408,7 @@ const translations = {
     skippedDuplicates: 'Skipped {count} duplicate{plural}',
     ignoredInvalid: 'Ignored {count} invalid file{plural}',
     noMotionsAdded: 'No motions were added.',
-    knockdownTest: 'Knockdown test',
+    knockdownTest: '击倒测试',
     knockdownTestHint: 'Applies a strong horizontal impulse on the pelvis (XY) for get-up testing.',
     ampPolicyDescription: 'AMP policy for walk, run, and get-up trained on RTX4090.'
   },
