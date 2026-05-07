@@ -139,6 +139,7 @@
             variant="tonal"
             block
             size="small"
+            data-test="knockdown-test"
             :disabled="state !== 1"
             @click="onKnockdownTest"
           >
