@@ -428,7 +428,7 @@ const translations = {
     noMotionsAdded: 'No motions were added.',
     knockdownTest: 'Knockdown test',
     knockdownTestHint: 'Applies a strong horizontal impulse on the pelvis (XY) for get-up testing.',
-    ampPolicyDescription: 'AMP policy for walk, run, and get-up trained on RTX4090.'
+    ampPolicyDescription: 'Final AMP policy for walk, run, and get-up trained on RTX4090 to 60000 iterations.'
   },
   zh: {
     mobileModeAlert: '已启用移动端模式，控制面板已精简并停靠到底部，便于触控操作。',
@@ -478,7 +478,7 @@ const translations = {
     noMotionsAdded: '没有添加任何动作。',
     knockdownTest: '击倒测试',
     knockdownTestHint: '在骨盆上施加一次水平面（XY）强冲击，用于测试倒地起身。',
-    ampPolicyDescription: '用于行走、奔跑与起身的 AMP 策略（RTX4090 训练）。'
+    ampPolicyDescription: '用于行走、奔跑与起身的最终 AMP 策略（RTX4090 训练至 60000 iteration）。'
   }
 };
 
@@ -522,12 +522,12 @@ export default {
         onnxPath: './examples/checkpoints/g1/policy_latest.onnx'
       },
       {
-        value: 'g1-amp-rtx4090-50000',
-        title: 'G1 AMP Walk/Run/Getup RTX4090',
-        description: 'AMP policy for walk, run, and getup trained on RTX4090.',
+        value: 'g1-amp-rtx4090-59999',
+        title: 'G1 AMP Walk/Run/Getup RTX4090 Final',
+        description: 'Final AMP policy for walk, run, and getup trained on RTX4090 to 60000 iterations.',
         descriptionKey: 'ampPolicyDescription',
         policyPath: './examples/checkpoints/g1/amp_policy.json',
-        onnxPath: './examples/checkpoints/g1/walk_run_getup_rtx4090_50000/model_50000.onnx'
+        onnxPath: './examples/checkpoints/g1/walk_run_getup_rtx4090_59999/model_59999.onnx'
       }
     ],
     currentPolicy: 'g1-tracking-latest',
@@ -656,7 +656,7 @@ export default {
       return this.policies.find((policy) => policy.value === this.currentPolicy) ?? null;
     },
     isAmpPolicy() {
-      return this.currentPolicy === 'g1-amp-rtx4090-50000';
+      return this.currentPolicy === 'g1-amp-rtx4090-59999';
     },
     policyDescription() {
       if (!this.selectedPolicy) {
