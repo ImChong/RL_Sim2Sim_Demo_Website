@@ -133,6 +133,18 @@
             hide-details
             @update:modelValue="onCmdChange"
           ></v-slider>
+          <v-btn
+            class="mt-3"
+            color="secondary"
+            variant="tonal"
+            block
+            size="small"
+            :disabled="state !== 1"
+            @click="onKnockdownTest"
+          >
+            {{ t.knockdownTest }}
+          </v-btn>
+          <div class="text-caption mt-1">{{ t.knockdownTestHint }}</div>
         </div>
 
         <v-alert
@@ -394,7 +406,10 @@ const translations = {
     addedMotions: 'Added {count} motion{plural}',
     skippedDuplicates: 'Skipped {count} duplicate{plural}',
     ignoredInvalid: 'Ignored {count} invalid file{plural}',
-    noMotionsAdded: 'No motions were added.'
+    noMotionsAdded: 'No motions were added.',
+    knockdownTest: 'Knockdown test',
+    knockdownTestHint: 'Applies a strong impulse on the torso for get-up testing.',
+    ampPolicyDescription: 'AMP policy for walk, run, and get-up trained on RTX4090.'
   },
   zh: {
     mobileModeAlert: '已启用移动端模式，控制面板已精简并停靠到底部，便于触控操作。',
@@ -438,7 +453,10 @@ const translations = {
     addedMotions: '已添加 {count} 个动作',
     skippedDuplicates: '已跳过 {count} 个重复项',
     ignoredInvalid: '已忽略 {count} 个无效文件',
-    noMotionsAdded: '没有添加任何动作。'
+    noMotionsAdded: '没有添加任何动作。',
+    knockdownTest: '击倒测试',
+    knockdownTestHint: '对躯干施加一次强冲击，用于测试倒地起身。',
+    ampPolicyDescription: '用于行走、奔跑与起身的 AMP 策略（RTX4090 训练）。'
   }
 };
 
@@ -853,6 +871,12 @@ export default {
       this.demo.params.cmdX = this.cmdX;
       this.demo.params.cmdY = this.cmdY;
       this.demo.params.cmdYaw = this.cmdYaw;
+    },
+    onKnockdownTest() {
+      if (!this.demo || this.state !== 1) {
+        return;
+      }
+      this.demo.queueKnockdownDisturbance();
     },
     onComplianceThresholdChange(value) {
       const numeric = Number(value);

@@ -279,7 +279,7 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
       bodies[b].bodyID = b;
       bodies[b].has_custom_mesh = false;
 
-      if (bodies[b].name === 'base') {
+      if (bodies[b].name === 'base' || bodies[b].name === 'pelvis') {
         parent.pelvis_body_id = b;
       }
     }

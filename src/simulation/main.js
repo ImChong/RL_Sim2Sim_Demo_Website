@@ -65,6 +65,8 @@ export class MuJoCoDemo {
     this._stepFrameCount = 0;
     this._stepLastTime = performance.now();
     this._lastRenderTime = 0;
+    /** @type {number} remaining physics substeps for AMP knockdown disturbance */
+    this._knockdownSubstepsRemaining = 0;
 
     this.container.appendChild(this.renderer.domElement);
 
@@ -306,6 +308,25 @@ export class MuJoCoDemo {
             applied[i] = 0.0;
           }
 
+          if (this._knockdownSubstepsRemaining > 0) {
+            let bodyId = 1;
+            if (Number.isInteger(this.pelvis_body_id)) {
+              bodyId = this.pelvis_body_id;
+            } else if (Number.isInteger(this.followBodyId)) {
+              bodyId = this.followBodyId;
+            }
+            const xp = this.simulation.xpos;
+            const idx = bodyId * 3;
+            const bx = xp[idx];
+            const by = xp[idx + 1];
+            const bz = xp[idx + 2];
+            const px = bx + 0.2;
+            const py = by - 0.05;
+            const pz = bz + 0.52;
+            this.simulation.applyForce(3800, -2200, 120, 140, -95, 35, px, py, pz, bodyId);
+            this._knockdownSubstepsRemaining -= 1;
+          }
+
           const dragged = this.dragStateManager.physicsObject;
           if (dragged && dragged.bodyID) {
             for (let b = 0; b < this.model.nbody; b++) {
@@ -423,6 +444,17 @@ export class MuJoCoDemo {
     return this.simStepHz;
   }
 
+  /**
+   * Queue several physics substeps of large wrench on the pelvis (AMP-only UI)
+   * to knock the robot down for get-up / recovery testing.
+   */
+  queueKnockdownDisturbance() {
+    if (!this.simulation || !this.model) {
+      return;
+    }
+    this._knockdownSubstepsRemaining = 18;
+  }
+
   readPolicyState() {
     const qpos = this.simulation.qpos;
     const qvel = this.simulation.qvel;
@@ -502,6 +534,7 @@ export class MuJoCoDemo {
     if (!this.simulation) {
       return;
     }
+    this._knockdownSubstepsRemaining = 0;
     this.params.paused = true;
     this.simulation.resetData();
     this.applyPolicyInitialState();
