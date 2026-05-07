@@ -6,6 +6,12 @@ import { getSimulationThemeSettings, normalizeSimulationThemeName } from './them
 
 const defaultPolicy = "./examples/checkpoints/g1/tracking_policy_latest.json";
 
+/** Horizontal knockdown push magnitude (N), applied in world XY; local Z (vertical) force component is zero. */
+const KNOCKDOWN_FORCE_XY_MAG = 3400;
+/** Unit direction in the horizontal plane (world X/Y), MuJoCo Z-up for G1. */
+const KNOCKDOWN_XY_DIR_X = 0.8191520442889918;
+const KNOCKDOWN_XY_DIR_Y = -0.573576436351046;
+
 export class MuJoCoDemo {
   constructor(mujoco) {
     this.mujoco = mujoco;
@@ -309,21 +315,7 @@ export class MuJoCoDemo {
           }
 
           if (this._knockdownSubstepsRemaining > 0) {
-            let bodyId = 1;
-            if (Number.isInteger(this.pelvis_body_id)) {
-              bodyId = this.pelvis_body_id;
-            } else if (Number.isInteger(this.followBodyId)) {
-              bodyId = this.followBodyId;
-            }
-            const xp = this.simulation.xpos;
-            const idx = bodyId * 3;
-            const bx = xp[idx];
-            const by = xp[idx + 1];
-            const bz = xp[idx + 2];
-            const px = bx + 0.2;
-            const py = by - 0.05;
-            const pz = bz + 0.52;
-            this.simulation.applyForce(3800, -2200, 120, 140, -95, 35, px, py, pz, bodyId);
+            this.applyPelvisKnockdownForceXYPlane();
             this._knockdownSubstepsRemaining -= 1;
           }
 
@@ -452,7 +444,47 @@ export class MuJoCoDemo {
     if (!this.simulation || !this.model) {
       return;
     }
-    this._knockdownSubstepsRemaining = 18;
+    this._knockdownSubstepsRemaining = 14;
+  }
+
+  /**
+   * Floating-base pelvis id for wrenches (never world body 0).
+   */
+  resolvePelvisBodyId() {
+    const map = this.bodyIdByName;
+    if (map && Number.isInteger(map.pelvis) && map.pelvis > 0) {
+      return map.pelvis;
+    }
+    if (map && Number.isInteger(map.base) && map.base > 0) {
+      return map.base;
+    }
+    if (Number.isInteger(this.pelvis_body_id) && this.pelvis_body_id > 0) {
+      return this.pelvis_body_id;
+    }
+    if (Number.isInteger(this.followBodyId) && this.followBodyId > 0) {
+      return this.followBodyId;
+    }
+    return 1;
+  }
+
+  /**
+   * Applies a horizontal-only force on the pelvis at its current body origin (world xpos).
+   * Does not modify qpos — disturbance is purely physical (mj_applyFT).
+   */
+  applyPelvisKnockdownForceXYPlane() {
+    const bodyId = this.resolvePelvisBodyId();
+    if (!Number.isInteger(bodyId) || bodyId < 1) {
+      return;
+    }
+    const xp = this.simulation.xpos;
+    const idx = bodyId * 3;
+    const px = xp[idx];
+    const py = xp[idx + 1];
+    const pz = xp[idx + 2];
+    const fx = KNOCKDOWN_FORCE_XY_MAG * KNOCKDOWN_XY_DIR_X;
+    const fy = KNOCKDOWN_FORCE_XY_MAG * KNOCKDOWN_XY_DIR_Y;
+    const fz = 0;
+    this.simulation.applyForce(fx, fy, fz, 0, 0, 0, px, py, pz, bodyId);
   }
 
   readPolicyState() {
