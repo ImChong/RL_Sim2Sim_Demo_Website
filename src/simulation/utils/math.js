@@ -1,5 +1,8 @@
 export function normalizeQuat(quat) {
-  const [w, x, y, z] = quat;
+  const w = quat[0];
+  const x = quat[1];
+  const y = quat[2];
+  const z = quat[3];
   // Math.hypot has overhead due to overflow/underflow checking.
   // Using Math.sqrt is significantly faster.
   const n = Math.sqrt(w * w + x * x + y * y + z * z);
@@ -15,8 +18,8 @@ export function quatConjugate(quat) {
 }
 
 export function quatMultiply(a, b) {
-  const [aw, ax, ay, az] = a;
-  const [bw, bx, by, bz] = b;
+  const aw = a[0], ax = a[1], ay = a[2], az = a[3];
+  const bw = b[0], bx = b[1], by = b[2], bz = b[3];
   return [
     aw * bw - ax * bx - ay * by - az * bz,
     aw * bx + ax * bw + ay * bz - az * by,
@@ -27,7 +30,7 @@ export function quatMultiply(a, b) {
 
 export function quatInverse(quat) {
   const conj = quatConjugate(quat);
-  const [w, x, y, z] = quat;
+  const w = quat[0], x = quat[1], y = quat[2], z = quat[3];
   const normSq = w * w + x * x + y * y + z * z;
   if (normSq < 1e-9) {
     return [1, 0, 0, 0];
@@ -37,7 +40,7 @@ export function quatInverse(quat) {
 }
 
 export function yawComponent(quat) {
-  const [w, x, y, z] = quat;
+  const w = quat[0], x = quat[1], y = quat[2], z = quat[3];
   const sinyCosp = 2.0 * (w * z + x * y);
   const cosyCosp = 1.0 - 2.0 * (y * y + z * z);
   const yaw = Math.atan2(sinyCosp, cosyCosp);
@@ -124,9 +127,9 @@ export function toFloatArray(value, length, fallback = 0.0) {
   }
   if (ArrayBuffer.isView(value)) {
     const out = new Float32Array(length);
-    const src = value;
-    for (let i = 0; i < length; i++) {
-      out[i] = src[i] ?? fallback;
+    out.set(value.subarray(0, Math.min(value.length, length)));
+    if (value.length < length && fallback !== 0) {
+      out.fill(fallback, value.length);
     }
     return out;
   }
@@ -136,7 +139,7 @@ export function toFloatArray(value, length, fallback = 0.0) {
 }
 
 export function quatApplyInv(quat, vec) {
-  const [w, x, y, z] = quat;
+  const w = quat[0], x = quat[1], y = quat[2], z = quat[3];
   const vx = vec[0];
   const vy = vec[1];
   const vz = vec[2];
@@ -166,7 +169,8 @@ export function quatToRotVec(quat) {
 }
 
 export function quatToRot6d(quat) {
-  const [w, x, y, z] = normalizeQuat(quat);
+  const q = normalizeQuat(quat);
+  const w = q[0], x = q[1], y = q[2], z = q[3];
   const xx = x * x;
   const yy = y * y;
   const zz = z * z;
