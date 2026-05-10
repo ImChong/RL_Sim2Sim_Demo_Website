@@ -34,6 +34,9 @@ export class PolicyRunner {
     this.obsModules = this._buildObsModules(config.obs_config);
     this.numObs = this.obsModules.reduce((sum, obs) => sum + (obs.size ?? 0), 0);
     this.historyLength = config.obs_config?.history_length || 1;
+
+    // Pre-allocate arrays to reduce GC pressure during inferencing
+    this.cachedJointPosRel = new Float32Array(this.numActions);
     this.obsHistory = [];
     this.fullObs = new Float32Array(this.numObs * this.historyLength);
     this.obsForPolicy = new Float32Array(this.numObs);
@@ -69,15 +72,19 @@ export class PolicyRunner {
       return state;
     }
     const jointPosAbs = state.jointPos ?? new Float32Array(this.numActions);
-    const jointPosRel = new Float32Array(this.numActions);
+
+    // Create a new object for policy state to avoid mutating the shared cached state,
+    // but reuse the cached array for relative joint positions to save TypedArray allocations
+    const policyState = { ...state };
+    policyState.jointPosAbs = jointPosAbs;
+
+    const jointPosRel = this.cachedJointPosRel;
     for (let i = 0; i < this.numActions; i++) {
       jointPosRel[i] = jointPosAbs[i] - this.defaultJointPos[i];
     }
-    return {
-      ...state,
-      jointPosAbs,
-      jointPos: jointPosRel
-    };
+    policyState.jointPos = jointPosRel;
+
+    return policyState;
   }
 
   reset(state = null) {
@@ -124,9 +131,13 @@ export class PolicyRunner {
       }
 
       if (this.historyLength > 1) {
-        this.obsHistory.push(new Float32Array(obsForPolicy));
-        if (this.obsHistory.length > this.historyLength) {
-          this.obsHistory.shift();
+        if (this.obsHistory.length < this.historyLength) {
+           this.obsHistory.push(new Float32Array(obsForPolicy));
+        } else {
+           // Recycle the oldest Float32Array to prevent GC per physics step
+           const oldestObs = this.obsHistory.shift();
+           oldestObs.set(obsForPolicy);
+           this.obsHistory.push(oldestObs);
         }
 
         const fullObs = this.fullObs;
