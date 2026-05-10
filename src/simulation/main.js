@@ -33,6 +33,20 @@ export class MuJoCoDemo {
     this.simulation = null;
     this.currentPolicyPath = defaultPolicy;
 
+    // Pre-allocated policy state arrays to avoid GC pressure per physics tick
+    this._cachedPolicyState = {
+      jointPos: null, // Will be initialized when policy is loaded
+      jointVel: null,
+      rootPos: new Float32Array(3),
+      rootQuat: new Float32Array(4),
+      rootAngVel: new Float32Array(3),
+      qvel_base: null, // Reference to rootAngVel
+      complianceEnabled: false,
+      complianceThreshold: 10.0,
+      cmd: [0.0, 0.0, 0.0]
+    };
+    this._cachedPolicyState.qvel_base = this._cachedPolicyState.rootAngVel;
+
     this.bodies = {};
     this.lights = {};
     this.visualThemeName = 'light';
@@ -511,31 +525,49 @@ export class MuJoCoDemo {
   readPolicyState() {
     const qpos = this.simulation.qpos;
     const qvel = this.simulation.qvel;
-    const jointPos = new Float32Array(this.numActions);
-    const jointVel = new Float32Array(this.numActions);
+
+    // Initialize lazily based on numActions (which changes on policy load)
+    if (!this._cachedPolicyState.jointPos || this._cachedPolicyState.jointPos.length !== this.numActions) {
+      this._cachedPolicyState.jointPos = new Float32Array(this.numActions);
+      this._cachedPolicyState.jointVel = new Float32Array(this.numActions);
+    }
+
+    const jointPos = this._cachedPolicyState.jointPos;
+    const jointVel = this._cachedPolicyState.jointVel;
     for (let i = 0; i < this.numActions; i++) {
       const qposAdr = this.qpos_adr_policy[i];
       const qvelAdr = this.qvel_adr_policy[i];
       jointPos[i] = qpos[qposAdr];
       jointVel[i] = qvel[qvelAdr];
     }
-    const rootPos = new Float32Array([qpos[0], qpos[1], qpos[2]]);
-    const rootQuat = new Float32Array([qpos[3], qpos[4], qpos[5], qpos[6]]);
-    const rootAngVel = new Float32Array([qvel[3], qvel[4], qvel[5]]);
+
+    const rootPos = this._cachedPolicyState.rootPos;
+    rootPos[0] = qpos[0];
+    rootPos[1] = qpos[1];
+    rootPos[2] = qpos[2];
+
+    const rootQuat = this._cachedPolicyState.rootQuat;
+    rootQuat[0] = qpos[3];
+    rootQuat[1] = qpos[4];
+    rootQuat[2] = qpos[5];
+    rootQuat[3] = qpos[6];
+
+    const rootAngVel = this._cachedPolicyState.rootAngVel;
+    rootAngVel[0] = qvel[3];
+    rootAngVel[1] = qvel[4];
+    rootAngVel[2] = qvel[5];
+
     const complianceEnabled = Boolean(this.params?.compliance_enabled);
     const rawThreshold = Number(this.params?.compliance_threshold);
     const complianceThreshold = Number.isFinite(rawThreshold) ? rawThreshold : 10.0;
-    return {
-      jointPos,
-      jointVel,
-      rootPos,
-      rootQuat,
-      rootAngVel,
-      complianceEnabled,
-      complianceThreshold,
-      qvel_base: rootAngVel,
-      cmd: [this.params.cmdX, this.params.cmdY, this.params.cmdYaw]
-    };
+
+    this._cachedPolicyState.complianceEnabled = complianceEnabled;
+    this._cachedPolicyState.complianceThreshold = complianceThreshold;
+    this._cachedPolicyState.cmd[0] = this.params.cmdX;
+    this._cachedPolicyState.cmd[1] = this.params.cmdY;
+    this._cachedPolicyState.cmd[2] = this.params.cmdYaw;
+
+    return this._cachedPolicyState;
   }
 
   applyPolicyInitialState() {
