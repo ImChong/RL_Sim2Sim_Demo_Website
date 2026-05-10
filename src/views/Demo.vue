@@ -526,8 +526,16 @@ export default {
         title: 'G1 AMP Walk/Run/Getup RTX4090 100000',
         description: 'AMP policy for walk, run, and getup trained on RTX4090 to 100000 iterations.',
         descriptionKey: 'ampPolicyDescription',
-        policyPath: './examples/checkpoints/g1/amp_policy.json',
+        policyPath: './examples/checkpoints/g1/amp_policy_100000.json',
         onnxPath: './examples/checkpoints/g1/walk_run_getup_rtx4090_100000/model_100000.onnx'
+      },
+      {
+        value: 'g1-amp-rtx4090-100000-standstill-fix',
+        title: 'G1 AMP Walk/Run/Getup RTX4090 100000 (stand still fix)',
+        description: 'AMP policy trained with zero-command standing stability rewards on RTX4090 to 100000 iterations.',
+        descriptionKey: 'ampPolicyStandStillFixDescription',
+        policyPath: './examples/checkpoints/g1/amp_policy_100000_standstill_fix.json',
+        onnxPath: './examples/checkpoints/g1/walk_run_getup_rtx4090_100000_standstill_fix/model_100000.onnx'
       }
     ],
     currentPolicy: 'g1-tracking-latest',
@@ -656,7 +664,7 @@ export default {
       return this.policies.find((policy) => policy.value === this.currentPolicy) ?? null;
     },
     isAmpPolicy() {
-      return this.currentPolicy === 'g1-amp-rtx4090-100000';
+      return this.currentPolicy?.startsWith('g1-amp-rtx4090-100000');
     },
     policyDescription() {
       if (!this.selectedPolicy) {
