@@ -225,7 +225,8 @@ export class TrackingHelper {
 
     const q0 = yawComponent(motion.rootQuat[0]);
     const qc = yawComponent(curr.rootQuat);
-    const qDeltaWxyz = quatMultiply(qc, quatInverse(q0));
+    const q0Inv = quatInverse(q0);
+    const qDeltaWxyz = quatMultiply(qc, q0Inv);
     const qDelta = new THREE.Quaternion(qDeltaWxyz[1], qDeltaWxyz[2], qDeltaWxyz[3], qDeltaWxyz[0]);
 
     const jointPos = motion.jointPos.map((row) => Float32Array.from(row));

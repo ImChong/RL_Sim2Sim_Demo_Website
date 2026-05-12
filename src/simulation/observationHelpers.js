@@ -65,6 +65,7 @@ class ProjectedGravityB {
   constructor() {
     this.gravity = [0.0, 0.0, -1.0];
     this.out = new Float32Array(3);
+    this._quat = new Float32Array(4);
   }
 
   get size() {
@@ -72,11 +73,8 @@ class ProjectedGravityB {
   }
 
   compute(state) {
-    const quat = normalizeQuat(state.rootQuat);
-    const gLocal = quatApplyInv(quat, this.gravity);
-    this.out[0] = gLocal[0];
-    this.out[1] = gLocal[1];
-    this.out[2] = gLocal[2];
+    normalizeQuat(state.rootQuat, this._quat);
+    quatApplyInv(this._quat, this.gravity, this.out);
     return this.out;
   }
 }
@@ -129,6 +127,14 @@ class TrackingCommandObsRaw {
     const nFut = this.futureSteps.length;
     this.outputLength = (nFut - 1) * 3 + nFut * 6;
     this.out = new Float32Array(this.outputLength);
+    this._baseQuat = new Float32Array(4);
+    this._diff = new Float32Array(3);
+    this._diffB = new Float32Array(3);
+    this._qCur = new Float32Array(4);
+    this._qCurInv = new Float32Array(4);
+    this._refQuat = new Float32Array(4);
+    this._rel = new Float32Array(4);
+    this._r6 = new Float32Array(6);
   }
 
   get size() {
@@ -147,31 +153,33 @@ class TrackingCommandObsRaw {
     const indices = clampFutureIndices(baseIdx, this.futureSteps, refLen);
 
     const basePos = tracking.refRootPos[indices[0]];
-    const baseQuat = normalizeQuat(tracking.refRootQuat[indices[0]]);
+    normalizeQuat(tracking.refRootQuat[indices[0]], this._baseQuat);
 
     let offset = 0;
     for (let i = 1; i < indices.length; i++) {
       const pos = tracking.refRootPos[indices[i]];
-      const diff = [pos[0] - basePos[0], pos[1] - basePos[1], pos[2] - basePos[2]];
-      const diffB = quatApplyInv(baseQuat, diff);
-      this.out[offset++] = diffB[0];
-      this.out[offset++] = diffB[1];
-      this.out[offset++] = diffB[2];
+      this._diff[0] = pos[0] - basePos[0];
+      this._diff[1] = pos[1] - basePos[1];
+      this._diff[2] = pos[2] - basePos[2];
+      quatApplyInv(this._baseQuat, this._diff, this._diffB);
+      this.out[offset++] = this._diffB[0];
+      this.out[offset++] = this._diffB[1];
+      this.out[offset++] = this._diffB[2];
     }
 
-    const qCur = normalizeQuat(state.rootQuat);
-    const qCurInv = quatInverse(qCur);
+    normalizeQuat(state.rootQuat, this._qCur);
+    quatInverse(this._qCur, this._qCurInv);
 
     for (let i = 0; i < indices.length; i++) {
-      const refQuat = normalizeQuat(tracking.refRootQuat[indices[i]]);
-      const rel = quatMultiply(qCurInv, refQuat);
-      const r6 = quatToRot6d(rel);
-      this.out[offset++] = r6[0];
-      this.out[offset++] = r6[1];
-      this.out[offset++] = r6[2];
-      this.out[offset++] = r6[3];
-      this.out[offset++] = r6[4];
-      this.out[offset++] = r6[5];
+      normalizeQuat(tracking.refRootQuat[indices[i]], this._refQuat);
+      quatMultiply(this._qCurInv, this._refQuat, this._rel);
+      quatToRot6d(this._rel, this._r6);
+      this.out[offset++] = this._r6[0];
+      this.out[offset++] = this._r6[1];
+      this.out[offset++] = this._r6[2];
+      this.out[offset++] = this._r6[3];
+      this.out[offset++] = this._r6[4];
+      this.out[offset++] = this._r6[5];
     }
 
     return this.out;
@@ -250,6 +258,9 @@ class TargetProjectedGravityBObs {
     this.policy = policy;
     this.futureSteps = kwargs.future_steps ?? [0, 2, 4, 8, 16];
     this.out = new Float32Array(this.size);
+    this._quat = new Float32Array(4);
+    this._gLocal = new Float32Array(3);
+    this.g = [0.0, 0.0, -1.0];
   }
 
   get size() {
@@ -263,14 +274,13 @@ class TargetProjectedGravityBObs {
       return this.out;
     }
     const indices = clampFutureIndices(tracking.refIdx, this.futureSteps, tracking.refLen);
-    const g = [0.0, 0.0, -1.0];
     let offset = 0;
     for (const idx of indices) {
-      const quat = normalizeQuat(tracking.refRootQuat[idx]);
-      const gLocal = quatApplyInv(quat, g);
-      this.out[offset++] = gLocal[0];
-      this.out[offset++] = gLocal[1];
-      this.out[offset++] = gLocal[2];
+      normalizeQuat(tracking.refRootQuat[idx], this._quat);
+      quatApplyInv(this._quat, this.g, this._gLocal);
+      this.out[offset++] = this._gLocal[0];
+      this.out[offset++] = this._gLocal[1];
+      this.out[offset++] = this._gLocal[2];
     }
     return this.out;
   }
