@@ -1,4 +1,4 @@
-export function normalizeQuat(quat) {
+export function normalizeQuat(quat, out = new Float32Array(4)) {
   const w = quat[0];
   const x = quat[1];
   const y = quat[2];
@@ -7,45 +7,56 @@ export function normalizeQuat(quat) {
   // Using Math.sqrt is significantly faster.
   const n = Math.sqrt(w * w + x * x + y * y + z * z);
   if (n < 1e-9) {
-    return [1, 0, 0, 0];
+    out[0] = 1; out[1] = 0; out[2] = 0; out[3] = 0;
+    return out;
   }
   const inv = 1.0 / n;
-  return [w * inv, x * inv, y * inv, z * inv];
+  out[0] = w * inv; out[1] = x * inv; out[2] = y * inv; out[3] = z * inv;
+  return out;
 }
 
-export function quatConjugate(quat) {
-  return [quat[0], -quat[1], -quat[2], -quat[3]];
+export function quatConjugate(quat, out = new Float32Array(4)) {
+  out[0] = quat[0];
+  out[1] = -quat[1];
+  out[2] = -quat[2];
+  out[3] = -quat[3];
+  return out;
 }
 
-export function quatMultiply(a, b) {
+export function quatMultiply(a, b, out = new Float32Array(4)) {
   const aw = a[0], ax = a[1], ay = a[2], az = a[3];
   const bw = b[0], bx = b[1], by = b[2], bz = b[3];
-  return [
-    aw * bw - ax * bx - ay * by - az * bz,
-    aw * bx + ax * bw + ay * bz - az * by,
-    aw * by - ax * bz + ay * bw + az * bx,
-    aw * bz + ax * by - ay * bx + az * bw
-  ];
+  out[0] = aw * bw - ax * bx - ay * by - az * bz;
+  out[1] = aw * bx + ax * bw + ay * bz - az * by;
+  out[2] = aw * by - ax * bz + ay * bw + az * bx;
+  out[3] = aw * bz + ax * by - ay * bx + az * bw;
+  return out;
 }
 
-export function quatInverse(quat) {
-  const conj = quatConjugate(quat);
+export function quatInverse(quat, out = new Float32Array(4)) {
+  const conj = quatConjugate(quat, out);
   const w = quat[0], x = quat[1], y = quat[2], z = quat[3];
   const normSq = w * w + x * x + y * y + z * z;
   if (normSq < 1e-9) {
-    return [1, 0, 0, 0];
+    out[0] = 1; out[1] = 0; out[2] = 0; out[3] = 0;
+    return out;
   }
   const inv = 1.0 / normSq;
-  return [conj[0] * inv, conj[1] * inv, conj[2] * inv, conj[3] * inv];
+  out[0] = conj[0] * inv;
+  out[1] = conj[1] * inv;
+  out[2] = conj[2] * inv;
+  out[3] = conj[3] * inv;
+  return out;
 }
 
-export function yawComponent(quat) {
+export function yawComponent(quat, out = new Float32Array(4)) {
   const w = quat[0], x = quat[1], y = quat[2], z = quat[3];
   const sinyCosp = 2.0 * (w * z + x * y);
   const cosyCosp = 1.0 - 2.0 * (y * y + z * z);
   const yaw = Math.atan2(sinyCosp, cosyCosp);
   const half = 0.5 * yaw;
-  return normalizeQuat([Math.cos(half), 0.0, 0.0, Math.sin(half)]);
+  out[0] = Math.cos(half); out[1] = 0.0; out[2] = 0.0; out[3] = Math.sin(half);
+  return normalizeQuat(out, out);
 }
 
 export function linspaceRows(a, b, steps) {
@@ -138,7 +149,7 @@ export function toFloatArray(value, length, fallback = 0.0) {
   return out;
 }
 
-export function quatApplyInv(quat, vec) {
+export function quatApplyInv(quat, vec, out = new Float32Array(3)) {
   const w = quat[0], x = quat[1], y = quat[2], z = quat[3];
   const vx = vec[0];
   const vy = vec[1];
@@ -149,27 +160,31 @@ export function quatApplyInv(quat, vec) {
   const cx = y * tz - z * ty;
   const cy = z * tx - x * tz;
   const cz = x * ty - y * tx;
-  return [
-    vx - w * tx + cx,
-    vy - w * ty + cy,
-    vz - w * tz + cz
-  ];
+  out[0] = vx - w * tx + cx;
+  out[1] = vy - w * ty + cy;
+  out[2] = vz - w * tz + cz;
+  return out;
 }
 
-export function quatToRotVec(quat) {
-  const q = normalizeQuat(quat);
+const _internalQ = new Float32Array(4);
+export function quatToRotVec(quat, out = new Float32Array(3)) {
+  const q = normalizeQuat(quat, _internalQ);
   const w = Math.max(-1.0, Math.min(1.0, q[0]));
   const angle = 2.0 * Math.acos(w);
   const s = Math.sqrt(Math.max(0.0, 1.0 - w * w));
   if (s < 1e-6) {
-    return [q[1] * 2.0, q[2] * 2.0, q[3] * 2.0];
+    out[0] = q[1] * 2.0; out[1] = q[2] * 2.0; out[2] = q[3] * 2.0;
+    return out;
   }
   const inv = 1.0 / s;
-  return [q[1] * inv * angle, q[2] * inv * angle, q[3] * inv * angle];
+  out[0] = q[1] * inv * angle;
+  out[1] = q[2] * inv * angle;
+  out[2] = q[3] * inv * angle;
+  return out;
 }
 
-export function quatToRot6d(quat) {
-  const q = normalizeQuat(quat);
+export function quatToRot6d(quat, out = new Float32Array(6)) {
+  const q = normalizeQuat(quat, _internalQ);
   const w = q[0], x = q[1], y = q[2], z = q[3];
   const xx = x * x;
   const yy = y * y;
@@ -181,12 +196,12 @@ export function quatToRot6d(quat) {
   const wy = w * y;
   const wz = w * z;
 
-  const r00 = 1.0 - 2.0 * (yy + zz);
-  const r01 = 2.0 * (xy - wz);
-  const r10 = 2.0 * (xy + wz);
-  const r11 = 1.0 - 2.0 * (xx + zz);
-  const r20 = 2.0 * (xz - wy);
-  const r21 = 2.0 * (yz + wx);
+  out[0] = 1.0 - 2.0 * (yy + zz);
+  out[1] = 2.0 * (xy + wz);
+  out[2] = 2.0 * (xz - wy);
+  out[3] = 2.0 * (xy - wz);
+  out[4] = 1.0 - 2.0 * (xx + zz);
+  out[5] = 2.0 * (yz + wx);
 
-  return [r00, r10, r20, r01, r11, r21];
+  return out;
 }

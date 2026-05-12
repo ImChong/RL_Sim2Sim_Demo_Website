@@ -14,3 +14,6 @@
 ## 2025-05-10 - Eliminate per-tick array allocations in PolicyRunner and main
 **Learning:** Found that `readPolicyState` in `main.js` and `makePolicyState` and history buffering in `policyRunner.js` created 5+ `Float32Array` objects per physics tick. Over the simulation loop this causes immense GC pressure and stuttering. Attempting to optimize it required careful handling so as not to mutate the original simulation array structures upstream or zero-pad history arrays incorrectly on start.
 **Action:** Always pre-allocate the output TypedArrays when working inside the simulation ticking loop, keeping a mutable reference like `_cachedPolicyState`. In order to clone an array efficiently from history without allocating new ones, use a combination of `.shift()` and `.push()` in a ring buffer style alongside `.set()`.
+## 2025-05-12 - Eliminate math allocations in Observation and Tracking hot loops
+**Learning:** Math functions returning new Float32Arrays inside hot observer loops (`ProjectedGravityB`, `TrackingCommandObsRaw`) and tracking logic creates unnecessary GC pressure.
+**Action:** Implemented the "out parameter pattern" in math functions like `normalizeQuat`, `quatMultiply`, `quatInverse` etc. By pre-allocating variables inside the class constructors and mutating them in place, we avoid hidden array allocations inside `compute` running 500-1000Hz.
