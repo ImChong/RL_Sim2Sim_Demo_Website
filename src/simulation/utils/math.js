@@ -119,13 +119,15 @@ export function slerpMany(q0, q1, steps) {
   return results;
 }
 
-export function clampFutureIndices(base, steps, length) {
-  return steps.map((step) => {
-    const idx = base + step;
-    if (idx < 0) return 0;
-    if (idx >= length) return length - 1;
-    return idx;
-  });
+export function clampFutureIndices(base, steps, length, out) {
+  if (!out) {
+    out = new Int32Array(steps.length);
+  }
+  for (let i = 0; i < steps.length; i++) {
+    const idx = base + steps[i];
+    out[i] = idx < 0 ? 0 : (idx >= length ? length - 1 : idx);
+  }
+  return out;
 }
 
 export function toFloatArray(value, length, fallback = 0.0) {

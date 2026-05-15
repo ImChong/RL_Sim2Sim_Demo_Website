@@ -17,3 +17,7 @@
 ## 2025-05-12 - Eliminate math allocations in Observation and Tracking hot loops
 **Learning:** Math functions returning new Float32Arrays inside hot observer loops (`ProjectedGravityB`, `TrackingCommandObsRaw`) and tracking logic creates unnecessary GC pressure.
 **Action:** Implemented the "out parameter pattern" in math functions like `normalizeQuat`, `quatMultiply`, `quatInverse` etc. By pre-allocating variables inside the class constructors and mutating them in place, we avoid hidden array allocations inside `compute` running 500-1000Hz.
+
+## 2025-05-15 - Array.map allocations in clampFutureIndices
+**Learning:** Found that `clampFutureIndices` was using `Array.prototype.map()` internally. Because this function is called inside hot loops by observation classes like `TargetRootZObs`, `TargetJointPosObs`, and `TargetProjectedGravityBObs` to get future indices during tracking updates, it triggered continuous allocations of new Arrays causing GC pressure.
+**Action:** Replaced `.map()` with a traditional `for` loop, added an optional `out` parameter to `clampFutureIndices`, and updated observation classes to pre-allocate `this._indices = new Int32Array(this.futureSteps.length);` in their constructor to pass to `clampFutureIndices`. This eliminates per-tick array allocations for future steps indices tracking.

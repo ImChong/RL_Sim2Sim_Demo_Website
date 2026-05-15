@@ -134,9 +134,9 @@ test('slerpMany returns empty for non-positive steps', () => {
 });
 
 test('clampFutureIndices clamps to [0, length-1]', () => {
-  assert.deepEqual(clampFutureIndices(5, [0, 2, 100], 10), [5, 7, 9]);
-  assert.deepEqual(clampFutureIndices(0, [-3, 0, 1], 5), [0, 0, 1]);
-  assert.deepEqual(clampFutureIndices(2, [-5], 4), [0]);
+  assert.deepEqual(Array.from(clampFutureIndices(5, [0, 2, 100], 10)), [5, 7, 9]);
+  assert.deepEqual(Array.from(clampFutureIndices(0, [-3, 0, 1], 5)), [0, 0, 1]);
+  assert.deepEqual(Array.from(clampFutureIndices(2, [-5], 4)), [0]);
 });
 
 test('toFloatArray fills from array with fallback for missing entries', () => {

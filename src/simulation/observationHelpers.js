@@ -135,6 +135,7 @@ class TrackingCommandObsRaw {
     this._refQuat = new Float32Array(4);
     this._rel = new Float32Array(4);
     this._r6 = new Float32Array(6);
+    this._indices = new Int32Array(this.futureSteps.length);
   }
 
   get size() {
@@ -150,7 +151,7 @@ class TrackingCommandObsRaw {
 
     const baseIdx = tracking.refIdx;
     const refLen = tracking.refLen;
-    const indices = clampFutureIndices(baseIdx, this.futureSteps, refLen);
+    const indices = clampFutureIndices(baseIdx, this.futureSteps, refLen, this._indices);
 
     const basePos = tracking.refRootPos[indices[0]];
     normalizeQuat(tracking.refRootQuat[indices[0]], this._baseQuat);
@@ -191,6 +192,7 @@ class TargetRootZObs {
     this.policy = policy;
     this.futureSteps = kwargs.future_steps ?? [0, 2, 4, 8, 16];
     this.out = new Float32Array(this.size);
+    this._indices = new Int32Array(this.futureSteps.length);
   }
 
   get size() {
@@ -203,7 +205,7 @@ class TargetRootZObs {
       this.out.fill(0.0);
       return this.out;
     }
-    const indices = clampFutureIndices(tracking.refIdx, this.futureSteps, tracking.refLen);
+    const indices = clampFutureIndices(tracking.refIdx, this.futureSteps, tracking.refLen, this._indices);
     for (let i = 0; i < indices.length; i++) {
       this.out[i] = tracking.refRootPos[indices[i]][2] + 0.035;
     }
@@ -215,7 +217,7 @@ class TargetJointPosObs {
   constructor(policy, kwargs = {}) {
     this.policy = policy;
     this.futureSteps = kwargs.future_steps ?? [0, 2, 4, 8, 16];
-
+    this._indices = new Int32Array(this.futureSteps.length);
     // We lazily allocate this since size depends on policy.tracking.nJoints
     this.out = null;
   }
@@ -236,7 +238,7 @@ class TargetJointPosObs {
       return this.out ?? new Float32Array(0);
     }
 
-    const indices = clampFutureIndices(tracking.refIdx, this.futureSteps, tracking.refLen);
+    const indices = clampFutureIndices(tracking.refIdx, this.futureSteps, tracking.refLen, this._indices);
     const current = state?.jointPos ?? new Float32Array(tracking.nJoints);
     let offset = 0;
     const halfLen = indices.length * tracking.nJoints;
@@ -261,6 +263,7 @@ class TargetProjectedGravityBObs {
     this._quat = new Float32Array(4);
     this._gLocal = new Float32Array(3);
     this.g = [0.0, 0.0, -1.0];
+    this._indices = new Int32Array(this.futureSteps.length);
   }
 
   get size() {
@@ -273,7 +276,7 @@ class TargetProjectedGravityBObs {
       this.out.fill(0.0);
       return this.out;
     }
-    const indices = clampFutureIndices(tracking.refIdx, this.futureSteps, tracking.refLen);
+    const indices = clampFutureIndices(tracking.refIdx, this.futureSteps, tracking.refLen, this._indices);
     let offset = 0;
     for (const idx of indices) {
       normalizeQuat(tracking.refRootQuat[idx], this._quat);
