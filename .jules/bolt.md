@@ -21,3 +21,7 @@
 ## 2025-05-15 - Array.map allocations in clampFutureIndices
 **Learning:** Found that `clampFutureIndices` was using `Array.prototype.map()` internally. Because this function is called inside hot loops by observation classes like `TargetRootZObs`, `TargetJointPosObs`, and `TargetProjectedGravityBObs` to get future indices during tracking updates, it triggered continuous allocations of new Arrays causing GC pressure.
 **Action:** Replaced `.map()` with a traditional `for` loop, added an optional `out` parameter to `clampFutureIndices`, and updated observation classes to pre-allocate `this._indices = new Int32Array(this.futureSteps.length);` in their constructor to pass to `clampFutureIndices`. This eliminates per-tick array allocations for future steps indices tracking.
+
+## 2025-05-16 - Avoid functional TypedArray methods in hot loops
+**Learning:** Found that using `.map()` on a TypedArray (like `Float32Array`) in a hot path (e.g. `slerpMany`) creates a new array allocation per call, which puts pressure on the garbage collector. Additionally, calling `Float32Array.from()` when the input is already a Float32Array causes unnecessary allocations.
+**Action:** When working with TypedArrays in hot loops, avoid higher-order array methods (`.map()`, `.filter()`, etc.) and instead mutate the array in-place. Also, remove redundant conversions like `Float32Array.from()` if the array type is already correct.

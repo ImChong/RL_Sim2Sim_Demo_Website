@@ -85,7 +85,11 @@ export function slerpMany(q0, q1, steps) {
   let dot = start[0] * end[0] + start[1] * end[1] + start[2] * end[2] + start[3] * end[3];
   if (dot < 0.0) {
     dot = -dot;
-    end = end.map((v) => -v);
+    // Bolt: Avoid .map() to reduce memory allocation and iterator overhead in hot path
+    end[0] = -end[0];
+    end[1] = -end[1];
+    end[2] = -end[2];
+    end[3] = -end[3];
   }
 
   const results = [];
@@ -98,7 +102,9 @@ export function slerpMany(q0, q1, steps) {
       for (let j = 0; j < 4; j++) {
         row[j] = (1.0 - t) * start[j] + t * end[j];
       }
-      results.push(Float32Array.from(normalizeQuat(row)));
+      // Bolt: Normalize in-place and avoid Float32Array.from() allocation
+      normalizeQuat(row, row);
+      results.push(row);
     }
     return results;
   }
@@ -114,7 +120,8 @@ export function slerpMany(q0, q1, steps) {
     for (let j = 0; j < 4; j++) {
       row[j] = coeff0 * start[j] + coeff1 * end[j];
     }
-    results.push(Float32Array.from(row));
+    // Bolt: Avoid Float32Array.from() allocation, row is already a Float32Array
+    results.push(row);
   }
   return results;
 }
