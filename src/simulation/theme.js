@@ -9,6 +9,7 @@ export function getSimulationThemeSettings(name) {
       themeName,
       lightIntensityScale: 0.72,
       ambientIntensity: 0.07,
+      /** 深蓝灰背景，与 MJCF 地面色一致，避免偏绿或雾效染色 */
       backgroundRgb: [0.08, 0.12, 0.18],
     };
   }

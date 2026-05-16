@@ -72,11 +72,15 @@ export class MuJoCoDemo {
     this.scene.add(this.ambientLight);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
-    this.renderScale = 2.0;
+    this.renderScale = Math.min(window.devicePixelRatio, 2);
     this.renderer.setPixelRatio(this.renderScale);
     this.renderer.setSize(window.innerWidth, this.getViewH());
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.outputEncoding = THREE.sRGBEncoding;
+    /** 不使用 ACES 等胶片映射，避免整体发灰/偏色，保持 MJCF 设计的白黑金属对比 */
+    this.renderer.toneMapping = THREE.NoToneMapping;
+    this.renderer.toneMappingExposure = 1;
 
     this.simStepHz = 0;
     this._stepFrameCount = 0;
@@ -195,6 +199,10 @@ export class MuJoCoDemo {
       this.scene.background.setRGB(...this.currentVisualSettings.backgroundRgb);
     } else if (this.scene) {
       this.scene.background = new THREE.Color(...this.currentVisualSettings.backgroundRgb);
+    }
+
+    if (this.scene) {
+      this.scene.fog = null;
     }
 
     if (this.ambientLight) {
