@@ -341,6 +341,15 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
           vertex_buffer[v + 2] = -temp;
         }
 
+        let normal_buffer = model.mesh_normal.subarray(
+          model.mesh_vertadr[meshID] * 3,
+          (model.mesh_vertadr[meshID] + model.mesh_vertnum[meshID]) * 3);
+        for (let v = 0; v < normal_buffer.length; v += 3) {
+          let temp = normal_buffer[v + 1];
+          normal_buffer[v + 1] = normal_buffer[v + 2];
+          normal_buffer[v + 2] = -temp;
+        }
+
         let uv_buffer = model.mesh_texcoord.subarray(
           model.mesh_texcoordadr[meshID] * 2,
           (model.mesh_texcoordadr[meshID] + model.mesh_vertnum[meshID]) * 2);
@@ -348,9 +357,9 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
           model.mesh_faceadr[meshID] * 3,
           (model.mesh_faceadr[meshID] + model.mesh_facenum[meshID]) * 3);
         geometry.setAttribute('position', new THREE.BufferAttribute(vertex_buffer, 3));
+        geometry.setAttribute('normal', new THREE.BufferAttribute(normal_buffer, 3));
         geometry.setAttribute('uv', new THREE.BufferAttribute(uv_buffer, 2));
         geometry.setIndex(Array.from(triangle_buffer));
-        geometry.computeVertexNormals();
         meshes[meshID] = geometry;
       } else {
         geometry = meshes[meshID];
@@ -394,7 +403,6 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
           rgbaArray[(p * 4) + 3] = channels > 3 ? texData[offset + ((p * channels) + 3)] : 255;
         }
         texture = new THREE.DataTexture(rgbaArray, width, height, THREE.RGBAFormat, THREE.UnsignedByteType);
-        texture.encoding = THREE.sRGBEncoding;
         if (texId == 2) {
           texture.repeat = new THREE.Vector2(100, 100);
           texture.wrapS = THREE.RepeatWrapping;
@@ -412,13 +420,14 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
     }
 
     const matId = model.geom_matid[g];
+    const alpha = color[3] <= 1 ? color[3] : color[3] / 255;
     const roughnessFromShininess = matId !== -1
       ? THREE.MathUtils.clamp(1.0 - model.mat_shininess[matId], 0.04, 1.0)
       : undefined;
     const materialOptions = {
       color: new THREE.Color(color[0], color[1], color[2]),
-      transparent: color[3] < 1.0,
-      opacity: color[3] / 255,
+      transparent: alpha < 1.0,
+      opacity: alpha,
       specularIntensity: matId !== -1 ? model.mat_specular[matId] : undefined,
       reflectivity: matId !== -1 ? model.mat_reflectance[matId] : undefined,
       roughness: roughnessFromShininess,
@@ -428,7 +437,24 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
       materialOptions.map = texture;
     }
 
-    let currentMaterial = new THREE.MeshPhysicalMaterial(materialOptions);
+    const useMeshStandard = type === mujoco.mjtGeom.mjGEOM_MESH.value;
+    let currentMaterial;
+    if (useMeshStandard) {
+      const isDark = color[0] < 0.38 && color[1] < 0.38 && color[2] < 0.38;
+      const stdOpts = {
+        color: new THREE.Color(color[0], color[1], color[2]),
+        transparent: alpha < 1.0,
+        opacity: alpha,
+        metalness: isDark ? 0.22 : 0.38,
+        roughness: isDark ? 0.62 : 0.5,
+      };
+      if (texture) {
+        stdOpts.map = texture;
+      }
+      currentMaterial = new THREE.MeshStandardMaterial(stdOpts);
+    } else {
+      currentMaterial = new THREE.MeshPhysicalMaterial(materialOptions);
+    }
 
     let mesh = new THREE.Mesh();
     if (type == 0) {
@@ -507,7 +533,7 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
     light.shadow.mapSize.width = 2048;
     light.shadow.mapSize.height = 2048;
     light.shadow.camera.near = 0.1;
-    light.shadow.camera.far = 10;
+    light.shadow.camera.far = 30;
     if (bodies[0]) {
       bodies[0].add(light);
     } else {

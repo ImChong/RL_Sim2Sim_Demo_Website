@@ -71,6 +71,20 @@ export class MuJoCoDemo {
     this.ambientLight.name = 'AmbientLight';
     this.scene.add(this.ambientLight);
 
+    this.sonicHemi = new THREE.HemisphereLight(0x6a8aaa, 0x2a3a28, this.currentVisualSettings.sonicHemiIntensity);
+    this.sonicHemi.name = 'SonicStyleHemisphere';
+    this.scene.add(this.sonicHemi);
+
+    this.sonicFill = new THREE.DirectionalLight(0x80c0ff, this.currentVisualSettings.sonicFillIntensity);
+    this.sonicFill.name = 'SonicStyleFill';
+    this.sonicFill.position.set(-3, 4, 2);
+    this.scene.add(this.sonicFill);
+
+    this.sonicRim = new THREE.DirectionalLight(0xffffff, this.currentVisualSettings.sonicRimIntensity);
+    this.sonicRim.name = 'SonicStyleRim';
+    this.sonicRim.position.set(-2, 2.5, 4);
+    this.scene.add(this.sonicRim);
+
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderScale = Math.min(window.devicePixelRatio, 2);
     this.renderer.setPixelRatio(this.renderScale);
@@ -207,6 +221,16 @@ export class MuJoCoDemo {
 
     if (this.ambientLight) {
       this.ambientLight.intensity = this.currentVisualSettings.ambientIntensity;
+    }
+
+    if (this.sonicHemi) {
+      this.sonicHemi.intensity = this.currentVisualSettings.sonicHemiIntensity;
+    }
+    if (this.sonicFill) {
+      this.sonicFill.intensity = this.currentVisualSettings.sonicFillIntensity;
+    }
+    if (this.sonicRim) {
+      this.sonicRim.intensity = this.currentVisualSettings.sonicRimIntensity;
     }
 
     for (const [index, light] of Object.entries(this.lights ?? {})) {
