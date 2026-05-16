@@ -71,15 +71,6 @@ export class MuJoCoDemo {
     this.ambientLight.name = 'AmbientLight';
     this.scene.add(this.ambientLight);
 
-    this.cinematicHemi = new THREE.HemisphereLight(0x6a8aaa, 0x2a3a28, this.currentVisualSettings.cinematicHemiIntensity);
-    this.cinematicHemi.name = 'CinematicHemisphere';
-    this.scene.add(this.cinematicHemi);
-
-    this.cinematicFill = new THREE.DirectionalLight(0xa8c4e8, this.currentVisualSettings.cinematicFillIntensity);
-    this.cinematicFill.name = 'CinematicFill';
-    this.cinematicFill.position.set(-2.8, 3.2, 1.6);
-    this.scene.add(this.cinematicFill);
-
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderScale = Math.min(window.devicePixelRatio, 2);
     this.renderer.setPixelRatio(this.renderScale);
@@ -87,8 +78,9 @@ export class MuJoCoDemo {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputEncoding = THREE.sRGBEncoding;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.28;
+    /** 不使用 ACES 等胶片映射，避免整体发灰/偏色，保持 MJCF 设计的白黑金属对比 */
+    this.renderer.toneMapping = THREE.NoToneMapping;
+    this.renderer.toneMappingExposure = 1;
 
     this.simStepHz = 0;
     this._stepFrameCount = 0;
@@ -209,25 +201,12 @@ export class MuJoCoDemo {
       this.scene.background = new THREE.Color(...this.currentVisualSettings.backgroundRgb);
     }
 
-    const fogD = this.currentVisualSettings.fogExp2Density ?? 0;
     if (this.scene) {
-      if (fogD > 0) {
-        const fogColor = new THREE.Color(...this.currentVisualSettings.backgroundRgb);
-        this.scene.fog = new THREE.FogExp2(fogColor, fogD);
-      } else {
-        this.scene.fog = null;
-      }
+      this.scene.fog = null;
     }
 
     if (this.ambientLight) {
       this.ambientLight.intensity = this.currentVisualSettings.ambientIntensity;
-    }
-
-    if (this.cinematicHemi) {
-      this.cinematicHemi.intensity = this.currentVisualSettings.cinematicHemiIntensity;
-    }
-    if (this.cinematicFill) {
-      this.cinematicFill.intensity = this.currentVisualSettings.cinematicFillIntensity;
     }
 
     for (const [index, light] of Object.entries(this.lights ?? {})) {
