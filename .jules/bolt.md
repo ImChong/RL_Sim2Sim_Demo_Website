@@ -25,3 +25,7 @@
 ## 2025-05-16 - Avoid functional TypedArray methods in hot loops
 **Learning:** Found that using `.map()` on a TypedArray (like `Float32Array`) in a hot path (e.g. `slerpMany`) creates a new array allocation per call, which puts pressure on the garbage collector. Additionally, calling `Float32Array.from()` when the input is already a Float32Array causes unnecessary allocations.
 **Action:** When working with TypedArrays in hot loops, avoid higher-order array methods (`.map()`, `.filter()`, etc.) and instead mutate the array in-place. Also, remove redundant conversions like `Float32Array.from()` if the array type is already correct.
+
+## 2025-05-17 - Avoid .map and Float32Array.from allocations
+**Learning:** In code like `trackingHelper.js`, converting plain arrays to `Float32Array` using `.map()` combined with `Float32Array.from()` creates a large amount of temporary objects due to `.map()` creating a new array and iterator overhead from `Float32Array.from()`.
+**Action:** When converting lists of vectors to TypedArrays, prefer traditional `for` loops and `new Float32Array(...)` which has much less overhead, especially in observation initialization code or frame data preparation.
