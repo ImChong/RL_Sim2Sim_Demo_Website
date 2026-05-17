@@ -21,7 +21,12 @@ function toFloat32Rows(rows) {
   if (!Array.isArray(rows)) {
     return null;
   }
-  return rows.map((row) => Float32Array.from(row));
+  // Bolt: Avoid array.map() and Float32Array.from() allocations in hot path
+  const result = new Array(rows.length);
+  for (let i = 0; i < rows.length; i++) {
+    result[i] = new Float32Array(rows[i]);
+  }
+  return result;
 }
 
 function normalizeMotionClip(clip) {
@@ -229,20 +234,29 @@ export class TrackingHelper {
     const qDeltaWxyz = quatMultiply(qc, q0Inv);
     const qDelta = new THREE.Quaternion(qDeltaWxyz[1], qDeltaWxyz[2], qDeltaWxyz[3], qDeltaWxyz[0]);
 
-    const jointPos = motion.jointPos.map((row) => Float32Array.from(row));
+    // Bolt: Replaced .map() with for-loops and Float32Array.from() with new Float32Array() to reduce GC overhead
+    const jointPos = new Array(motion.jointPos.length);
+    for (let i = 0; i < motion.jointPos.length; i++) {
+      jointPos[i] = new Float32Array(motion.jointPos[i]);
+    }
 
     const offset = new THREE.Vector3(pc.x, pc.y, p0.z);
-    const rootPos = motion.rootPos.map((row) => {
+
+    const rootPos = new Array(motion.rootPos.length);
+    for (let i = 0; i < motion.rootPos.length; i++) {
+      const row = motion.rootPos[i];
       const pos = new THREE.Vector3(...row);
       pos.sub(p0).applyQuaternion(qDelta).add(offset);
-      return Float32Array.from([pos.x, pos.y, pos.z]);
-    });
+      rootPos[i] = new Float32Array([pos.x, pos.y, pos.z]);
+    }
 
-    const rootQuat = motion.rootQuat.map((row) => {
+    const rootQuat = new Array(motion.rootQuat.length);
+    for (let i = 0; i < motion.rootQuat.length; i++) {
+      const row = motion.rootQuat[i];
       const q = new THREE.Quaternion(row[1], row[2], row[3], row[0]);
       const aligned = qDelta.clone().multiply(q);
-      return Float32Array.from([aligned.w, aligned.x, aligned.y, aligned.z]);
-    });
+      rootQuat[i] = new Float32Array([aligned.w, aligned.x, aligned.y, aligned.z]);
+    }
 
     return { jointPos, rootQuat, rootPos };
   }

@@ -125,7 +125,8 @@ export class PolicyRunner {
           obs.update(policyState);
         }
         const obsValue = obs.compute(policyState);
-        const obsArray = ArrayBuffer.isView(obsValue) ? obsValue : Float32Array.from(obsValue);
+        // Bolt: Use new Float32Array() instead of Float32Array.from() to avoid iterator allocation overhead
+        const obsArray = ArrayBuffer.isView(obsValue) ? obsValue : new Float32Array(obsValue);
         obsForPolicy.set(obsArray, offset);
         offset += obsArray.length;
       }
