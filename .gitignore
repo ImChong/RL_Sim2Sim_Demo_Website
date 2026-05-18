@@ -34,6 +34,9 @@ Thumbs.db
 *.sln
 *.sw?
 
+# Local agent / verification outputs (screenshots, etc.)
+/artifacts/
+
 # Build files
 /build
 

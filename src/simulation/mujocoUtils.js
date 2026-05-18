@@ -440,13 +440,15 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
     const useMeshStandard = type === mujoco.mjtGeom.mjGEOM_MESH.value;
     let currentMaterial;
     if (useMeshStandard) {
-      const isDark = color[0] < 0.38 && color[1] < 0.38 && color[2] < 0.38;
+      const maxRgb = Math.max(color[0], color[1], color[2]);
+      const isDark = maxRgb < 0.38;
+      const isVeryDark = maxRgb < 0.28;
       const stdOpts = {
         color: new THREE.Color(color[0], color[1], color[2]),
         transparent: alpha < 1.0,
         opacity: alpha,
-        metalness: isDark ? 0.22 : 0.38,
-        roughness: isDark ? 0.62 : 0.5,
+        metalness: isVeryDark ? 0 : isDark ? 0.22 : 0.38,
+        roughness: isVeryDark ? 1 : isDark ? 0.62 : 0.5,
       };
       if (texture) {
         stdOpts.map = texture;
