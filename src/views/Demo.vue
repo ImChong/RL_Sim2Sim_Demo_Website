@@ -428,8 +428,8 @@ const translations = {
     noMotionsAdded: 'No motions were added.',
     knockdownTest: 'Knockdown test',
     knockdownTestHint: 'Applies a strong horizontal impulse on the pelvis in a random XY direction (fixed magnitude) for get-up testing.',
-    ampPolicyStandStillFixDescription:
-      'AMP policy trained with zero-command standing stability rewards on RTX4090 to 100000 iterations.'
+    ampPolicyDescription:
+      'AMP policy trained for walk, run, and get-up behaviors.'
   },
   zh: {
     mobileModeAlert: '已启用移动端模式，控制面板已精简并停靠到底部，便于触控操作。',
@@ -479,8 +479,8 @@ const translations = {
     noMotionsAdded: '没有添加任何动作。',
     knockdownTest: '击倒测试',
     knockdownTestHint: '在骨盆上沿水平面（XY）随机方向施加一次固定大小的强冲击，用于测试倒地起身。',
-    ampPolicyStandStillFixDescription:
-      '在零速度指令站立稳定性奖励下训练的 AMP 策略（RTX4090 训练至 100000 iteration）。'
+    ampPolicyDescription:
+      '用于行走、跑步和起身行为的 AMP 策略。'
   }
 };
 
@@ -524,12 +524,12 @@ export default {
         onnxPath: './examples/checkpoints/g1/policy_latest.onnx'
       },
       {
-        value: 'g1-amp-rtx4090-100000-standstill-fix',
-        title: 'G1 AMP Walk/Run/Getup RTX4090 100000 (stand still fix)',
-        description: 'AMP policy trained with zero-command standing stability rewards on RTX4090 to 100000 iterations.',
-        descriptionKey: 'ampPolicyStandStillFixDescription',
-        policyPath: './examples/checkpoints/g1/amp_policy_100000_standstill_fix.json',
-        onnxPath: './examples/checkpoints/g1/walk_run_getup_rtx4090_100000_standstill_fix/model_100000.onnx'
+        value: 'g1-amp-walk-run-getup',
+        title: 'G1 AMP Walk/Run/Getup',
+        description: 'AMP policy trained for walk, run, and get-up behaviors.',
+        descriptionKey: 'ampPolicyDescription',
+        policyPath: './examples/checkpoints/g1/amp_policy_walk_run_getup.json',
+        onnxPath: './examples/checkpoints/g1/walk_run_getup/model_99999.onnx'
       }
     ],
     currentPolicy: 'g1-tracking-latest',
@@ -658,7 +658,7 @@ export default {
       return this.policies.find((policy) => policy.value === this.currentPolicy) ?? null;
     },
     isAmpPolicy() {
-      return this.currentPolicy?.startsWith('g1-amp-rtx4090-100000');
+      return this.currentPolicy?.startsWith('g1-amp');
     },
     policyDescription() {
       if (!this.selectedPolicy) {
