@@ -19,7 +19,7 @@
 
   <asset>
     <material name="silver" rgba="0.7 0.7 0.7 1"/>
-    <material name="black" rgba="0.2 0.2 0.2 1"/>
+    <material name="black" rgba="0.02 0.02 0.02 1"/>
 
     <mesh name="pelvis" file="pelvis.STL"/>
     <mesh name="pelvis_contour_link" file="pelvis_contour_link.STL"/>
@@ -62,9 +62,9 @@
   </asset>
 
   <worldbody>
-    <light name="key_light" directional="true" diffuse="1.35 1.35 1.35" specular="0.1 0.1 0.1" pos="4 5.5 2" dir="-0.45 -0.55 -0.7" castshadow="true" cutoff="255"/>
-    <light name="fill_light" directional="true" diffuse="0.52 0.6 0.72" specular="0.05 0.05 0.06" pos="-3.5 -3 4" dir="0.42 0.38 -0.82" castshadow="false" cutoff="255"/>
-    <light name="rim_light" directional="true" diffuse="0.38 0.38 0.42" specular="0.04 0.04 0.04" pos="0 4 3.5" dir="0.12 -0.62 -0.77" castshadow="false" cutoff="255"/>
+    <light name="key_light" directional="true" diffuse="1.12 1.12 1.12" specular="0.06 0.06 0.06" pos="4 5.5 2" dir="-0.45 -0.55 -0.7" castshadow="true" cutoff="255"/>
+    <light name="fill_light" directional="true" diffuse="0.28 0.32 0.38" specular="0.02 0.02 0.025" pos="-3.5 -3 4" dir="0.42 0.38 -0.82" castshadow="false" cutoff="255"/>
+    <light name="rim_light" directional="true" diffuse="0.22 0.22 0.25" specular="0.02 0.02 0.02" pos="0 4 3.5" dir="0.12 -0.62 -0.77" castshadow="false" cutoff="255"/>
     <geom name="floor" size="0 0 0.05" friction="0.75 .1 .1" type="plane" material="groundplane"/>
     <body name="pelvis" pos="0 0 0.793" childclass="g1">
       <camera name="tracking" pos="1.734 -1.135 .35" xyaxes="0.552 0.834 -0.000 -0.170 0.112 0.979" mode="trackcom"/>
