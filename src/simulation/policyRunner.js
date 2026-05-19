@@ -37,7 +37,7 @@ export class PolicyRunner {
 
     // Pre-allocate arrays to reduce GC pressure during inferencing
     this.cachedJointPosRel = new Float32Array(this.numActions);
-    this.obsHistory = [];
+    this.historyCount = 0;
     this.fullObs = new Float32Array(this.numObs * this.historyLength);
     this.obsForPolicy = new Float32Array(this.numObs);
     this.target = new Float32Array(this.numActions);
@@ -90,7 +90,7 @@ export class PolicyRunner {
   reset(state = null) {
     this.inputDict = this.module.initInput() ?? {};
     this.lastActions.fill(0.0);
-    this.obsHistory = [];
+    this.historyCount = 0;
     if (this.tracking) {
       this.tracking.reset(state);
     }
@@ -132,19 +132,21 @@ export class PolicyRunner {
       }
 
       if (this.historyLength > 1) {
-        if (this.obsHistory.length < this.historyLength) {
-           this.obsHistory.push(new Float32Array(obsForPolicy));
-        } else {
-           // Recycle the oldest Float32Array to prevent GC per physics step
-           const oldestObs = this.obsHistory.shift();
-           oldestObs.set(obsForPolicy);
-           this.obsHistory.push(oldestObs);
-        }
-
         const fullObs = this.fullObs;
-        for (let i = 0; i < this.historyLength; i++) {
-          const idx = Math.max(0, this.obsHistory.length - this.historyLength + i);
-          fullObs.set(this.obsHistory[idx], i * this.numObs);
+        if (this.historyCount === 0) {
+          // Initialize history by broadcasting the first observation
+          for (let i = 0; i < this.historyLength; i++) {
+            fullObs.set(obsForPolicy, i * this.numObs);
+          }
+          this.historyCount = 1;
+        } else {
+          // Bolt: Use native TypedArray.copyWithin to efficiently shift the history buffer
+          // avoiding an array of Float32Arrays and multiple manual .set() calls per tick
+          fullObs.copyWithin(0, this.numObs);
+          fullObs.set(obsForPolicy, (this.historyLength - 1) * this.numObs);
+          if (this.historyCount < this.historyLength) {
+            this.historyCount++;
+          }
         }
         this.inputDict['policy'] = new ort.Tensor('float32', fullObs, [1, fullObs.length]);
       } else {
