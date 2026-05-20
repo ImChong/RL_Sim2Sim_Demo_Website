@@ -86,7 +86,7 @@ class JointPos {
     this.numJoints = policy.numActions;
 
     this.maxStep = Math.max(...this.posSteps);
-    this.history = Array.from({ length: this.maxStep + 1 }, () => new Float32Array(this.numJoints));
+    this.history = new Float32Array((this.maxStep + 1) * this.numJoints);
     this.out = new Float32Array(this.posSteps.length * this.numJoints);
   }
 
@@ -96,24 +96,22 @@ class JointPos {
 
   reset(state) {
     const source = state?.jointPos ?? new Float32Array(this.numJoints);
-    this.history[0].set(source);
-    for (let i = 1; i < this.history.length; i++) {
-      this.history[i].set(this.history[0]);
+    for (let i = 0; i <= this.maxStep; i++) {
+      this.history.set(source, i * this.numJoints);
     }
   }
 
   update(state) {
-    for (let i = this.history.length - 1; i > 0; i--) {
-      this.history[i].set(this.history[i - 1]);
-    }
-    this.history[0].set(state.jointPos);
+    this.history.copyWithin(this.numJoints, 0, this.maxStep * this.numJoints);
+    this.history.set(state.jointPos, 0);
   }
 
   compute() {
     let offset = 0;
     for (const step of this.posSteps) {
-      const idx = Math.min(step, this.history.length - 1);
-      this.out.set(this.history[idx], offset);
+      const idx = Math.min(step, this.maxStep);
+      const start = idx * this.numJoints;
+      this.out.set(this.history.subarray(start, start + this.numJoints), offset);
       offset += this.numJoints;
     }
     return this.out;
@@ -303,8 +301,7 @@ class PrevActions {
     const { history_steps = 4 } = kwargs;
     this.steps = Math.max(1, Math.floor(history_steps));
     this.numActions = policy.numActions;
-    this.actionBuffer = Array.from({ length: this.steps }, () => new Float32Array(this.numActions));
-    this.out = new Float32Array(this.steps * this.numActions);
+    this.actionBuffer = new Float32Array(this.steps * this.numActions);
   }
 
   /**
@@ -313,26 +310,17 @@ class PrevActions {
    * @returns {Float32Array}
    */
   compute() {
-    let offset = 0;
-    for (let i = 0; i < this.steps; i++) {
-      this.out.set(this.actionBuffer[i], offset);
-      offset += this.numActions;
-    }
-    return this.out;
+    return this.actionBuffer;
   }
 
   reset() {
-    for (const buffer of this.actionBuffer) {
-      buffer.fill(0.0);
-    }
+    this.actionBuffer.fill(0.0);
   }
 
   update() {
-    for (let i = this.actionBuffer.length - 1; i > 0; i--) {
-      this.actionBuffer[i].set(this.actionBuffer[i - 1]);
-    }
+    this.actionBuffer.copyWithin(this.numActions, 0, (this.steps - 1) * this.numActions);
     const source = this.policy?.lastActions ?? new Float32Array(this.numActions);
-    this.actionBuffer[0].set(source);
+    this.actionBuffer.set(source, 0);
   }
 
   get size() {
@@ -349,7 +337,7 @@ class JointVel {
     this.numJoints = policy.numActions;
 
     this.maxStep = Math.max(...this.velSteps);
-    this.history = Array.from({ length: this.maxStep + 1 }, () => new Float32Array(this.numJoints));
+    this.history = new Float32Array((this.maxStep + 1) * this.numJoints);
     this.out = new Float32Array(this.velSteps.length * this.numJoints);
   }
 
@@ -359,23 +347,21 @@ class JointVel {
 
   reset(state) {
     const source = state?.jointVel ?? new Float32Array(this.numJoints);
-    this.history[0].set(source);
-    for (let i = 1; i < this.history.length; i++) {
-      this.history[i].set(this.history[0]);
+    for (let i = 0; i <= this.maxStep; i++) {
+      this.history.set(source, i * this.numJoints);
     }
   }
 
   update(state) {
-    for (let i = this.history.length - 1; i > 0; i--) {
-      this.history[i].set(this.history[i - 1]);
-    }
-    this.history[0].set(state.jointVel);
+    this.history.copyWithin(this.numJoints, 0, this.maxStep * this.numJoints);
+    this.history.set(state.jointVel, 0);
   }
 
   compute() {
     for (let i = 0; i < this.velSteps.length; i++) {
-      const step = this.velSteps[i];
-      this.out.set(this.history[step], i * this.numJoints);
+      const step = Math.min(this.velSteps[i], this.maxStep);
+      const start = step * this.numJoints;
+      this.out.set(this.history.subarray(start, start + this.numJoints), i * this.numJoints);
     }
     return this.out;
   }
