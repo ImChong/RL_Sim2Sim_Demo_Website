@@ -822,6 +822,13 @@ export default {
 
       for (const file of fileList) {
         try {
+          // Add a 5MB size limit check to prevent Uncontrolled Resource Consumption (DoS)
+          // parsing large JSON files could block the UI thread or cause OOM
+          if (file.size > 5 * 1024 * 1024) {
+            console.warn(`File ${file.name} exceeds 5MB limit, skipping.`);
+            failed += 1;
+            continue;
+          }
           const text = await file.text();
           const parsed = JSON.parse(text);
           const clip = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
