@@ -529,7 +529,7 @@ export default {
         description: 'AMP policy trained for walk, run, and get-up behaviors.',
         descriptionKey: 'ampPolicyDescription',
         policyPath: './examples/checkpoints/g1/amp_policy_walk_run_getup.json',
-        onnxPath: './examples/checkpoints/g1/walk_run_getup/model_143800.onnx'
+        onnxPath: './examples/checkpoints/g1/walk_run_getup/model_127100.onnx'
       }
     ],
     currentPolicy: 'g1-tracking-latest',
