@@ -1,5 +1,11 @@
 # Agents 说明
 
+## 知识库
+
+与本仓库相关的 **CAD 生成 / 逆向工程** 背景资料见 [`docs/knowledge/`](docs/knowledge/)（含 GenCAD、GenCAD-3D 原始摘录与中文消化摘要）。处理 CAD 程序生成、多模态几何或 DeepCAD 相关任务前，建议先阅读 [`docs/knowledge/gencad/README.md`](docs/knowledge/gencad/README.md)。
+
+---
+
 后续修改本仓库的 agents 请先安装并启用 Chrome DevTools MCP：
 
 - 项目地址：<https://github.com/ChromeDevTools/chrome-devtools-mcp>

@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "last_updated": "2026-05-21",
+  "entries": [
+    {
+      "id": "gencad-project-page",
+      "title": "GenCAD Project Page",
+      "url": "https://gencad.github.io/",
+      "type": "project_page",
+      "related_digest": "docs/knowledge/gencad/digest-gencad.md",
+      "archived_at": "docs/knowledge/gencad/sources/raw-gencad-project.md"
+    },
+    {
+      "id": "gencad-github",
+      "title": "GenCAD GitHub Repository",
+      "url": "https://github.com/ferdous-alam/GenCAD",
+      "type": "repository",
+      "related_digest": "docs/knowledge/gencad/digest-gencad.md",
+      "archived_at": "docs/knowledge/gencad/sources/raw-gencad-readme.md"
+    },
+    {
+      "id": "gencad-arxiv",
+      "title": "GenCAD arXiv Paper",
+      "url": "https://arxiv.org/abs/2409.16294",
+      "type": "paper",
+      "related_digest": "docs/knowledge/gencad/digest-gencad.md",
+      "archived_at": "docs/knowledge/gencad/sources/raw-arxiv-2409.16294.md"
+    },
+    {
+      "id": "gencad3d-project-page",
+      "title": "GenCAD-3D Project Page",
+      "url": "https://gencad3d.github.io/",
+      "type": "project_page",
+      "related_digest": "docs/knowledge/gencad/digest-gencad-3d.md",
+      "archived_at": "docs/knowledge/gencad/sources/raw-gencad-3d-project.md"
+    },
+    {
+      "id": "gencad3d-github",
+      "title": "GenCAD-3D GitHub Repository",
+      "url": "https://github.com/yunomi-git/GenCAD-3D",
+      "type": "repository",
+      "related_digest": "docs/knowledge/gencad/digest-gencad-3d.md",
+      "archived_at": "docs/knowledge/gencad/sources/raw-gencad-3d-readme.md"
+    },
+    {
+      "id": "gencad3d-arxiv",
+      "title": "GenCAD-3D arXiv Paper",
+      "url": "https://arxiv.org/abs/2509.15246",
+      "type": "paper",
+      "related_digest": "docs/knowledge/gencad/digest-gencad-3d.md",
+      "archived_at": "docs/knowledge/gencad/sources/raw-arxiv-2509.15246.md"
+    },
+    {
+      "id": "gencad3d-dataset",
+      "title": "GenCAD-3D HuggingFace Dataset",
+      "url": "https://huggingface.co/datasets/yu-nomi/GenCAD_3D",
+      "type": "dataset",
+      "related_digest": "docs/knowledge/gencad/digest-gencad-3d.md"
+    },
+    {
+      "id": "gencad3d-weights",
+      "title": "GenCAD-3D HuggingFace Weights",
+      "url": "https://huggingface.co/yu-nomi/GenCAD_3D",
+      "type": "model_weights",
+      "related_digest": "docs/knowledge/gencad/digest-gencad-3d.md"
+    },
+    {
+      "id": "deepcad",
+      "title": "DeepCAD (baseline dataset & method)",
+      "url": "https://github.com/rundiwu/DeepCAD",
+      "type": "related_work",
+      "related_digest": "docs/knowledge/gencad/comparison.md"
+    }
+  ]
+}
