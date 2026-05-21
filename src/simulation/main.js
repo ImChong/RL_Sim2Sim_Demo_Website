@@ -1,7 +1,16 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { DragStateManager } from './utils/DragStateManager.js';
-import { downloadExampleScenesFolder, getPosition, getQuaternion, toMujocoPos, reloadScene, reloadPolicy } from './mujocoUtils.js';
+import {
+  downloadExampleScenesFolder,
+  ensureSceneAssetsForPath,
+  getPosition,
+  getQuaternion,
+  initialSceneAssetPrefixes,
+  toMujocoPos,
+  reloadScene,
+  reloadPolicy
+} from './mujocoUtils.js';
 import { getSimulationThemeSettings, normalizeSimulationThemeName } from './theme.js';
 import { REFLECTION_QUALITY_PRESETS } from './reflectionQuality.js';
 
@@ -168,7 +177,7 @@ export class MuJoCoDemo {
 
     await downloadExampleScenesFolder(this.mujoco, (p) => {
       report(sceneDownload * p);
-    });
+    }, { prefixes: initialSceneAssetPrefixes() });
     report(sceneDownload);
     await this.reloadScene(defaultScene);
     this.updateFollowBodyId();
@@ -202,6 +211,7 @@ export class MuJoCoDemo {
       while (this.policyRunner?.isInferencing) {
         await new Promise((resolve) => setTimeout(resolve, 10));
       }
+      await ensureSceneAssetsForPath(this.mujoco, nextScenePath);
       await this.reloadScene(nextScenePath);
       this.updateFollowBodyId();
       this.timestep = this.model.opt.timestep;

@@ -49,6 +49,9 @@ export class TrackingHelper {
     this.policyJointNames = config.policy_joint_names ?? [];
     this.motions = {};
     this.motionMeta = {};
+    this.motionCatalog = Array.isArray(config.motion_catalog) ? config.motion_catalog.slice() : [];
+    this.motionBaseUrl = config.motion_base_url ?? null;
+    this._loadingMotions = new Map();
     this.nJoints = this.policyJointNames.length;
     this.transitionLen = 0;
     this.motionLen = 0;
@@ -86,14 +89,61 @@ export class TrackingHelper {
   }
 
   availableMotions() {
-    return Object.keys(this.motions);
+    const names = new Set(Object.keys(this.motions));
+    for (const entry of this.motionCatalog) {
+      if (entry?.name) {
+        names.add(entry.name);
+      }
+    }
+    return [...names].sort();
   }
 
   isComplianceSuitable(name) {
     if (name === 'default') {
       return true;
     }
+    const catalogEntry = this.motionCatalog.find((entry) => entry?.name === name);
+    if (catalogEntry && typeof catalogEntry.complianceSuitable === 'boolean') {
+      return catalogEntry.complianceSuitable;
+    }
     return this.motionMeta[name]?.complianceSuitable ?? true;
+  }
+
+  async ensureMotionLoaded(name) {
+    if (!name || this.motions[name]) {
+      return Boolean(name && this.motions[name]);
+    }
+    if (this._loadingMotions.has(name)) {
+      return this._loadingMotions.get(name);
+    }
+    const entry = this.motionCatalog.find((item) => item?.name === name);
+    if (!entry?.file || !this.motionBaseUrl) {
+      return false;
+    }
+    const loadPromise = (async () => {
+      const clipUrl = new URL(entry.file, this.motionBaseUrl).toString();
+      const response = await fetch(clipUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to load motion clip from ${clipUrl}: ${response.status}`);
+      }
+      const clip = await response.json();
+      const normalized = normalizeMotionClip(clip);
+      if (!normalized) {
+        throw new Error(`TrackingHelper: invalid motion clip "${name}"`);
+      }
+      normalized.jointPos = normalized.jointPos.map((row) => this._mapDatasetJointPosToPolicy(row));
+      this.motions[name] = normalized;
+      if (typeof entry.complianceSuitable === 'boolean') {
+        this.motionMeta[name] = { complianceSuitable: entry.complianceSuitable };
+      }
+      return true;
+    })();
+    this._loadingMotions.set(name, loadPromise);
+    try {
+      return await loadPromise;
+    } finally {
+      this._loadingMotions.delete(name);
+    }
   }
 
 

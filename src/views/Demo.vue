@@ -977,13 +977,27 @@ export default {
       }
       return !this.isMotionComplianceSuitable(name);
     },
-    onMotionChange(value) {
+    async onMotionChange(value) {
       if (!this.demo) {
         return;
       }
       if (!value || value === this.demo.params.current_motion) {
         this.currentMotion = this.demo.params.current_motion ?? value;
         return;
+      }
+      const tracking = this.demo?.policyRunner?.tracking ?? null;
+      if (tracking?.ensureMotionLoaded) {
+        try {
+          const loaded = await tracking.ensureMotionLoaded(value);
+          if (!loaded) {
+            this.currentMotion = this.demo.params.current_motion;
+            return;
+          }
+        } catch (error) {
+          console.error('Failed to load motion:', error);
+          this.currentMotion = this.demo.params.current_motion;
+          return;
+        }
       }
       const accepted = this.requestMotion(value);
       if (!accepted) {

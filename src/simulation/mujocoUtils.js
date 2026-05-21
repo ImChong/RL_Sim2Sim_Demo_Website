@@ -48,7 +48,23 @@ function parseMotionIndex(payload) {
   };
 }
 
-async function loadMotionIndex(indexPayload, motionsUrl, onProgress) {
+/** Motion names loaded before first interactive frame (others load on demand). */
+const INITIAL_TRACKING_MOTION_NAMES = ['default'];
+
+async function fetchMotionClip(entry, baseUrl, onProgress) {
+  if (!entry?.file || !entry?.name) {
+    throw new Error('Motion index entries must include a name and file path.');
+  }
+  const clipUrl = new URL(entry.file, baseUrl).toString();
+  const response = await fetch(clipUrl);
+  if (!response.ok) {
+    throw new Error(`Failed to load motion clip from ${clipUrl}: ${response.status}`);
+  }
+  const bytes = await readResponseBodyWithProgress(response, onProgress);
+  return JSON.parse(new TextDecoder('utf-8').decode(bytes));
+}
+
+async function loadMotionIndex(indexPayload, motionsUrl, onProgress, options = {}) {
   const index = parseMotionIndex(indexPayload);
   if (!index) {
     onProgress?.(1);
@@ -63,30 +79,60 @@ async function loadMotionIndex(indexPayload, motionsUrl, onProgress) {
     : new URL('.', motionsUrl);
   const motions = {};
   const motionMeta = {};
+  const catalog = [];
   const entries = index.motions.map((entry) => normalizeMotionEntry(entry));
-  const weights = entries.map((entry) => (entry && entry.file && entry.name ? 1 : 0));
-  const reporter = createWeightedProgressReporter(weights, onProgress);
+  const eagerNames = new Set(
+    Array.isArray(options.eagerNames) && options.eagerNames.length > 0
+      ? options.eagerNames
+      : INITIAL_TRACKING_MOTION_NAMES
+  );
 
-  const requests = entries.map(async (entry, i) => {
-    if (!entry || !entry.file || !entry.name) {
-      throw new Error('Motion index entries must include a name and file path.');
+  for (const entry of entries) {
+    if (!entry?.file || !entry?.name) {
+      continue;
     }
-    const clipUrl = new URL(entry.file, baseUrl).toString();
-    const response = await fetch(clipUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to load motion clip from ${clipUrl}: ${response.status}`);
-    }
-    const bytes = await readResponseBodyWithProgress(response, (r) => reporter(i, r));
-    const clip = JSON.parse(new TextDecoder('utf-8').decode(bytes));
-    motions[entry.name] = clip;
+    catalog.push(entry);
     if (typeof entry.complianceSuitable === 'boolean') {
       motionMeta[entry.name] = { compliance_suitable: entry.complianceSuitable };
     }
-  });
+  }
 
-  await Promise.all(requests);
+  const eagerEntries = catalog.filter((entry) => eagerNames.has(entry.name));
+  const weights = eagerEntries.map(() => 1);
+  const reporter = createWeightedProgressReporter(weights, onProgress);
+
+  await Promise.all(
+    eagerEntries.map(async (entry, i) => {
+      const clip = await fetchMotionClip(entry, baseUrl, (r) => reporter(i, r));
+      motions[entry.name] = clip;
+    })
+  );
   onProgress?.(1);
-  return { motions, motionMeta };
+  return { motions, motionMeta, catalog, baseUrl: baseUrl.toString() };
+}
+
+/** Prefixes (e.g. `g1/`) used to filter entries in examples/scenes/files.json. */
+export function sceneAssetPrefixesForPath(scenePath) {
+  const slash = scenePath.indexOf('/');
+  if (slash < 0) {
+    return [];
+  }
+  return [scenePath.slice(0, slash + 1)];
+}
+
+export function initialSceneAssetPrefixes() {
+  return ['g1/'];
+}
+
+export function filterSceneFilesByPrefixes(allFiles, prefixes) {
+  if (!Array.isArray(prefixes) || prefixes.length === 0) {
+    return allFiles;
+  }
+  return allFiles.filter((rel) => prefixes.some((prefix) => rel.startsWith(prefix)));
+}
+
+function sceneAssetExistsInFs(mujoco, relativePath) {
+  return mujoco.FS.analyzePath(`/working/${relativePath}`).exists;
 }
 
 export async function reloadScene(mjcf_path) {
@@ -163,10 +209,12 @@ export async function reloadPolicy(policy_path, options = {}) {
       const payload = JSON.parse(motionIndexText);
       const indexedMotions = await loadMotionIndex(payload, motionsUrl, (r) => {
         reportInit(0.22 + 0.38 * r);
-      });
+      }, { eagerNames: INITIAL_TRACKING_MOTION_NAMES });
       if (indexedMotions) {
         trackingConfig.motions = indexedMotions.motions;
         trackingConfig.motion_meta = indexedMotions.motionMeta;
+        trackingConfig.motion_catalog = indexedMotions.catalog;
+        trackingConfig.motion_base_url = indexedMotions.baseUrl;
       } else {
         trackingConfig.motions = payload;
       }
@@ -631,7 +679,8 @@ function configureJointMappings(demo, jointNames) {
   demo.defaultJposPolicy.fill(0.0);
 }
 
-export async function downloadExampleScenesFolder(mujoco, onProgress) {
+export async function downloadExampleScenesFolder(mujoco, onProgress, options = {}) {
+  const prefixes = options.prefixes ?? null;
   const listUrl = './examples/scenes/files.json';
   const listResponse = await fetch(listUrl);
   if (!listResponse.ok) {
@@ -643,8 +692,15 @@ export async function downloadExampleScenesFolder(mujoco, onProgress) {
     }))
   );
 
+  const scopedFiles = filterSceneFilesByPrefixes(allFiles, prefixes);
+  const filesToDownload = scopedFiles.filter((rel) => !sceneAssetExistsInFs(mujoco, rel));
+  if (filesToDownload.length === 0) {
+    onProgress?.(1);
+    return;
+  }
+
   const base = './examples/scenes/';
-  const weights = allFiles.map(() => 1);
+  const weights = filesToDownload.map(() => 1);
   const reporter = createWeightedProgressReporter(weights, (overall) => {
     onProgress?.(0.02 + 0.98 * overall);
   });
@@ -663,7 +719,7 @@ export async function downloadExampleScenesFolder(mujoco, onProgress) {
   };
 
   await Promise.all(
-    allFiles.map(async (rel, i) => {
+    filesToDownload.map(async (rel, i) => {
       const url = base + rel;
       const response = await fetch(url);
       if (!response.ok) {
@@ -679,6 +735,16 @@ export async function downloadExampleScenesFolder(mujoco, onProgress) {
     })
   );
   onProgress?.(1);
+}
+
+/** Download scene assets for the given path if they are not already in the MuJoCo MEMFS. */
+export async function ensureSceneAssetsForPath(mujoco, scenePath, onProgress) {
+  const prefixes = sceneAssetPrefixesForPath(scenePath);
+  if (prefixes.length === 0) {
+    onProgress?.(1);
+    return;
+  }
+  await downloadExampleScenesFolder(mujoco, onProgress, { prefixes });
 }
 
 export function getPosition(buffer, index, target, swizzle = true) {

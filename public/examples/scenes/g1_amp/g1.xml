@@ -18,7 +18,7 @@
 
   <asset>
     <material name="silver" rgba="0.7 0.7 0.7 1"/>
-    <material name="black" rgba="0.2 0.2 0.2 1"/>
+    <material name="black" rgba="0.02 0.02 0.02 1"/>
 
     <mesh name="pelvis" file="pelvis.STL"/>
     <mesh name="pelvis_contour_link" file="pelvis_contour_link.STL"/>
