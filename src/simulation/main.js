@@ -1,12 +1,21 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { DragStateManager } from './utils/DragStateManager.js';
-import { downloadExampleScenesFolder, getPosition, getQuaternion, toMujocoPos, reloadScene, reloadPolicy } from './mujocoUtils.js';
+import {
+  downloadExampleScenesFolder,
+  ensureSceneAssetsForPath,
+  getPosition,
+  getQuaternion,
+  initialSceneAssetPrefixes,
+  toMujocoPos,
+  reloadScene,
+  reloadPolicy
+} from './mujocoUtils.js';
 import { getSimulationThemeSettings, normalizeSimulationThemeName } from './theme.js';
 import { REFLECTION_QUALITY_PRESETS } from './reflectionQuality.js';
 
-const defaultPolicy = "./examples/checkpoints/g1/tracking_policy_latest.json";
-const defaultScene = 'g1/g1.xml';
+const defaultPolicy = './examples/checkpoints/g1/amp_policy_walk_run_getup.json';
+const defaultScene = 'g1_amp/scene_g1.xml';
 
 /** Horizontal knockdown push magnitude (N), applied in world XY; local Z (vertical) force component is zero. */
 const KNOCKDOWN_FORCE_XY_MAG = 3400;
@@ -168,7 +177,7 @@ export class MuJoCoDemo {
 
     await downloadExampleScenesFolder(this.mujoco, (p) => {
       report(sceneDownload * p);
-    });
+    }, { prefixes: initialSceneAssetPrefixes() });
     report(sceneDownload);
     await this.reloadScene(defaultScene);
     this.updateFollowBodyId();
@@ -202,6 +211,7 @@ export class MuJoCoDemo {
       while (this.policyRunner?.isInferencing) {
         await new Promise((resolve) => setTimeout(resolve, 10));
       }
+      await ensureSceneAssetsForPath(this.mujoco, nextScenePath);
       await this.reloadScene(nextScenePath);
       this.updateFollowBodyId();
       this.timestep = this.model.opt.timestep;
