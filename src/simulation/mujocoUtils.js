@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Reflector } from './utils/Reflector.js';
+import { REFLECTION_QUALITY_PRESETS } from './reflectionQuality.js';
 import { PolicyRunner } from './policyRunner.js';
 import { toFloatArray } from './utils/math.js';
 import {
@@ -252,6 +253,7 @@ export async function reloadPolicy(policy_path, options = {}) {
 }
 
 export async function loadSceneFromURL(mujoco, filename, parent) {
+  parent.reflectors = [];
   if (parent.simulation) {
     parent.simulation.free();
     parent.simulation = null;
@@ -460,13 +462,18 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
 
     let mesh = new THREE.Mesh();
     if (type == 0) {
+      const reflectionPreset = parent.getReflectionQualityPreset?.() ?? REFLECTION_QUALITY_PRESETS[2];
       mesh = new Reflector(new THREE.PlaneGeometry(100, 100), {
         clipBias: 0.003,
         texture,
-        textureWidth: 256,
-        textureHeight: 256,
-        multisample: 0
+        textureWidth: reflectionPreset.size,
+        textureHeight: reflectionPreset.size,
+        multisample: reflectionPreset.multisample
       });
+      if (!parent.reflectors) {
+        parent.reflectors = [];
+      }
+      parent.reflectors.push(mesh);
       mesh.rotateX(-Math.PI / 2);
       mesh.material.depthWrite = false;
       mesh.renderOrder = -1;

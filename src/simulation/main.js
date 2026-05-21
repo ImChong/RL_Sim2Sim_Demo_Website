@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { DragStateManager } from './utils/DragStateManager.js';
 import { downloadExampleScenesFolder, getPosition, getQuaternion, toMujocoPos, reloadScene, reloadPolicy } from './mujocoUtils.js';
 import { getSimulationThemeSettings, normalizeSimulationThemeName } from './theme.js';
+import { REFLECTION_QUALITY_PRESETS } from './reflectionQuality.js';
 
 const defaultPolicy = "./examples/checkpoints/g1/tracking_policy_latest.json";
 
@@ -87,6 +88,8 @@ export class MuJoCoDemo {
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderScale = Math.min(window.devicePixelRatio, 2);
+    this.reflectionQuality = 2;
+    this.reflectors = [];
     this.renderer.setPixelRatio(this.renderScale);
     this.renderer.setSize(window.innerWidth, this.getViewH());
     this.renderer.shadowMap.enabled = true;
@@ -492,6 +495,22 @@ export class MuJoCoDemo {
     this.renderScale = clamped;
     this.renderer.setPixelRatio(this.renderScale);
     this.renderer.setSize(window.innerWidth, this.getViewH());
+    this._lastRenderTime = 0;
+    this.render();
+  }
+
+  getReflectionQualityPreset(level = this.reflectionQuality) {
+    const index = Math.max(0, Math.min(REFLECTION_QUALITY_PRESETS.length - 1, Math.round(level)));
+    return REFLECTION_QUALITY_PRESETS[index];
+  }
+
+  setReflectionQuality(level) {
+    const index = Math.max(0, Math.min(REFLECTION_QUALITY_PRESETS.length - 1, Math.round(level)));
+    this.reflectionQuality = index;
+    const preset = REFLECTION_QUALITY_PRESETS[index];
+    for (const reflector of this.reflectors) {
+      reflector.setReflectionQuality?.(preset.size, preset.multisample);
+    }
     this._lastRenderTime = 0;
     this.render();
   }

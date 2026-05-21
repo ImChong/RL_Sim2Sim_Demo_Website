@@ -321,6 +321,8 @@
         <div class="status-legend">
           <span class="status-name">{{ t.renderScale }}</span>
           <span class="text-caption">{{ renderScaleLabel }}</span>
+          <span class="status-name">{{ t.groundReflection }}</span>
+          <span class="text-caption">{{ reflectionQualityLabel }}</span>
           <span class="status-name">{{ t.simFreq }}</span>
           <span class="text-caption">{{ simStepLabel }}</span>
         </div>
@@ -333,6 +335,16 @@
           hide-details
           :aria-label="t.renderScale"
           @update:modelValue="onRenderScaleChange"
+        ></v-slider>
+        <v-slider
+          v-model="reflectionQuality"
+          min="0"
+          max="4"
+          step="1"
+          density="compact"
+          hide-details
+          :aria-label="t.groundReflection"
+          @update:modelValue="onReflectionQualityChange"
         ></v-slider>
       </v-card-text>
       <v-card-actions>
@@ -412,6 +424,7 @@ const translations = {
     velocityY: 'Velocity Y',
     yawRate: 'Yaw Rate',
     renderScale: 'Render scale',
+    groundReflection: 'Ground reflection',
     simFreq: 'Sim Freq',
     reset: 'Reset',
     loadingSimulationTitle: 'Loading Simulation Environment',
@@ -463,6 +476,7 @@ const translations = {
     velocityY: 'Y 方向速度',
     yawRate: '偏航角速度',
     renderScale: '渲染倍率',
+    groundReflection: '地面反射',
     simFreq: '仿真频率',
     reset: '重置',
     loadingSimulationTitle: '正在加载仿真环境',
@@ -547,6 +561,7 @@ export default {
     cmdY: 0.0,
     cmdYaw: 0.0,
     renderScale: 2.0,
+    reflectionQuality: 2,
     simStepHz: 0,
     isSmallScreen: false,
     isMobileControlsCollapsed: true,
@@ -671,6 +686,11 @@ export default {
     renderScaleLabel() {
       return `${this.renderScale.toFixed(2)}x`;
     },
+    reflectionQualityLabel() {
+      const sizes = [128, 192, 256, 384, 512];
+      const idx = Math.max(0, Math.min(4, Math.round(this.reflectionQuality)));
+      return `${sizes[idx]} px`;
+    },
     complianceThresholdLabel() {
       return this.complianceThreshold.toFixed(1);
     },
@@ -772,6 +792,7 @@ export default {
         }
         this.startTrackingPoll();
         this.renderScale = this.demo.renderScale ?? this.renderScale;
+        this.reflectionQuality = this.demo.reflectionQuality ?? this.reflectionQuality;
         const matchingPolicy = this.policies.find(
           (policy) => policy.policyPath === this.demo.currentPolicyPath
         );
@@ -1081,6 +1102,12 @@ export default {
         return;
       }
       this.demo.setRenderScale(value);
+    },
+    onReflectionQualityChange(value) {
+      if (!this.demo) {
+        return;
+      }
+      this.demo.setReflectionQuality(value);
     },
     getAvailableMotions() {
       const tracking = this.demo?.policyRunner?.tracking ?? null;
