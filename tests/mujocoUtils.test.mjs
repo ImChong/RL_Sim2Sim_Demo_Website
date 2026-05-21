@@ -12,8 +12,8 @@ test('sceneAssetPrefixesForPath returns top-level folder prefix', () => {
   assert.deepEqual(sceneAssetPrefixesForPath('scene.xml'), []);
 });
 
-test('initialSceneAssetPrefixes only preloads tracking scene bundle', () => {
-  assert.deepEqual(initialSceneAssetPrefixes(), ['g1/']);
+test('initialSceneAssetPrefixes only preloads default AMP scene bundle', () => {
+  assert.deepEqual(initialSceneAssetPrefixes(), ['g1_amp/']);
 });
 
 test('filterSceneFilesByPrefixes limits downloads to requested bundles', () => {

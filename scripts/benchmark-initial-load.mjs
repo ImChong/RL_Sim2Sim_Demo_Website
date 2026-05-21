@@ -14,15 +14,13 @@ async function fetchBytes(url) {
 }
 
 const filesJson = JSON.parse(await readFile('public/examples/scenes/files.json', 'utf8'));
-const g1Files = filesJson.filter((rel) => rel.startsWith('g1/'));
+const ampFiles = filesJson.filter((rel) => rel.startsWith('g1_amp/'));
 const urls = [
   `${BASE}/`,
   `${BASE}/assets/vendor-mujoco-DT9nIDle.js`,
-  `${BASE}/examples/checkpoints/g1/tracking_policy_latest.json`,
-  `${BASE}/examples/checkpoints/g1/tracking/policy_latest.onnx`,
-  `${BASE}/examples/checkpoints/g1/motions.json`,
-  `${BASE}/examples/checkpoints/g1/motions/default.json`,
-  ...g1Files.map((rel) => `${BASE}/examples/scenes/${rel}`)
+  `${BASE}/examples/checkpoints/g1/amp_policy_walk_run_getup.json`,
+  `${BASE}/examples/checkpoints/g1/walk_run_getup/model_60000.onnx`,
+  ...ampFiles.map((rel) => `${BASE}/examples/scenes/${rel}`)
 ];
 
 const started = performance.now();

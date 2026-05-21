@@ -14,8 +14,8 @@ import {
 import { getSimulationThemeSettings, normalizeSimulationThemeName } from './theme.js';
 import { REFLECTION_QUALITY_PRESETS } from './reflectionQuality.js';
 
-const defaultPolicy = "./examples/checkpoints/g1/tracking_policy_latest.json";
-const defaultScene = 'g1/g1.xml';
+const defaultPolicy = './examples/checkpoints/g1/amp_policy_walk_run_getup.json';
+const defaultScene = 'g1_amp/scene_g1.xml';
 
 /** Horizontal knockdown push magnitude (N), applied in world XY; local Z (vertical) force component is zero. */
 const KNOCKDOWN_FORCE_XY_MAG = 3400;

@@ -43,18 +43,6 @@
       <v-card-text v-show="!isSmallScreen || !isMobileControlsCollapsed" class="py-0 controls-body">
         <div class="training-links">
           <v-btn
-            href="https://github.com/Axellwppr/motion_tracking"
-            target="_blank"
-            rel="noopener noreferrer"
-            variant="text"
-            size="small"
-            color="primary"
-            class="text-capitalize"
-          >
-            <v-icon icon="mdi-github" class="mr-1"></v-icon>
-            G1 Tracking Training Code
-          </v-btn>
-          <v-btn
             href="https://github.com/ccrpRepo/AMP_mjlab"
             target="_blank"
             rel="noopener noreferrer"
@@ -65,6 +53,18 @@
           >
             <v-icon icon="mdi-github" class="mr-1"></v-icon>
             G1 AMP Walk/Run/Getup Training Code
+          </v-btn>
+          <v-btn
+            href="https://github.com/Axellwppr/motion_tracking"
+            target="_blank"
+            rel="noopener noreferrer"
+            variant="text"
+            size="small"
+            color="primary"
+            class="text-capitalize"
+          >
+            <v-icon icon="mdi-github" class="mr-1"></v-icon>
+            G1 Tracking Training Code
           </v-btn>
         </div>
 
@@ -534,15 +534,6 @@ export default {
     trackingTimer: null,
     policies: [
       {
-        value: 'g1-tracking-latest',
-        title: 'G1 Tracking',
-        description: 'Tracking policy with compliance input enabled.',
-        descriptionKey: 'policyDescription',
-        policyPath: './examples/checkpoints/g1/tracking_policy_latest.json',
-        onnxPath: './examples/checkpoints/g1/tracking/policy_latest.onnx',
-        scenePath: 'g1/g1.xml'
-      },
-      {
         value: 'g1-amp-walk-run-getup',
         title: 'G1 AMP Walk/Run/Getup',
         description: 'AMP policy trained for walk, run, and get-up behaviors.',
@@ -550,9 +541,18 @@ export default {
         policyPath: './examples/checkpoints/g1/amp_policy_walk_run_getup.json',
         onnxPath: './examples/checkpoints/g1/walk_run_getup/model_60000.onnx',
         scenePath: 'g1_amp/scene_g1.xml'
+      },
+      {
+        value: 'g1-tracking-latest',
+        title: 'G1 Tracking',
+        description: 'Tracking policy with compliance input enabled.',
+        descriptionKey: 'policyDescription',
+        policyPath: './examples/checkpoints/g1/tracking_policy_latest.json',
+        onnxPath: './examples/checkpoints/g1/tracking/policy_latest.onnx',
+        scenePath: 'g1/g1.xml'
       }
     ],
-    currentPolicy: 'g1-tracking-latest',
+    currentPolicy: 'g1-amp-walk-run-getup',
     policyLabel: '',
     isPolicyLoading: false,
     policyLoadError: '',
@@ -1015,7 +1015,7 @@ export default {
       if (!selected) {
         return;
       }
-      const targetScenePath = selected.scenePath ?? 'g1/g1.xml';
+      const targetScenePath = selected.scenePath ?? 'g1_amp/scene_g1.xml';
       const needsReload = selected.policyPath !== this.demo.currentPolicyPath
         || selected.onnxPath
         || targetScenePath !== this.demo.currentScenePath;

@@ -121,7 +121,7 @@ export function sceneAssetPrefixesForPath(scenePath) {
 }
 
 export function initialSceneAssetPrefixes() {
-  return ['g1/'];
+  return ['g1_amp/'];
 }
 
 export function filterSceneFilesByPrefixes(allFiles, prefixes) {
