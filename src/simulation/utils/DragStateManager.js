@@ -32,6 +32,9 @@ export class DragStateManager {
         this.localHit = new Vector3();
         this.worldHit = new Vector3();
         this.currentWorld = new Vector3();
+        this._rayHit = new Vector3();
+        this._offset = new Vector3();
+        this._offsetDir = new Vector3();
 
         container.addEventListener( 'pointerdown', this.onPointer.bind(this), true );
         document.addEventListener( 'pointermove', this.onPointer.bind(this), true );
@@ -54,15 +57,15 @@ export class DragStateManager {
             if (obj.bodyID) {
                 this.physicsObject = obj;
                 this.grabDistance = intersects[0].distance;
-                let hit = this.raycaster.ray.origin.clone();
-                hit.addScaledVector(this.raycaster.ray.direction, this.grabDistance);
+                const hit = this._rayHit.copy(this.raycaster.ray.origin)
+                    .addScaledVector(this.raycaster.ray.direction, this.grabDistance);
                 this.arrow.position.copy(hit);
-                //this.physicsObject.startGrab(hit);
                 this.active = true;
                 this.controls.enabled = false;
-                this.localHit = obj.worldToLocal(hit.clone());
                 this.worldHit.copy(hit);
                 this.currentWorld.copy(hit);
+                this.localHit.copy(hit);
+                obj.worldToLocal(this.localHit);
                 this.arrow.visible = true;
                 break;
             }
@@ -71,9 +74,9 @@ export class DragStateManager {
     move(x, y) {
         if (this.active) {
             this.updateRaycaster(x, y);
-            let hit = this.raycaster.ray.origin.clone();
-            hit.addScaledVector(this.raycaster.ray.direction, this.grabDistance);
-            this.currentWorld.copy(hit);
+            this._rayHit.copy(this.raycaster.ray.origin)
+                .addScaledVector(this.raycaster.ray.direction, this.grabDistance);
+            this.currentWorld.copy(this._rayHit);
 
             this.update();
 
@@ -87,9 +90,9 @@ export class DragStateManager {
             this.worldHit.copy(this.localHit);
             this.physicsObject.localToWorld(this.worldHit);
             this.arrow.position.copy(this.worldHit);
-            this.offset = this.currentWorld.clone().sub(this.worldHit);
-            this.arrow.setDirection(this.offset.clone().normalize());
-            this.arrow.setLength(this.offset.clone().length());
+            this._offset.copy(this.currentWorld).sub(this.worldHit);
+            this.arrow.setDirection(this._offsetDir.copy(this._offset).normalize());
+            this.arrow.setLength(this._offset.length());
         }
     }
     end(evt) {

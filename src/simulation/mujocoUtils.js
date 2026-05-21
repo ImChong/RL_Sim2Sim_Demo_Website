@@ -460,7 +460,13 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
 
     let mesh = new THREE.Mesh();
     if (type == 0) {
-      mesh = new Reflector(new THREE.PlaneGeometry(100, 100), { clipBias: 0.003, texture });
+      mesh = new Reflector(new THREE.PlaneGeometry(100, 100), {
+        clipBias: 0.003,
+        texture,
+        textureWidth: 256,
+        textureHeight: 256,
+        multisample: 0
+      });
       mesh.rotateX(-Math.PI / 2);
       mesh.material.depthWrite = false;
       mesh.renderOrder = -1;
@@ -567,8 +573,8 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
     parent.lastSimState.bodies = new Map();
     parent.lastSimState.lights = new Map();
     parent.lastSimState.tendons = {
-      numWraps: { count: 0 },
-      matrix: new THREE.Matrix4()
+      count: 0,
+      matrix: parent.lastSimState.tendons?.matrix ?? new THREE.Matrix4()
     };
   }
 
