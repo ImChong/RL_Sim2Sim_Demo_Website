@@ -49,7 +49,7 @@ export class MuJoCoDemo {
 
     this.bodies = {};
     this.lights = {};
-    this.visualThemeName = 'light';
+    this.visualThemeName = 'dark';
     this.lightBaseIntensities = new Map();
 
     this.container = document.getElementById('mujoco-container');

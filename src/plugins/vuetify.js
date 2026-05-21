@@ -10,11 +10,12 @@ import 'vuetify/styles'
 
 // Composables
 import { createVuetify } from 'vuetify'
+import { getStoredTheme } from '@/utils/themePreference'
 
 // https://vuetifyjs.com/en/introduction/why-vuetify/#feature-guides
 export default createVuetify({
   theme: {
-    defaultTheme: 'light',
+    defaultTheme: getStoredTheme(),
   },
   defaults: {
     VSlider: {

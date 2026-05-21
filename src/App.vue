@@ -47,9 +47,18 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useTheme } from 'vuetify'
 import Demo from '@/views/Demo.vue'
+import {
+  applyDocumentTheme,
+  getStoredTheme,
+  themeStorageKey,
+} from '@/utils/themePreference'
 
 const theme = useTheme()
-const themeStorageKey = 'rl-sim2sim-demo-theme'
+const initialTheme = getStoredTheme()
+if (theme.global.name.value !== initialTheme) {
+  theme.change(initialTheme)
+}
+applyDocumentTheme(initialTheme)
 const languageStorageKey = 'rl-sim2sim-demo-language'
 const currentThemeName = computed(() => theme.global.name.value)
 const isDark = computed(() => theme.global.current.value.dark)
@@ -59,11 +68,6 @@ const languageToggleText = computed(() => (currentLanguage.value === 'zh' ? 'Eng
 const languageToggleLabel = computed(() => (
   currentLanguage.value === 'zh' ? 'Switch control panel to English' : '将控制面板切换为中文'
 ))
-
-function applyDocumentTheme(name) {
-  const dark = name === 'dark'
-  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
-}
 
 function toggleTheme() {
   const next = isDark.value ? 'light' : 'dark'
@@ -83,11 +87,6 @@ function toggleLanguage() {
 }
 
 onMounted(() => {
-  const saved = localStorage.getItem(themeStorageKey)
-  const preferDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-  const initial = saved || (preferDark ? 'dark' : 'light')
-  theme.change(initial)
-  applyDocumentTheme(initial)
   setLanguage(localStorage.getItem(languageStorageKey) || 'en')
 })
 
@@ -101,27 +100,6 @@ watch(
 
 <style>
 :root {
-  --bg: #fbfbfa;
-  --bg-alt: #f3f2ef;
-  --surface: rgba(255,255,255,.88);
-  --surface-strong: #ffffff;
-  --border: #e7e5e0;
-  --border-strong: #ddd9d0;
-  --text: #2f2d29;
-  --text-muted: #6f6b64;
-  --accent: #2d74da;
-  --accent-hover: #1a5bb8;
-  --header-bg: #faf9f6;
-  --header-border: #ddd9d0;
-  --shadow-sm: 0 8px 24px rgba(15, 23, 42, .05);
-  --shadow-md: 0 16px 40px rgba(15, 23, 42, .10);
-  --radius: 16px;
-  --header-h: 58px;
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, 'Noto Sans SC', sans-serif;
-  --transition: .22s ease;
-}
-
-[data-theme="dark"] {
   --bg: #151515;
   --bg-alt: #1d1d1d;
   --surface: rgba(39,39,39,.88);
@@ -136,6 +114,27 @@ watch(
   --header-border: #3c3c3c;
   --shadow-sm: 0 8px 24px rgba(0,0,0,.22);
   --shadow-md: 0 18px 44px rgba(0,0,0,.34);
+  --radius: 16px;
+  --header-h: 58px;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, 'Noto Sans SC', sans-serif;
+  --transition: .22s ease;
+}
+
+[data-theme="light"] {
+  --bg: #fbfbfa;
+  --bg-alt: #f3f2ef;
+  --surface: rgba(255,255,255,.88);
+  --surface-strong: #ffffff;
+  --border: #e7e5e0;
+  --border-strong: #ddd9d0;
+  --text: #2f2d29;
+  --text-muted: #6f6b64;
+  --accent: #2d74da;
+  --accent-hover: #1a5bb8;
+  --header-bg: #faf9f6;
+  --header-border: #ddd9d0;
+  --shadow-sm: 0 8px 24px rgba(15, 23, 42, .05);
+  --shadow-md: 0 16px 40px rgba(15, 23, 42, .10);
 }
 
 body,
@@ -152,11 +151,18 @@ body {
 
 body {
   background:
-    radial-gradient(circle at top left, rgba(45,116,218,.06), transparent 28%),
-    radial-gradient(circle at top right, rgba(120,119,198,.05), transparent 24%),
+    radial-gradient(circle at top left, rgba(105,163,255,.08), transparent 28%),
+    radial-gradient(circle at top right, rgba(120,119,198,.06), transparent 24%),
     var(--bg);
   color: var(--text);
   transition: background var(--transition), color var(--transition);
+}
+
+[data-theme="light"] body {
+  background:
+    radial-gradient(circle at top left, rgba(45,116,218,.06), transparent 28%),
+    radial-gradient(circle at top right, rgba(120,119,198,.05), transparent 24%),
+    var(--bg);
 }
 
 .v-application {
@@ -261,10 +267,10 @@ body {
   color: var(--accent);
 }
 
-.icon-sun { display: none; }
-.icon-moon { display: inline; }
-[data-theme="dark"] .icon-sun { display: inline; }
-[data-theme="dark"] .icon-moon { display: none; }
+.icon-sun { display: inline; }
+.icon-moon { display: none; }
+[data-theme="light"] .icon-sun { display: none; }
+[data-theme="light"] .icon-moon { display: inline; }
 
 .app-main {
   min-height: calc(100vh - var(--header-h));
