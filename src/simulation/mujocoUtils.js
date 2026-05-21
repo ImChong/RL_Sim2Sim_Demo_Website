@@ -90,6 +90,7 @@ async function loadMotionIndex(indexPayload, motionsUrl, onProgress) {
 }
 
 export async function reloadScene(mjcf_path) {
+  this.currentScenePath = mjcf_path;
   this.scene.remove(this.scene.getObjectByName('MuJoCo Root'));
   const mujoco = this.mujoco;
   console.log('Loading scene:', mjcf_path);

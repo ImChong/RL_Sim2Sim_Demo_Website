@@ -6,6 +6,7 @@ import { getSimulationThemeSettings, normalizeSimulationThemeName } from './them
 import { REFLECTION_QUALITY_PRESETS } from './reflectionQuality.js';
 
 const defaultPolicy = "./examples/checkpoints/g1/tracking_policy_latest.json";
+const defaultScene = 'g1/g1.xml';
 
 /** Horizontal knockdown push magnitude (N), applied in world XY; local Z (vertical) force component is zero. */
 const KNOCKDOWN_FORCE_XY_MAG = 3400;
@@ -33,6 +34,7 @@ export class MuJoCoDemo {
     this.data = null;
     this.simulation = null;
     this.currentPolicyPath = defaultPolicy;
+    this.currentScenePath = defaultScene;
 
     // Pre-allocated policy state arrays to avoid GC pressure per physics tick
     this._cachedPolicyState = {
@@ -168,7 +170,7 @@ export class MuJoCoDemo {
       report(sceneDownload * p);
     });
     report(sceneDownload);
-    await this.reloadScene('g1/g1.xml');
+    await this.reloadScene(defaultScene);
     this.updateFollowBodyId();
     report(sceneDownload + sceneBuild);
     await this.reloadPolicy(defaultPolicy, {
@@ -188,6 +190,26 @@ export class MuJoCoDemo {
 
     await this.reloadPolicy(this.currentPolicyPath ?? defaultPolicy);
     console.log('timestep:', this.timestep, 'decimation:', this.decimation);
+    this.alive = true;
+  }
+
+  async switchSceneAndPolicy(scenePath, policyPath, options = {}) {
+    const nextScenePath = scenePath ?? defaultScene;
+    const nextPolicyPath = policyPath ?? defaultPolicy;
+    const needsSceneReload = nextScenePath !== this.currentScenePath;
+
+    if (needsSceneReload) {
+      while (this.policyRunner?.isInferencing) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      await this.reloadScene(nextScenePath);
+      this.updateFollowBodyId();
+      this.timestep = this.model.opt.timestep;
+      this.decimation = Math.max(1, Math.round(0.02 / this.timestep));
+    }
+
+    await this.reloadPolicy(nextPolicyPath, options);
+    console.log('scene:', this.currentScenePath, 'timestep:', this.timestep, 'decimation:', this.decimation);
     this.alive = true;
   }
 

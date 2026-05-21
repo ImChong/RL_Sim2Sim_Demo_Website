@@ -539,7 +539,8 @@ export default {
         description: 'Tracking policy with compliance input enabled.',
         descriptionKey: 'policyDescription',
         policyPath: './examples/checkpoints/g1/tracking_policy_latest.json',
-        onnxPath: './examples/checkpoints/g1/tracking/policy_latest.onnx'
+        onnxPath: './examples/checkpoints/g1/tracking/policy_latest.onnx',
+        scenePath: 'g1/g1.xml'
       },
       {
         value: 'g1-amp-walk-run-getup',
@@ -547,7 +548,8 @@ export default {
         description: 'AMP policy trained for walk, run, and get-up behaviors.',
         descriptionKey: 'ampPolicyDescription',
         policyPath: './examples/checkpoints/g1/amp_policy_walk_run_getup.json',
-        onnxPath: './examples/checkpoints/g1/walk_run_getup/model_60000.onnx'
+        onnxPath: './examples/checkpoints/g1/walk_run_getup/model_60000.onnx',
+        scenePath: 'g1_amp/scene_g1.xml'
       }
     ],
     currentPolicy: 'g1-tracking-latest',
@@ -999,7 +1001,10 @@ export default {
       if (!selected) {
         return;
       }
-      const needsReload = selected.policyPath !== this.demo.currentPolicyPath || selected.onnxPath;
+      const targetScenePath = selected.scenePath ?? 'g1/g1.xml';
+      const needsReload = selected.policyPath !== this.demo.currentPolicyPath
+        || selected.onnxPath
+        || targetScenePath !== this.demo.currentScenePath;
       if (!needsReload) {
         return;
       }
@@ -1008,7 +1013,7 @@ export default {
       this.isPolicyLoading = true;
       this.policyLoadError = '';
       try {
-        await this.demo.reloadPolicy(selected.policyPath, {
+        await this.demo.switchSceneAndPolicy(targetScenePath, selected.policyPath, {
           onnxPath: selected.onnxPath || undefined
         });
         if (this.isAmpPolicy) {
