@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { DragStateManager } from './utils/DragStateManager.js';
 import { downloadExampleScenesFolder, getPosition, getQuaternion, toMujocoPos, reloadScene, reloadPolicy } from './mujocoUtils.js';
 import { getSimulationThemeSettings, normalizeSimulationThemeName } from './theme.js';
+import { REFLECTION_QUALITY_PRESETS } from './reflectionQuality.js';
 
 const defaultPolicy = "./examples/checkpoints/g1/tracking_policy_latest.json";
 
@@ -87,6 +88,8 @@ export class MuJoCoDemo {
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderScale = Math.min(window.devicePixelRatio, 2);
+    this.reflectionQuality = 2;
+    this.reflectors = [];
     this.renderer.setPixelRatio(this.renderScale);
     this.renderer.setSize(window.innerWidth, this.getViewH());
     this.renderer.shadowMap.enabled = true;
@@ -132,11 +135,15 @@ export class MuJoCoDemo {
     this.followBodyId = null;
     this.followDistance = this.camera.position.distanceTo(this.controls.target);
 
+    this._dragForceVec = new THREE.Vector3();
+    this._dragPointVec = new THREE.Vector3();
+    this._lightLookAt = new THREE.Vector3();
+
     this.lastSimState = {
       bodies: new Map(),
       lights: new Map(),
       tendons: {
-        numWraps: 0,
+        count: 0,
         matrix: new THREE.Matrix4()
       }
     };
@@ -373,10 +380,7 @@ export class MuJoCoDemo {
             console.error('Torque control not implemented yet.');
           }
 
-          const applied = this.simulation.qfrc_applied;
-          for (let i = 0; i < applied.length; i++) {
-            applied[i] = 0.0;
-          }
+          this.simulation.qfrc_applied.fill(0.0);
 
           if (this._knockdownSubstepsRemaining > 0) {
             this.applyPelvisKnockdownForceXYPlane();
@@ -385,21 +389,22 @@ export class MuJoCoDemo {
 
           const dragged = this.dragStateManager.physicsObject;
           if (dragged && dragged.bodyID) {
-            for (let b = 0; b < this.model.nbody; b++) {
-              if (this.bodies[b]) {
-                getPosition(this.simulation.xpos, b, this.bodies[b].position);
-                getQuaternion(this.simulation.xquat, b, this.bodies[b].quaternion);
-                this.bodies[b].updateWorldMatrix();
-              }
-            }
             const bodyID = dragged.bodyID;
+            const bodyGroup = this.bodies[bodyID];
+            if (bodyGroup) {
+              getPosition(this.simulation.xpos, bodyID, bodyGroup.position);
+              getQuaternion(this.simulation.xquat, bodyID, bodyGroup.quaternion);
+            }
+            if (this.mujocoRoot) {
+              this.mujocoRoot.updateWorldMatrix(true, true);
+            }
             this.dragStateManager.update();
             const force = toMujocoPos(
-              this.dragStateManager.currentWorld.clone()
+              this._dragForceVec
+                .copy(this.dragStateManager.currentWorld)
                 .sub(this.dragStateManager.worldHit)
                 .multiplyScalar(60.0)
             );
-            // clamp force magnitude
             const forceMagnitude = Math.sqrt(force.x * force.x + force.y * force.y + force.z * force.z);
             const maxForce = 30.0;
             if (forceMagnitude > maxForce) {
@@ -408,7 +413,8 @@ export class MuJoCoDemo {
               force.y *= scale;
               force.z *= scale;
             }
-            const point = toMujocoPos(this.dragStateManager.worldHit.clone());
+            this._dragPointVec.copy(this.dragStateManager.worldHit);
+            const point = toMujocoPos(this._dragPointVec);
             this.simulation.applyForce(force.x, force.y, force.z, 0, 0, 0, point.x, point.y, point.z, bodyID);
           }
 
@@ -446,10 +452,7 @@ export class MuJoCoDemo {
           getPosition(this.simulation.light_xdir, l, cached.direction);
         }
 
-        this.lastSimState.tendons.numWraps = {
-          count: this.model.nwrap,
-          matrix: this.lastSimState.tendons.matrix
-        };
+        this.lastSimState.tendons.count = this.model.nwrap;
 
         this._stepFrameCount += 1;
         const now = performance.now();
@@ -492,6 +495,22 @@ export class MuJoCoDemo {
     this.renderScale = clamped;
     this.renderer.setPixelRatio(this.renderScale);
     this.renderer.setSize(window.innerWidth, this.getViewH());
+    this._lastRenderTime = 0;
+    this.render();
+  }
+
+  getReflectionQualityPreset(level = this.reflectionQuality) {
+    const index = Math.max(0, Math.min(REFLECTION_QUALITY_PRESETS.length - 1, Math.round(level)));
+    return REFLECTION_QUALITY_PRESETS[index];
+  }
+
+  setReflectionQuality(level) {
+    const index = Math.max(0, Math.min(REFLECTION_QUALITY_PRESETS.length - 1, Math.round(level)));
+    this.reflectionQuality = index;
+    const preset = REFLECTION_QUALITY_PRESETS[index];
+    for (const reflector of this.reflectors) {
+      reflector.setReflectionQuality?.(preset.size, preset.multisample);
+    }
     this._lastRenderTime = 0;
     this.render();
   }
@@ -689,12 +708,13 @@ export class MuJoCoDemo {
     for (const [l, cached] of this.lastSimState.lights) {
       if (this.lights[l]) {
         this.lights[l].position.copy(cached.position);
-        this.lights[l].lookAt(cached.direction.clone().add(this.lights[l].position));
+        this._lightLookAt.copy(cached.direction).add(this.lights[l].position);
+        this.lights[l].lookAt(this._lightLookAt);
       }
     }
 
     if (this.mujocoRoot && this.mujocoRoot.cylinders) {
-      const numWraps = this.lastSimState.tendons.numWraps.count;
+      const numWraps = this.lastSimState.tendons.count;
       this.mujocoRoot.cylinders.count = numWraps;
       this.mujocoRoot.spheres.count = numWraps > 0 ? numWraps + 1 : 0;
       this.mujocoRoot.cylinders.instanceMatrix.needsUpdate = true;

@@ -41,6 +41,8 @@ export class PolicyRunner {
     this.fullObs = new Float32Array(this.numObs * this.historyLength);
     this.obsForPolicy = new Float32Array(this.numObs);
     this.target = new Float32Array(this.numActions);
+    this._policyTensor = null;
+    this._policyTensorSize = 0;
     this.onModuleInitProgress = typeof options.onInitProgress === 'function'
       ? options.onInitProgress
       : null;
@@ -72,23 +74,52 @@ export class PolicyRunner {
       return state;
     }
     const jointPosAbs = state.jointPos ?? new Float32Array(this.numActions);
-
-    // Create a new object for policy state to avoid mutating the shared cached state,
-    // but reuse the cached array for relative joint positions to save TypedArray allocations
-    const policyState = { ...state };
-    policyState.jointPosAbs = jointPosAbs;
-
     const jointPosRel = this.cachedJointPosRel;
     for (let i = 0; i < this.numActions; i++) {
       jointPosRel[i] = jointPosAbs[i] - this.defaultJointPos[i];
     }
-    policyState.jointPos = jointPosRel;
+    const rel = this._relPolicyState ?? {
+      jointPos: jointPosRel,
+      jointPosAbs,
+      jointVel: state.jointVel,
+      rootPos: state.rootPos,
+      rootQuat: state.rootQuat,
+      rootAngVel: state.rootAngVel,
+      qvel_base: state.qvel_base,
+      complianceEnabled: state.complianceEnabled,
+      complianceThreshold: state.complianceThreshold,
+      cmd: state.cmd
+    };
+    if (!this._relPolicyState) {
+      this._relPolicyState = rel;
+      return rel;
+    }
+    rel.jointPosAbs = jointPosAbs;
+    rel.jointVel = state.jointVel;
+    rel.rootPos = state.rootPos;
+    rel.rootQuat = state.rootQuat;
+    rel.rootAngVel = state.rootAngVel;
+    rel.qvel_base = state.qvel_base;
+    rel.complianceEnabled = state.complianceEnabled;
+    rel.complianceThreshold = state.complianceThreshold;
+    rel.cmd = state.cmd;
+    return rel;
+  }
 
-    return policyState;
+  _bindPolicyTensor() {
+    const data = this.historyLength > 1 ? this.fullObs : this.obsForPolicy;
+    const size = data.length;
+    if (!this._policyTensor || this._policyTensorSize !== size) {
+      this._policyTensor = new ort.Tensor('float32', data, [1, size]);
+      this._policyTensorSize = size;
+    }
+    this.inputDict.policy = this._policyTensor;
   }
 
   reset(state = null) {
     this.inputDict = this.module.initInput() ?? {};
+    this._policyTensor = null;
+    this._policyTensorSize = 0;
     this.lastActions.fill(0.0);
     this.historyCount = 0;
     if (this.tracking) {
@@ -148,13 +179,13 @@ export class PolicyRunner {
             this.historyCount++;
           }
         }
-        this.inputDict['policy'] = new ort.Tensor('float32', fullObs, [1, fullObs.length]);
-      } else {
-        this.inputDict['policy'] = new ort.Tensor('float32', obsForPolicy, [1, obsForPolicy.length]);
       }
+      this._bindPolicyTensor();
 
       const [result, carry] = await this.module.runInference(this.inputDict);
-      this.inputDict = { ...this.inputDict, ...carry };
+      if (carry && Object.keys(carry).length > 0) {
+        Object.assign(this.inputDict, carry);
+      }
 
       const action = result['action']?.data;
       if (!action || action.length !== this.numActions) {

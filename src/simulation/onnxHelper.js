@@ -6,6 +6,10 @@ export class ONNXModule {
     this.modelPath = config.path;
     this.metaData = config.meta;
     this.isRecurrent = config.meta.in_keys.includes("adapt_hx");
+    this._onnxInput = {};
+    this._result = {};
+    this._carry = {};
+    this._emptyCarry = {};
     console.log("isRecurrent", this.isRecurrent);
   }
 
@@ -42,33 +46,33 @@ export class ONNXModule {
 
   initInput() {
     if (this.isRecurrent) {
-      return {
-        "is_init": new ort.Tensor('bool', [true], [1]),
-        "adapt_hx": new ort.Tensor('float32', new Float32Array(128), [1, 128])
+      if (!this._isInitTrue) {
+        this._isInitTrue = new ort.Tensor('bool', [true], [1]);
+        this._isInitFalse = new ort.Tensor('bool', [false], [1]);
       }
-    } else {
-      return {};
+      return {
+        is_init: this._isInitTrue,
+        adapt_hx: new ort.Tensor('float32', new Float32Array(128), [1, 128])
+      };
     }
+    return {};
   }
 
   async runInference(input) {
-    // construct input
-    let onnxInput = {};
+    const onnxInput = this._onnxInput;
     for (let i = 0; i < this.inKeys.length; i++) {
       onnxInput[this.session.inputNames[i]] = input[this.inKeys[i]];
     }
-    // run inference
     const onnxOutput = await this.session.run(onnxInput);
-    // construct output
-    let result = {};
+    const result = this._result;
     for (let i = 0; i < this.outKeys.length; i++) {
       result[this.outKeys[i]] = onnxOutput[this.session.outputNames[i]];
     }
-    let carry = {};
     if (this.isRecurrent) {
-      carry["is_init"] = new ort.Tensor('bool', [false], [1]);
-      carry["adapt_hx"] = result["next,adapt_hx"];
+      this._carry.is_init = this._isInitFalse;
+      this._carry.adapt_hx = result['next,adapt_hx'];
+      return [result, this._carry];
     }
-    return [result, carry];
+    return [result, this._emptyCarry];
   }
 }

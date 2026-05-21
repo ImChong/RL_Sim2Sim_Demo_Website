@@ -51,10 +51,12 @@ class Reflector extends Mesh {
 		const textureMatrix = new Matrix4();
 		const virtualCamera = this.camera;
 
-		const renderTarget = new WebGLRenderTarget( textureWidth, textureHeight, { samples: multisample, type: HalfFloatType } );
+		this._textureSize = textureWidth;
+		this._multisample = multisample;
+		this._renderTarget = new WebGLRenderTarget( textureWidth, textureHeight, { samples: multisample, type: HalfFloatType } );
 
 		this.material = new MeshPhysicalMaterial( { map: blendTexture });
-		this.material.uniforms = { tDiffuse     : { value: renderTarget.texture },
+		this.material.uniforms = { tDiffuse     : { value: this._renderTarget.texture },
 								   textureMatrix: { value: textureMatrix        }};
         this.material.onBeforeCompile = ( shader ) => {
 
@@ -77,7 +79,7 @@ class Reflector extends Mesh {
 				}`;
 
 			// Set the LightMap Accumulation Buffer
-			shader.uniforms.tDiffuse = { value: renderTarget.texture };
+			shader.uniforms.tDiffuse = { value: scope._renderTarget.texture };
 			shader.uniforms.textureMatrix = { value: textureMatrix };
 			this.material.uniforms = shader.uniforms;
 
@@ -176,7 +178,7 @@ class Reflector extends Mesh {
 			renderer.outputEncoding = LinearEncoding;
 			renderer.toneMapping = NoToneMapping;
 
-			renderer.setRenderTarget( renderTarget );
+			renderer.setRenderTarget( scope._renderTarget );
 
 			renderer.state.buffers.depth.setMask( true ); // make sure the depth buffer is writable so it can be properly cleared, see #18897
 
@@ -206,13 +208,34 @@ class Reflector extends Mesh {
 
 		this.getRenderTarget = function () {
 
-			return renderTarget;
+			return scope._renderTarget;
+
+		};
+
+		this.setReflectionQuality = function ( textureSize, multisample ) {
+
+			const size = Math.max( 64, Math.min( 1024, Math.round( textureSize ) ) );
+			const samples = multisample !== undefined ? multisample : scope._multisample;
+			if ( size === scope._textureSize && samples === scope._multisample ) {
+				return;
+			}
+
+			scope._renderTarget.dispose();
+			scope._textureSize = size;
+			scope._multisample = samples;
+			scope._renderTarget = new WebGLRenderTarget( size, size, { samples: samples, type: HalfFloatType } );
+
+			scope.material.uniforms.tDiffuse.value = scope._renderTarget.texture;
+			const compiled = scope.material.userData.shader;
+			if ( compiled?.uniforms?.tDiffuse ) {
+				compiled.uniforms.tDiffuse.value = scope._renderTarget.texture;
+			}
 
 		};
 
 		this.dispose = function () {
 
-			renderTarget.dispose();
+			scope._renderTarget.dispose();
 			scope.material.dispose();
 
 		};
