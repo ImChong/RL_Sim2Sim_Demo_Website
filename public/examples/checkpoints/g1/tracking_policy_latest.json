@@ -23,7 +23,7 @@
         ]
       ]
     },
-    "path": "./examples/checkpoints/g1/policy_latest.onnx"
+    "path": "./examples/checkpoints/g1/tracking/policy_latest.onnx"
   },
   "obs_config": {
     "policy": [
