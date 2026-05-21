@@ -318,13 +318,13 @@
             {{ cameraFollowEnabled ? t.on : t.off }}
           </v-btn>
         </div>
-        <div class="status-legend">
-          <span class="status-name">{{ t.renderScale }}</span>
-          <span class="text-caption">{{ renderScaleLabel }}</span>
-          <span class="status-name">{{ t.groundReflection }}</span>
-          <span class="text-caption">{{ reflectionQualityLabel }}</span>
+        <div class="status-legend follow-controls mt-2">
           <span class="status-name">{{ t.simFreq }}</span>
           <span class="text-caption">{{ simStepLabel }}</span>
+        </div>
+        <div class="status-legend follow-controls mt-2">
+          <span class="status-name">{{ t.renderScale }}</span>
+          <span class="text-caption">{{ renderScaleLabel }}</span>
         </div>
         <v-slider
           v-model="renderScale"
@@ -336,6 +336,10 @@
           :aria-label="t.renderScale"
           @update:modelValue="onRenderScaleChange"
         ></v-slider>
+        <div class="status-legend follow-controls mt-2">
+          <span class="status-name">{{ t.groundReflection }}</span>
+          <span class="text-caption">{{ reflectionQualityLabel }}</span>
+        </div>
         <v-slider
           v-model="reflectionQuality"
           min="0"
