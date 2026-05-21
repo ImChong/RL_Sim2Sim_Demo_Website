@@ -41,9 +41,10 @@ npm run dev
 
 ### 2）添加 policy 配置与 ONNX 模型
 - 新建：`public/examples/checkpoints/<robot>/tracking_policy.json`
-- 放置 ONNX 模型到：`public/examples/checkpoints/<robot>/tracking_policy.onnx`
+- 将 Tracking ONNX 放到子目录，例如：`public/examples/checkpoints/<robot>/tracking/policy_latest.onnx`
+- AMP 类策略同理放到独立子目录，例如：`public/examples/checkpoints/<robot>/walk_run_getup/model_60000.onnx`
 - 确认 JSON 中以下字段正确：
-  - `onnx.path` 指向正确的 ONNX 文件，例如 `./examples/checkpoints/<robot>/tracking_policy.onnx`
+  - `onnx.path` 指向正确的 ONNX 文件，例如 `./examples/checkpoints/<robot>/tracking/policy_latest.onnx`
   - `policy_joint_names` 与 MJCF actuator 中的关节名一致
   - `obs_config` 中使用的 observation 名称已在 `src/simulation/observationHelpers.js` 中实现
   - `action_scale`、`stiffness`、`damping`、`default_joint_pos` 的长度与 `policy_joint_names` 一致

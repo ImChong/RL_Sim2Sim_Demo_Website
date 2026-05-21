@@ -521,7 +521,7 @@ export default {
         description: 'Tracking policy with compliance input enabled.',
         descriptionKey: 'policyDescription',
         policyPath: './examples/checkpoints/g1/tracking_policy_latest.json',
-        onnxPath: './examples/checkpoints/g1/policy_latest.onnx'
+        onnxPath: './examples/checkpoints/g1/tracking/policy_latest.onnx'
       },
       {
         value: 'g1-amp-walk-run-getup',
