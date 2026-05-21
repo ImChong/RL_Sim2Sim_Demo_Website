@@ -36,3 +36,7 @@
 ## 2024-05-20 - Optimizing sliding windows in TypedArrays
 **Learning:** For sliding window history buffers (like those in `PrevActions`, `JointPos`, `JointVel`), maintaining an Array of TypedArrays and shifting them via iteration and `.set()` is slow.
 **Action:** Replace Arrays of TypedArrays with a single, flat `Float32Array` representing the entire buffer. Use the native `TypedArray.prototype.copyWithin()` to shift the history. In benchmarks, this was measured to be 3-4x faster for high-frequency updates, significantly reducing iteration and memory overhead.
+
+## 2025-05-21 - TypedArray.set() natively accepts JS arrays
+**Learning:** Found that converting standard JavaScript arrays (or views) to TypedArrays (e.g. `new Float32Array(array)`) before using `.set()` creates unnecessary intermediate allocations that put pressure on the Garbage Collector in hot paths (like `PolicyRunner.step()` running at high frequency).
+**Action:** When copying data into a TypedArray, pass standard JavaScript arrays directly to `TypedArray.prototype.set(array)`. It natively handles standard JS arrays, completely avoiding the need for intermediate typed array allocations and improving performance in simulation loops.
