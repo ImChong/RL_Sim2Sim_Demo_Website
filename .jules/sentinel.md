@@ -12,3 +12,7 @@
 **Vulnerability:** Missing file size limits when users upload motion JSON files.
 **Learning:** Calling `file.text()` or `JSON.parse()` on excessively large files can block the UI thread or cause an Out-of-Memory (OOM) error, leading to a Denial of Service (DoS).
 **Prevention:** Enforce strict file size limits (e.g., 5MB) on user-uploaded files before attempting to read or parse them into memory.
+## 2026-05-21 - [Restrict CSP Evaluation to WebAssembly Only]
+**Vulnerability:** Broad `unsafe-eval` in CSP.
+**Learning:** The application uses WebAssembly (WASM) for MuJoCo and ONNX, which requires evaluation permissions. Using `unsafe-eval` grants permission to evaluate standard JavaScript strings as well, increasing XSS risks. `wasm-unsafe-eval` is a safer modern alternative that permits WASM evaluation while continuing to block regular JS `eval()`.
+**Prevention:** Use `wasm-unsafe-eval` instead of `unsafe-eval` in Content Security Policies when evaluation is only needed for WebAssembly modules.
