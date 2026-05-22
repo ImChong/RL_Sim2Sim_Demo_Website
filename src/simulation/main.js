@@ -206,19 +206,40 @@ export class MuJoCoDemo {
     const nextScenePath = scenePath ?? defaultScene;
     const nextPolicyPath = policyPath ?? defaultPolicy;
     const needsSceneReload = nextScenePath !== this.currentScenePath;
+    const report = (t) => {
+      if (typeof options.onProgress === 'function') {
+        options.onProgress(Math.min(1, Math.max(0, t)));
+      }
+    };
+    const sceneDownload = needsSceneReload ? 0.52 : 0;
+    const sceneBuild = needsSceneReload ? 0.13 : 0;
+    const policyWeight = 1 - sceneDownload - sceneBuild;
 
     if (needsSceneReload) {
       while (this.policyRunner?.isInferencing) {
         await new Promise((resolve) => setTimeout(resolve, 10));
       }
-      await ensureSceneAssetsForPath(this.mujoco, nextScenePath);
+      await ensureSceneAssetsForPath(this.mujoco, nextScenePath, (p) => {
+        report(sceneDownload * p);
+      });
+      report(sceneDownload);
       await this.reloadScene(nextScenePath);
       this.updateFollowBodyId();
       this.timestep = this.model.opt.timestep;
       this.decimation = Math.max(1, Math.round(0.02 / this.timestep));
+      report(sceneDownload + sceneBuild);
+    } else {
+      report(0);
     }
 
-    await this.reloadPolicy(nextPolicyPath, options);
+    const { onProgress, ...policyOptions } = options;
+    await this.reloadPolicy(nextPolicyPath, {
+      ...policyOptions,
+      onInitProgress: (p) => {
+        report(sceneDownload + sceneBuild + policyWeight * p);
+      }
+    });
+    report(1);
     console.log('scene:', this.currentScenePath, 'timestep:', this.timestep, 'decimation:', this.decimation);
     this.alive = true;
   }

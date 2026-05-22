@@ -81,17 +81,9 @@
           hide-details
           item-title="title"
           item-value="value"
-          :disabled="isPolicyLoading || state !== 1"
+          :disabled="state !== 1"
           @update:modelValue="onPolicyChange"
         ></v-select>
-        <v-progress-linear
-          v-if="isPolicyLoading"
-          indeterminate
-          height="4"
-          color="primary"
-          class="mt-2"
-          :aria-label="t.policy"
-        ></v-progress-linear>
 
         <div v-if="isAmpPolicy" class="mt-4">
           <div class="status-legend follow-controls mt-2">
@@ -554,7 +546,6 @@ export default {
     ],
     currentPolicy: 'g1-amp-walk-run-getup',
     policyLabel: '',
-    isPolicyLoading: false,
     policyLoadError: '',
     motionUploadFiles: [],
     motionUploadMessage: '',
@@ -765,27 +756,45 @@ export default {
         plural: count === 1 ? '' : 's'
       });
     },
+    setSimulationLoadProgress(ratio) {
+      this.simulationLoadProgress = Math.round(Math.min(100, Math.max(0, ratio * 100)));
+    },
+    async runWithSimulationLoading(task) {
+      const previousState = this.state;
+      this.state = 0;
+      this.simulationLoadProgress = 0;
+      try {
+        await task((ratio) => this.setSimulationLoadProgress(ratio));
+        this.state = 1;
+      } catch (error) {
+        if (previousState === 1) {
+          this.state = 1;
+        } else {
+          this.state = -1;
+          this.extra_error_message = error.toString();
+        }
+        throw error;
+      }
+    },
     async init() {
       if (typeof WebAssembly !== 'object' || typeof WebAssembly.instantiate !== 'function') {
         this.state = -2;
         return;
       }
 
-      const setLoadProgress = (ratio) => {
-        this.simulationLoadProgress = Math.round(Math.min(100, Math.max(0, ratio * 100)));
-      };
-
       try {
-        setLoadProgress(0.02);
-        const mujoco = await loadMujoco();
-        setLoadProgress(0.10);
-        this.demo = new MuJoCoDemo(mujoco);
-        this.demo.setVisualTheme?.(this.visualTheme);
-        this.demo.setFollowEnabled?.(this.cameraFollowEnabled);
-        await this.demo.init((r) => {
-          setLoadProgress(0.10 + 0.90 * r);
+        await this.runWithSimulationLoading(async (report) => {
+          report(0.02);
+          const mujoco = await loadMujoco();
+          report(0.10);
+          this.demo = new MuJoCoDemo(mujoco);
+          this.demo.setVisualTheme?.(this.visualTheme);
+          this.demo.setFollowEnabled?.(this.cameraFollowEnabled);
+          await this.demo.init((r) => {
+            report(0.10 + 0.90 * r);
+          });
+          report(1);
         });
-        setLoadProgress(1);
         this.demo.main_loop();
         this.demo.params.paused = false;
         this.reapplyCustomMotions();
@@ -806,10 +815,7 @@ export default {
           this.currentPolicy = matchingPolicy.value;
         }
         this.policyLabel = this.demo.currentPolicyPath?.split('/').pop() ?? this.policyLabel;
-        this.state = 1;
       } catch (error) {
-        this.state = -1;
-        this.extra_error_message = error.toString();
         console.error(error);
       }
     },
@@ -1024,12 +1030,14 @@ export default {
       }
       const wasPaused = this.demo.params?.paused ?? false;
       this.demo.params.paused = true;
-      this.isPolicyLoading = true;
       this.policyLoadError = '';
       try {
-        await this.demo.switchSceneAndPolicy(targetScenePath, selected.policyPath, {
-          onnxPath: selected.onnxPath || undefined
-        });
+        await this.runWithSimulationLoading((report) =>
+          this.demo.switchSceneAndPolicy(targetScenePath, selected.policyPath, {
+            onnxPath: selected.onnxPath || undefined,
+            onProgress: report
+          })
+        );
         if (this.isAmpPolicy) {
           this.resetAmpCommandSliders();
         }
@@ -1042,7 +1050,6 @@ export default {
         console.error('Failed to reload policy:', error);
         this.policyLoadError = error.toString();
       } finally {
-        this.isPolicyLoading = false;
         this.demo.params.paused = wasPaused;
       }
     },
