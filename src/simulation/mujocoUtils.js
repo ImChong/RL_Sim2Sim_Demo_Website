@@ -11,6 +11,33 @@ import {
 
 const MOTION_INDEX_FORMAT = 'tracking-motion-index-v1';
 
+/** MuJoCo mat_texrepeat for a material id (u/v repeat counts). */
+function getMatTexRepeat(model, matId) {
+  if (matId < 0) {
+    return { u: 1, v: 1 };
+  }
+  const u = model.mat_texrepeat[matId * 2];
+  const v = model.mat_texrepeat[(matId * 2) + 1];
+  return {
+    u: Number.isFinite(u) && u > 0 ? u : 1,
+    v: Number.isFinite(v) && v > 0 ? v : 1
+  };
+}
+
+/** Bake mat_texrepeat into plane UVs (Reflector shader ignores texture.repeat on the checker map). */
+function applyMatTexRepeatToPlaneGeometry(geometry, repeatU, repeatV) {
+  const uv = geometry.attributes.uv;
+  if (!uv) {
+    return;
+  }
+  const u = Number.isFinite(repeatU) && repeatU > 0 ? repeatU : 1;
+  const v = Number.isFinite(repeatV) && repeatV > 0 ? repeatV : 1;
+  for (let i = 0; i < uv.count; i++) {
+    uv.setXY(i, uv.getX(i) * u, uv.getY(i) * v);
+  }
+  uv.needsUpdate = true;
+}
+
 function stripJsonExtension(path) {
   const file = path.split('/').pop() ?? path;
   return file.replace(/\.json$/i, '');
@@ -454,18 +481,10 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
           rgbaArray[(p * 4) + 3] = channels > 3 ? texData[offset + ((p * channels) + 3)] : 255;
         }
         texture = new THREE.DataTexture(rgbaArray, width, height, THREE.RGBAFormat, THREE.UnsignedByteType);
-        if (texId == 2) {
-          texture.repeat = new THREE.Vector2(100, 100);
-          texture.wrapS = THREE.RepeatWrapping;
-          texture.wrapT = THREE.RepeatWrapping;
-        } else {
-          texture.repeat = new THREE.Vector2(
-            model.mat_texrepeat[(model.geom_matid[g] * 2) + 0],
-            model.mat_texrepeat[(model.geom_matid[g] * 2) + 1]);
-          texture.wrapS = THREE.RepeatWrapping;
-          texture.wrapT = THREE.RepeatWrapping;
-        }
-
+        const { u: repeatU, v: repeatV } = getMatTexRepeat(model, matId);
+        texture.repeat.set(repeatU, repeatV);
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
         texture.needsUpdate = true;
       }
     }
@@ -512,7 +531,13 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
     let mesh = new THREE.Mesh();
     if (type == 0) {
       const reflectionPreset = parent.getReflectionQualityPreset?.() ?? REFLECTION_QUALITY_PRESETS[2];
-      mesh = new Reflector(new THREE.PlaneGeometry(100, 100), {
+      const planeGeometry = new THREE.PlaneGeometry(100, 100);
+      if (texture) {
+        const { u: repeatU, v: repeatV } = getMatTexRepeat(model, matId);
+        applyMatTexRepeatToPlaneGeometry(planeGeometry, repeatU, repeatV);
+        texture.repeat.set(1, 1);
+      }
+      mesh = new Reflector(planeGeometry, {
         clipBias: 0.003,
         texture,
         textureWidth: reflectionPreset.size,
