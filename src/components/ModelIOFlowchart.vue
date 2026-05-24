@@ -144,8 +144,9 @@ export default {
     mobileToggleBottom() {
       const safe = 'env(safe-area-inset-bottom, 0px)';
       const vvp = 'var(--vvp-offset-bottom, 0px)';
-      const controls = this.mobileControlsCollapsed ? '56px' : 'min(46vh, 380px)';
-      return `calc(12px + ${safe} + ${vvp} + ${controls})`;
+      const panelHeight = 'var(--mobile-controls-panel-height, 52px)';
+      const gap = 'var(--mobile-flow-controls-gap, 10px)';
+      return `calc(12px + ${safe} + ${vvp} + ${panelHeight} + ${gap})`;
     }
   },
   watch: {
@@ -260,7 +261,13 @@ export default {
   z-index: 1051;
   min-height: 40px;
   padding-inline: 12px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+  border-radius: 18px !important;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.22);
+}
+
+.model-io-toggle-mobile :deep(.v-btn__overlay),
+.model-io-toggle-mobile :deep(.v-btn__underlay) {
+  border-radius: 18px;
 }
 
 .model-io-dock-sheet-open .model-io-toggle-mobile {
