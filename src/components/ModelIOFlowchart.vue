@@ -293,16 +293,24 @@ export default {
 
 .model-io-panel-sheet {
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100% !important;
+  left: 12px;
+  right: 12px;
+  bottom: calc(12px + constant(safe-area-inset-bottom) + var(--vvp-offset-bottom, 0px));
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px) + var(--vvp-offset-bottom, 0px));
+  width: auto !important;
   max-width: none;
-  max-height: min(82vh, 100dvh - var(--header-h, 58px) - 12px);
+  max-height: min(58vh, calc(100dvh - var(--header-h, 58px) - 24px));
   margin: 0;
-  border-radius: 16px 16px 0 0;
+  border-radius: 18px;
   z-index: 1100;
-  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.22);
+}
+
+.model-io-panel-sheet .model-io-body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: 12px;
 }
 
 .model-io-title {

@@ -6,91 +6,83 @@
     <div
       ref="viewport"
       class="pipeline-viewport"
-      :class="{ 'pipeline-viewport-vertical': isVertical }"
+      :class="{ 'pipeline-viewport-panzoom': isMobile }"
       :style="viewportStyle"
     >
       <div
-        class="pipeline-canvas"
-        :style="{ width: `${layout.width}px`, height: `${layout.height}px` }"
+        class="pipeline-transform"
+        :style="transformStyle"
       >
-        <div class="pipeline-grid" aria-hidden="true" />
-        <svg
-          class="pipeline-edges"
-          :width="layout.width"
-          :height="layout.height"
-          aria-hidden="true"
+        <div
+          class="pipeline-canvas"
+          :style="{ width: `${layout.width}px`, height: `${layout.height}px` }"
         >
-          <defs>
-            <marker
-              :id="arrowMarkerId"
-              markerWidth="8"
-              markerHeight="8"
-              refX="7"
-              refY="4"
-              orient="auto"
-            >
-              <path d="M0,0 L8,4 L0,8 Z" fill="context-stroke" />
-            </marker>
-          </defs>
-          <path
-            v-for="edge in renderedEdges"
-            :key="edge.id"
-            :d="edge.d"
-            class="pipeline-edge"
-            :class="{ 'pipeline-edge-active': live }"
-            :marker-end="`url(#${arrowMarkerId})`"
-          />
-        </svg>
+          <div class="pipeline-grid" aria-hidden="true" />
+          <svg
+            class="pipeline-edges"
+            :width="layout.width"
+            :height="layout.height"
+            aria-hidden="true"
+          >
+            <defs>
+              <marker
+                :id="arrowMarkerId"
+                markerWidth="8"
+                markerHeight="8"
+                refX="7"
+                refY="4"
+                orient="auto"
+              >
+                <path d="M0,0 L8,4 L0,8 Z" fill="context-stroke" />
+              </marker>
+            </defs>
+            <path
+              v-for="edge in renderedEdges"
+              :key="edge.id"
+              :d="edge.d"
+              class="pipeline-edge"
+              :class="{ 'pipeline-edge-active': live }"
+              :marker-end="`url(#${arrowMarkerId})`"
+            />
+          </svg>
 
-        <div
-          v-for="node in layout.nodes"
-          :key="node.id"
-          :ref="(el) => setNodeRef(node.id, el)"
-          class="pipeline-node"
-          :class="[
-            `pipeline-node-${node.kind}`,
-            {
-              'pipeline-node-live': live,
-              'pipeline-node-vertical': isVertical
-            }
-          ]"
-          :style="{
-            width: `${node.width}px`,
-            height: `${node.height}px`,
-            transform: `translate(${node.x}px, ${node.y}px)`
-          }"
-        >
-          <span
-            v-if="!isVertical"
-            class="pipeline-port pipeline-port-in"
-            aria-hidden="true"
-          />
-          <span
-            v-else
-            class="pipeline-port pipeline-port-top"
-            aria-hidden="true"
-          />
-        <div
-          class="pipeline-node-card"
-          :class="{ 'pipeline-node-card-scroll': node.scrollable }"
-        >
-          <div class="pipeline-node-title">{{ node.title }}</div>
-          <div v-if="node.subtitle" class="pipeline-node-subtitle">{{ node.subtitle }}</div>
-          <div v-for="(line, idx) in node.lines" :key="idx" class="pipeline-node-line">
-            <span class="pipeline-node-key">{{ line.k }}</span>
-            <span class="pipeline-node-val">{{ line.v }}</span>
+          <div
+            v-for="node in layout.nodes"
+            :key="node.id"
+            :ref="(el) => setNodeRef(node.id, el)"
+            class="pipeline-node"
+            :class="[
+              `pipeline-node-${node.kind}`,
+              {
+                'pipeline-node-live': live
+              }
+            ]"
+            :style="{
+              width: `${node.width}px`,
+              height: `${node.height}px`,
+              transform: `translate(${node.x}px, ${node.y}px)`
+            }"
+          >
+            <span
+              class="pipeline-port pipeline-port-in"
+              aria-hidden="true"
+            />
+            <div
+              class="pipeline-node-card"
+              :class="{ 'pipeline-node-card-scroll': node.scrollable }"
+            >
+              <div class="pipeline-node-title">{{ node.title }}</div>
+              <div v-if="node.subtitle" class="pipeline-node-subtitle">{{ node.subtitle }}</div>
+              <div v-for="(line, idx) in node.lines" :key="idx" class="pipeline-node-line">
+                <span class="pipeline-node-key">{{ line.k }}</span>
+                <span class="pipeline-node-val">{{ line.v }}</span>
+              </div>
+            </div>
+            <span
+              class="pipeline-port pipeline-port-out"
+              aria-hidden="true"
+            />
           </div>
-        </div>
-          <span
-            v-if="!isVertical"
-            class="pipeline-port pipeline-port-out"
-            aria-hidden="true"
-          />
-          <span
-            v-else
-            class="pipeline-port pipeline-port-bottom"
-            aria-hidden="true"
-          />
         </div>
       </div>
     </div>
@@ -101,6 +93,22 @@
 import { buildPipelineGraph } from '@/simulation/pipelineGraphLayout.js';
 
 let graphInstanceCounter = 0;
+
+const MIN_SCALE = 0.25;
+const MAX_SCALE = 3;
+
+function touchDistance(touches) {
+  const dx = touches[0].clientX - touches[1].clientX;
+  const dy = touches[0].clientY - touches[1].clientY;
+  return Math.hypot(dx, dy);
+}
+
+function touchCenter(touches) {
+  return {
+    x: (touches[0].clientX + touches[1].clientX) / 2,
+    y: (touches[0].clientY + touches[1].clientY) / 2
+  };
+}
 
 export default {
   name: 'ModelIOPipelineGraph',
@@ -126,22 +134,21 @@ export default {
     nodeRefs: {},
     renderedEdges: [],
     resizeObserver: null,
-    arrowMarkerId: `pipeline-arrow-${++graphInstanceCounter}`
+    arrowMarkerId: `pipeline-arrow-${++graphInstanceCounter}`,
+    panX: 0,
+    panY: 0,
+    scale: 1,
+    gesture: null
   }),
   computed: {
     layout() {
       const lang = this.language === 'en' ? 'en' : 'zh';
-      return buildPipelineGraph(this.telemetry, lang, {
-        layout: this.isMobile ? 'vertical' : 'horizontal'
-      });
-    },
-    isVertical() {
-      return this.layout.layout === 'vertical';
+      return buildPipelineGraph(this.telemetry, lang, { layout: 'horizontal' });
     },
     scrollHint() {
       return this.language === 'en'
-        ? 'Scroll inside the chart to view all nodes'
-        : '在图表区域内滑动查看完整流程';
+        ? 'Drag to pan · Pinch to zoom'
+        : '单指拖动平移 · 双指捏合缩放';
     },
     viewportStyle() {
       if (!this.isMobile) {
@@ -150,9 +157,17 @@ export default {
           minHeight: `${this.layout.height}px`
         };
       }
+      return null;
+    },
+    transformStyle() {
+      if (!this.isMobile) {
+        return null;
+      }
       return {
-        minHeight: `${Math.min(this.layout.height, 360)}px`,
-        maxHeight: 'min(42vh, 360px)'
+        transform: `translate(${this.panX}px, ${this.panY}px) scale(${this.scale})`,
+        transformOrigin: '0 0',
+        width: `${this.layout.width}px`,
+        height: `${this.layout.height}px`
       };
     }
   },
@@ -160,27 +175,50 @@ export default {
     layout: {
       handler() {
         this.scheduleEdgeUpdate();
+        this.scheduleViewportFit();
       },
       deep: true
     },
     live() {
       this.scheduleEdgeUpdate();
     },
-    isMobile() {
+    isMobile(isMobile) {
+      this.teardownTouchHandlers();
+      if (isMobile) {
+        this.$nextTick(() => {
+          this.setupTouchHandlers();
+          this.fitViewport();
+        });
+      } else {
+        this.panX = 0;
+        this.panY = 0;
+        this.scale = 1;
+      }
       this.scheduleEdgeUpdate();
     }
   },
   mounted() {
-    this.resizeObserver = new ResizeObserver(() => this.scheduleEdgeUpdate());
+    this.resizeObserver = new ResizeObserver(() => {
+      this.scheduleEdgeUpdate();
+      this.scheduleViewportFit();
+    });
     if (this.$refs.viewport) {
       this.resizeObserver.observe(this.$refs.viewport);
     }
+    if (this.isMobile) {
+      this.setupTouchHandlers();
+    }
     this.scheduleEdgeUpdate();
+    this.scheduleViewportFit();
   },
   beforeUnmount() {
+    this.teardownTouchHandlers();
     this.resizeObserver?.disconnect();
     if (this._edgeRaf) {
       cancelAnimationFrame(this._edgeRaf);
+    }
+    if (this._fitRaf) {
+      cancelAnimationFrame(this._fitRaf);
     }
   },
   methods: {
@@ -190,6 +228,153 @@ export default {
       } else {
         delete this.nodeRefs[id];
       }
+    },
+    setupTouchHandlers() {
+      const viewport = this.$refs.viewport;
+      if (!viewport || this._touchViewport === viewport) {
+        return;
+      }
+      this.teardownTouchHandlers();
+      this._touchViewport = viewport;
+      this._onTouchStart = (e) => this.handleTouchStart(e);
+      this._onTouchMove = (e) => this.handleTouchMove(e);
+      this._onTouchEnd = (e) => this.handleTouchEnd(e);
+      viewport.addEventListener('touchstart', this._onTouchStart, { passive: true });
+      viewport.addEventListener('touchmove', this._onTouchMove, { passive: false });
+      viewport.addEventListener('touchend', this._onTouchEnd, { passive: true });
+      viewport.addEventListener('touchcancel', this._onTouchEnd, { passive: true });
+    },
+    teardownTouchHandlers() {
+      const viewport = this._touchViewport;
+      if (!viewport) {
+        return;
+      }
+      viewport.removeEventListener('touchstart', this._onTouchStart);
+      viewport.removeEventListener('touchmove', this._onTouchMove);
+      viewport.removeEventListener('touchend', this._onTouchEnd);
+      viewport.removeEventListener('touchcancel', this._onTouchEnd);
+      this._touchViewport = null;
+      this.gesture = null;
+    },
+    handleTouchStart(e) {
+      if (!this.isMobile) {
+        return;
+      }
+      const touches = e.touches;
+      const rect = this.$refs.viewport.getBoundingClientRect();
+      if (touches.length === 1) {
+        this.gesture = {
+          mode: 'pan',
+          startX: touches[0].clientX,
+          startY: touches[0].clientY,
+          startPanX: this.panX,
+          startPanY: this.panY
+        };
+        return;
+      }
+      if (touches.length >= 2) {
+        const center = touchCenter(touches);
+        const focalX = (center.x - rect.left - this.panX) / this.scale;
+        const focalY = (center.y - rect.top - this.panY) / this.scale;
+        this.gesture = {
+          mode: 'pinch',
+          startDistance: touchDistance(touches),
+          startScale: this.scale,
+          focalX,
+          focalY,
+          rectLeft: rect.left,
+          rectTop: rect.top
+        };
+      }
+    },
+    handleTouchMove(e) {
+      if (!this.isMobile || !this.gesture) {
+        return;
+      }
+      const touches = e.touches;
+      if (this.gesture.mode === 'pan' && touches.length === 1) {
+        e.preventDefault();
+        this.panX = this.gesture.startPanX + (touches[0].clientX - this.gesture.startX);
+        this.panY = this.gesture.startPanY + (touches[0].clientY - this.gesture.startY);
+        this.scheduleEdgeUpdate();
+        return;
+      }
+      if (touches.length >= 2) {
+        e.preventDefault();
+        const center = touchCenter(touches);
+        const distance = touchDistance(touches);
+        if (this.gesture.mode === 'pan') {
+          const rect = this.$refs.viewport.getBoundingClientRect();
+          const focalX = (center.x - rect.left - this.panX) / this.scale;
+          const focalY = (center.y - rect.top - this.panY) / this.scale;
+          this.gesture = {
+            mode: 'pinch',
+            startDistance: distance,
+            startScale: this.scale,
+            focalX,
+            focalY,
+            rectLeft: rect.left,
+            rectTop: rect.top
+          };
+        }
+        const ratio = distance / this.gesture.startDistance;
+        const nextScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, this.gesture.startScale * ratio));
+        this.scale = nextScale;
+        this.panX = center.x - this.gesture.rectLeft - this.gesture.focalX * nextScale;
+        this.panY = center.y - this.gesture.rectTop - this.gesture.focalY * nextScale;
+        this.scheduleEdgeUpdate();
+      }
+    },
+    handleTouchEnd(e) {
+      if (!this.gesture) {
+        return;
+      }
+      if (e.touches.length === 0) {
+        this.gesture = null;
+        return;
+      }
+      if (e.touches.length === 1 && this.gesture.mode === 'pinch') {
+        this.gesture = {
+          mode: 'pan',
+          startX: e.touches[0].clientX,
+          startY: e.touches[0].clientY,
+          startPanX: this.panX,
+          startPanY: this.panY
+        };
+      }
+    },
+    scheduleViewportFit() {
+      if (!this.isMobile) {
+        return;
+      }
+      if (this._fitRaf) {
+        cancelAnimationFrame(this._fitRaf);
+      }
+      this._fitRaf = requestAnimationFrame(() => {
+        this._fitRaf = null;
+        this.fitViewport();
+      });
+    },
+    fitViewport() {
+      const viewport = this.$refs.viewport;
+      if (!this.isMobile || !viewport || !this.layout.width) {
+        return;
+      }
+      const pad = 8;
+      const vw = viewport.clientWidth;
+      const vh = viewport.clientHeight;
+      if (vw < 1 || vh < 1) {
+        return;
+      }
+      const fitScale = Math.min(
+        (vw - pad * 2) / this.layout.width,
+        (vh - pad * 2) / this.layout.height,
+        1
+      );
+      this.scale = Math.max(MIN_SCALE, fitScale);
+      this.panX = pad + (vw - pad * 2 - this.layout.width * this.scale) / 2;
+      this.panY = pad + (vh - pad * 2 - this.layout.height * this.scale) / 2;
+      this.scheduleEdgeUpdate();
     },
     scheduleEdgeUpdate() {
       if (this._edgeRaf) {
@@ -212,18 +397,10 @@ export default {
         if (!el) {
           return null;
         }
-        const selector = this.isVertical
-          ? (side === 'out' ? '.pipeline-port-bottom' : '.pipeline-port-top')
-          : (side === 'out' ? '.pipeline-port-out' : '.pipeline-port-in');
+        const selector = side === 'out' ? '.pipeline-port-out' : '.pipeline-port-in';
         const port = el.querySelector(selector);
         const target = port ?? el;
         const r = target.getBoundingClientRect();
-        if (this.isVertical) {
-          return {
-            x: r.left + r.width / 2 - canvasRect.left,
-            y: r.top + (side === 'out' ? r.height : 0) - canvasRect.top
-          };
-        }
         return {
           x: r.left + (side === 'out' ? r.width : 0) - canvasRect.left,
           y: r.top + r.height / 2 - canvasRect.top
@@ -239,9 +416,7 @@ export default {
           }
           return {
             id: edge.id,
-            d: this.isVertical
-              ? this.verticalBezierPath(from, to)
-              : this.horizontalBezierPath(from, to)
+            d: this.horizontalBezierPath(from, to)
           };
         })
         .filter(Boolean);
@@ -251,12 +426,6 @@ export default {
       const c1x = from.x + dx;
       const c2x = to.x - dx;
       return `M ${from.x} ${from.y} C ${c1x} ${from.y}, ${c2x} ${to.y}, ${to.x} ${to.y}`;
-    },
-    verticalBezierPath(from, to) {
-      const dy = Math.max(28, Math.abs(to.y - from.y) * 0.4);
-      const c1y = from.y + dy;
-      const c2y = to.y - dy;
-      return `M ${from.x} ${from.y} C ${from.x} ${c1y}, ${to.x} ${c2y}, ${to.x} ${to.y}`;
     }
   }
 };
@@ -266,12 +435,15 @@ export default {
 .pipeline-shell-mobile {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
   gap: 6px;
 }
 
 .pipeline-scroll-hint {
   margin: 0;
   padding: 0 4px;
+  flex-shrink: 0;
   color: rgba(var(--v-theme-on-surface), 0.55);
   line-height: 1.3;
 }
@@ -287,10 +459,17 @@ export default {
   touch-action: pan-x pan-y;
 }
 
-.pipeline-viewport-vertical {
-  overflow-x: hidden;
-  overflow-y: auto;
-  touch-action: pan-y;
+.pipeline-viewport-panzoom {
+  flex: 1 1 auto;
+  min-height: 220px;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+}
+
+.pipeline-transform {
+  position: relative;
+  will-change: transform;
 }
 
 .pipeline-canvas {
@@ -338,11 +517,6 @@ export default {
   align-items: center;
 }
 
-.pipeline-node-vertical {
-  flex-direction: column;
-  align-items: stretch;
-}
-
 .pipeline-node-card {
   flex: 1;
   min-width: 0;
@@ -352,10 +526,6 @@ export default {
   border: 1px solid rgba(71, 85, 105, 0.65);
   background: linear-gradient(180deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
-}
-
-.pipeline-node-vertical .pipeline-node-card {
-  margin: 0 8px;
 }
 
 .pipeline-node-live .pipeline-node-card {
@@ -429,14 +599,6 @@ export default {
   border-color: #34d399;
   background: #064e3b;
   box-shadow: 0 0 6px rgba(52, 211, 153, 0.5);
-}
-
-.pipeline-node-vertical .pipeline-port-top {
-  margin: 0 auto 2px;
-}
-
-.pipeline-node-vertical .pipeline-port-bottom {
-  margin: 2px auto 0;
 }
 
 .pipeline-node-card-scroll {
