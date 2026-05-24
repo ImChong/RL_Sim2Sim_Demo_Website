@@ -59,3 +59,15 @@ test('buildPipelineGraph skips history node when length is 1', () => {
   assert.equal(graph.nodes.find((n) => n.id === 'history'), undefined);
   assert.ok(graph.edges.some((e) => e.from === 'warehouse' && e.to === 'onnx'));
 });
+
+test('buildPipelineGraph vertical layout stacks nodes', () => {
+  const graph = buildPipelineGraph(baseTelemetry, 'zh', { layout: 'vertical' });
+  assert.equal(graph.layout, 'vertical');
+  assert.ok(graph.width <= 320);
+  assert.ok(graph.height > 400);
+  const sim = graph.nodes.find((n) => n.id === 'sim');
+  const motor = graph.nodes.find((n) => n.id === 'motor');
+  assert.ok(sim);
+  assert.ok(motor);
+  assert.ok(motor.y > sim.y);
+});

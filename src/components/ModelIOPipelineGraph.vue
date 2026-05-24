@@ -1,64 +1,94 @@
 <template>
-  <div
-    ref="viewport"
-    class="pipeline-viewport"
-    :style="{ minWidth: `${layout.width}px`, minHeight: `${layout.height}px` }"
-  >
+  <div class="pipeline-shell" :class="{ 'pipeline-shell-mobile': isMobile }">
+    <p v-if="isMobile" class="pipeline-scroll-hint text-caption">
+      {{ scrollHint }}
+    </p>
     <div
-      class="pipeline-canvas"
-      :style="{ width: `${layout.width}px`, height: `${layout.height}px` }"
+      ref="viewport"
+      class="pipeline-viewport"
+      :class="{ 'pipeline-viewport-vertical': isVertical }"
+      :style="viewportStyle"
     >
-      <div class="pipeline-grid" aria-hidden="true" />
-      <svg
-        class="pipeline-edges"
-        :width="layout.width"
-        :height="layout.height"
-        aria-hidden="true"
-      >
-        <defs>
-          <marker
-            id="pipeline-arrow"
-            markerWidth="8"
-            markerHeight="8"
-            refX="7"
-            refY="4"
-            orient="auto"
-          >
-            <path d="M0,0 L8,4 L0,8 Z" fill="context-stroke" />
-          </marker>
-        </defs>
-        <path
-          v-for="edge in renderedEdges"
-          :key="edge.id"
-          :d="edge.d"
-          class="pipeline-edge"
-          :class="{ 'pipeline-edge-active': live }"
-          marker-end="url(#pipeline-arrow)"
-        />
-      </svg>
-
       <div
-        v-for="node in layout.nodes"
-        :key="node.id"
-        :ref="(el) => setNodeRef(node.id, el)"
-        class="pipeline-node"
-        :class="[`pipeline-node-${node.kind}`, { 'pipeline-node-live': live }]"
-        :style="{
-          width: `${node.width}px`,
-          height: `${node.height}px`,
-          transform: `translate(${node.x}px, ${node.y}px)`
-        }"
+        class="pipeline-canvas"
+        :style="{ width: `${layout.width}px`, height: `${layout.height}px` }"
       >
-        <span class="pipeline-port pipeline-port-in" aria-hidden="true" />
-        <div class="pipeline-node-card">
-          <div class="pipeline-node-title">{{ node.title }}</div>
-          <div v-if="node.subtitle" class="pipeline-node-subtitle">{{ node.subtitle }}</div>
-          <div v-for="(line, idx) in node.lines" :key="idx" class="pipeline-node-line">
-            <span class="pipeline-node-key">{{ line.k }}</span>
-            <span class="pipeline-node-val">{{ line.v }}</span>
+        <div class="pipeline-grid" aria-hidden="true" />
+        <svg
+          class="pipeline-edges"
+          :width="layout.width"
+          :height="layout.height"
+          aria-hidden="true"
+        >
+          <defs>
+            <marker
+              :id="arrowMarkerId"
+              markerWidth="8"
+              markerHeight="8"
+              refX="7"
+              refY="4"
+              orient="auto"
+            >
+              <path d="M0,0 L8,4 L0,8 Z" fill="context-stroke" />
+            </marker>
+          </defs>
+          <path
+            v-for="edge in renderedEdges"
+            :key="edge.id"
+            :d="edge.d"
+            class="pipeline-edge"
+            :class="{ 'pipeline-edge-active': live }"
+            :marker-end="`url(#${arrowMarkerId})`"
+          />
+        </svg>
+
+        <div
+          v-for="node in layout.nodes"
+          :key="node.id"
+          :ref="(el) => setNodeRef(node.id, el)"
+          class="pipeline-node"
+          :class="[
+            `pipeline-node-${node.kind}`,
+            {
+              'pipeline-node-live': live,
+              'pipeline-node-vertical': isVertical
+            }
+          ]"
+          :style="{
+            width: `${node.width}px`,
+            height: `${node.height}px`,
+            transform: `translate(${node.x}px, ${node.y}px)`
+          }"
+        >
+          <span
+            v-if="!isVertical"
+            class="pipeline-port pipeline-port-in"
+            aria-hidden="true"
+          />
+          <span
+            v-else
+            class="pipeline-port pipeline-port-top"
+            aria-hidden="true"
+          />
+          <div class="pipeline-node-card">
+            <div class="pipeline-node-title">{{ node.title }}</div>
+            <div v-if="node.subtitle" class="pipeline-node-subtitle">{{ node.subtitle }}</div>
+            <div v-for="(line, idx) in node.lines" :key="idx" class="pipeline-node-line">
+              <span class="pipeline-node-key">{{ line.k }}</span>
+              <span class="pipeline-node-val">{{ line.v }}</span>
+            </div>
           </div>
+          <span
+            v-if="!isVertical"
+            class="pipeline-port pipeline-port-out"
+            aria-hidden="true"
+          />
+          <span
+            v-else
+            class="pipeline-port pipeline-port-bottom"
+            aria-hidden="true"
+          />
         </div>
-        <span class="pipeline-port pipeline-port-out" aria-hidden="true" />
       </div>
     </div>
   </div>
@@ -66,6 +96,8 @@
 
 <script>
 import { buildPipelineGraph } from '@/simulation/pipelineGraphLayout.js';
+
+let graphInstanceCounter = 0;
 
 export default {
   name: 'ModelIOPipelineGraph',
@@ -81,17 +113,44 @@ export default {
     live: {
       type: Boolean,
       default: false
+    },
+    isMobile: {
+      type: Boolean,
+      default: false
     }
   },
   data: () => ({
     nodeRefs: {},
     renderedEdges: [],
-    resizeObserver: null
+    resizeObserver: null,
+    arrowMarkerId: `pipeline-arrow-${++graphInstanceCounter}`
   }),
   computed: {
     layout() {
       const lang = this.language === 'en' ? 'en' : 'zh';
-      return buildPipelineGraph(this.telemetry, lang);
+      return buildPipelineGraph(this.telemetry, lang, {
+        layout: this.isMobile ? 'vertical' : 'horizontal'
+      });
+    },
+    isVertical() {
+      return this.layout.layout === 'vertical';
+    },
+    scrollHint() {
+      return this.language === 'en'
+        ? 'Scroll inside the chart to view all nodes'
+        : '在图表区域内滑动查看完整流程';
+    },
+    viewportStyle() {
+      if (!this.isMobile) {
+        return {
+          minWidth: `${this.layout.width}px`,
+          minHeight: `${this.layout.height}px`
+        };
+      }
+      return {
+        minHeight: `${Math.min(this.layout.height, 360)}px`,
+        maxHeight: 'min(42vh, 360px)'
+      };
     }
   },
   watch: {
@@ -102,6 +161,9 @@ export default {
       deep: true
     },
     live() {
+      this.scheduleEdgeUpdate();
+    },
+    isMobile() {
       this.scheduleEdgeUpdate();
     }
   },
@@ -147,9 +209,18 @@ export default {
         if (!el) {
           return null;
         }
-        const port = el.querySelector(side === 'out' ? '.pipeline-port-out' : '.pipeline-port-in');
+        const selector = this.isVertical
+          ? (side === 'out' ? '.pipeline-port-bottom' : '.pipeline-port-top')
+          : (side === 'out' ? '.pipeline-port-out' : '.pipeline-port-in');
+        const port = el.querySelector(selector);
         const target = port ?? el;
         const r = target.getBoundingClientRect();
+        if (this.isVertical) {
+          return {
+            x: r.left + r.width / 2 - canvasRect.left,
+            y: r.top + (side === 'out' ? r.height : 0) - canvasRect.top
+          };
+        }
         return {
           x: r.left + (side === 'out' ? r.width : 0) - canvasRect.left,
           y: r.top + r.height / 2 - canvasRect.top
@@ -165,33 +236,64 @@ export default {
           }
           return {
             id: edge.id,
-            d: this.bezierPath(from, to)
+            d: this.isVertical
+              ? this.verticalBezierPath(from, to)
+              : this.horizontalBezierPath(from, to)
           };
         })
         .filter(Boolean);
     },
-    bezierPath(from, to) {
+    horizontalBezierPath(from, to) {
       const dx = Math.max(40, Math.abs(to.x - from.x) * 0.45);
       const c1x = from.x + dx;
       const c2x = to.x - dx;
       return `M ${from.x} ${from.y} C ${c1x} ${from.y}, ${c2x} ${to.y}, ${to.x} ${to.y}`;
+    },
+    verticalBezierPath(from, to) {
+      const dy = Math.max(28, Math.abs(to.y - from.y) * 0.4);
+      const c1y = from.y + dy;
+      const c2y = to.y - dy;
+      return `M ${from.x} ${from.y} C ${from.x} ${c1y}, ${to.x} ${c2y}, ${to.x} ${to.y}`;
     }
   }
 };
 </script>
 
 <style scoped>
+.pipeline-shell-mobile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pipeline-scroll-hint {
+  margin: 0;
+  padding: 0 4px;
+  color: rgba(var(--v-theme-on-surface), 0.55);
+  line-height: 1.3;
+}
+
 .pipeline-viewport {
   overflow: auto;
   max-width: 100%;
   border-radius: 10px;
   border: 1px solid rgba(56, 189, 148, 0.15);
   background: #0b1018;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-x pan-y;
+}
+
+.pipeline-viewport-vertical {
+  overflow-x: hidden;
+  overflow-y: auto;
+  touch-action: pan-y;
 }
 
 .pipeline-canvas {
   position: relative;
   flex-shrink: 0;
+  margin: 0 auto;
 }
 
 .pipeline-grid {
@@ -233,6 +335,11 @@ export default {
   align-items: center;
 }
 
+.pipeline-node-vertical {
+  flex-direction: column;
+  align-items: stretch;
+}
+
 .pipeline-node-card {
   flex: 1;
   min-width: 0;
@@ -242,6 +349,10 @@ export default {
   border: 1px solid rgba(71, 85, 105, 0.65);
   background: linear-gradient(180deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+.pipeline-node-vertical .pipeline-node-card {
+  margin: 0 8px;
 }
 
 .pipeline-node-live .pipeline-node-card {
@@ -282,6 +393,14 @@ export default {
   line-height: 1.25;
 }
 
+.pipeline-shell-mobile .pipeline-node-title {
+  font-size: 0.78rem;
+}
+
+.pipeline-shell-mobile .pipeline-node-line {
+  font-size: 0.65rem;
+}
+
 .pipeline-node-key {
   color: #64748b;
   flex-shrink: 0;
@@ -309,11 +428,11 @@ export default {
   box-shadow: 0 0 6px rgba(52, 211, 153, 0.5);
 }
 
-.pipeline-port-in {
-  margin-left: 0;
+.pipeline-node-vertical .pipeline-port-top {
+  margin: 0 auto 2px;
 }
 
-.pipeline-port-out {
-  margin-right: 0;
+.pipeline-node-vertical .pipeline-port-bottom {
+  margin: 2px auto 0;
 }
 </style>
