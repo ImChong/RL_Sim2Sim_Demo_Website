@@ -43,6 +43,10 @@ export class PolicyRunner {
     this.target = new Float32Array(this.numActions);
     this._policyTensor = null;
     this._policyTensorSize = 0;
+    this.lastRawAction = new Float32Array(this.numActions);
+    this.lastExtraOutputs = {};
+    this.lastStepAt = 0;
+    this.stepCount = 0;
     this.onModuleInitProgress = typeof options.onInitProgress === 'function'
       ? options.onInitProgress
       : null;
@@ -192,6 +196,21 @@ export class PolicyRunner {
         throw new Error('PolicyRunner received invalid action output');
       }
 
+      this.lastRawAction.set(action);
+      this.lastExtraOutputs = {};
+      for (const key of Object.keys(result)) {
+        if (key === 'action') {
+          continue;
+        }
+        const tensor = result[key];
+        if (tensor?.data) {
+          this.lastExtraOutputs[key] = {
+            dims: tensor.dims ? [...tensor.dims] : [],
+            preview: Array.from(tensor.data.subarray(0, Math.min(6, tensor.data.length)))
+          };
+        }
+      }
+
       const clip = typeof this.actionClip === 'number' ? this.actionClip : Infinity;
       for (let i = 0; i < this.numActions; i++) {
         const value = action[i];
@@ -204,6 +223,8 @@ export class PolicyRunner {
         target[i] = this.defaultJointPos[i] + this.actionScale[i] * this.lastActions[i];
       }
 
+      this.lastStepAt = performance.now();
+      this.stepCount += 1;
       return target;
     } finally {
       this.isInferencing = false;
