@@ -144,8 +144,9 @@ export default {
     mobileToggleBottom() {
       const safe = 'env(safe-area-inset-bottom, 0px)';
       const vvp = 'var(--vvp-offset-bottom, 0px)';
-      const controls = this.mobileControlsCollapsed ? '56px' : 'min(46vh, 380px)';
-      return `calc(12px + ${safe} + ${vvp} + ${controls})`;
+      const panelHeight = 'var(--mobile-controls-panel-height, 52px)';
+      const gap = 'var(--mobile-flow-controls-gap, 10px)';
+      return `calc(12px + ${safe} + ${vvp} + ${panelHeight} + ${gap})`;
     }
   },
   watch: {
@@ -260,7 +261,13 @@ export default {
   z-index: 1051;
   min-height: 40px;
   padding-inline: 12px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+  border-radius: 18px !important;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.22);
+}
+
+.model-io-toggle-mobile :deep(.v-btn__overlay),
+.model-io-toggle-mobile :deep(.v-btn__underlay) {
+  border-radius: 18px;
 }
 
 .model-io-dock-sheet-open .model-io-toggle-mobile {
@@ -293,16 +300,24 @@ export default {
 
 .model-io-panel-sheet {
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100% !important;
+  left: 12px;
+  right: 12px;
+  bottom: calc(12px + constant(safe-area-inset-bottom) + var(--vvp-offset-bottom, 0px));
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px) + var(--vvp-offset-bottom, 0px));
+  width: auto !important;
   max-width: none;
-  max-height: min(82vh, 100dvh - var(--header-h, 58px) - 12px);
+  max-height: min(58vh, calc(100dvh - var(--header-h, 58px) - 24px));
   margin: 0;
-  border-radius: 16px 16px 0 0;
+  border-radius: 18px;
   z-index: 1100;
-  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.22);
+}
+
+.model-io-panel-sheet .model-io-body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: 12px;
 }
 
 .model-io-title {
@@ -317,7 +332,9 @@ export default {
 .model-io-body {
   flex: 1 1 auto;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   overscroll-behavior: contain;
   padding-top: 0;
   padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));

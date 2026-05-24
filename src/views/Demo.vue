@@ -24,7 +24,10 @@
       {{ t.safariAlert }}
     </v-alert>
   </div>
-  <div :class="['controls', { 'controls-mobile': isSmallScreen, 'controls-mobile-collapsed': isSmallScreen && isMobileControlsCollapsed }]">
+  <div
+    ref="mobileControlsPanel"
+    :class="['controls', { 'controls-mobile': isSmallScreen, 'controls-mobile-collapsed': isSmallScreen && isMobileControlsCollapsed }]"
+  >
     <v-card class="controls-card">
       <v-card-title :class="['controls-title', { 'controls-title-mobile': isSmallScreen }]">
         <span>{{ t.panelTitle }}</span>
@@ -741,6 +744,7 @@ export default {
         this.isMobileControlsCollapsed = isSmall;
       }
       this.isSmallScreen = isSmall;
+      this.$nextTick(() => this.syncMobileControlsHeightObserver());
     },
     updateVisualViewportOffset() {
       if (!window.visualViewport) return;
@@ -748,12 +752,41 @@ export default {
       // 布局视口底部与可视视口底部之间的差值，即浏览器底部工具栏高度
       const offset = Math.max(0, window.innerHeight - (vvp.offsetTop + vvp.height));
       document.documentElement.style.setProperty('--vvp-offset-bottom', `${offset}px`);
+      this.updateMobileControlsHeight();
+    },
+    updateMobileControlsHeight() {
+      if (!this.isSmallScreen) {
+        document.documentElement.style.removeProperty('--mobile-controls-panel-height');
+        return;
+      }
+      const panel = this.$refs.mobileControlsPanel;
+      if (!panel) {
+        return;
+      }
+      const height = Math.ceil(panel.getBoundingClientRect().height);
+      document.documentElement.style.setProperty('--mobile-controls-panel-height', `${height}px`);
+    },
+    syncMobileControlsHeightObserver() {
+      if (!this.mobileControlsResizeObserver) {
+        return;
+      }
+      this.mobileControlsResizeObserver.disconnect();
+      if (!this.isSmallScreen) {
+        document.documentElement.style.removeProperty('--mobile-controls-panel-height');
+        return;
+      }
+      const panel = this.$refs.mobileControlsPanel;
+      if (panel) {
+        this.mobileControlsResizeObserver.observe(panel);
+        this.updateMobileControlsHeight();
+      }
     },
     toggleMobileControls() {
       if (!this.isSmallScreen) {
         return;
       }
       this.isMobileControlsCollapsed = !this.isMobileControlsCollapsed;
+      this.$nextTick(() => this.updateMobileControlsHeight());
     },
     formatMessage(template, values = {}) {
       return Object.entries(values).reduce(
@@ -1198,9 +1231,21 @@ export default {
       }
     };
     document.addEventListener('keydown', this.keydown_listener);
+    this.mobileControlsResizeObserver = new ResizeObserver(() => {
+      this.updateMobileControlsHeight();
+    });
+    this.$watch(
+      () => [this.isSmallScreen, this.isMobileControlsCollapsed],
+      () => {
+        this.$nextTick(() => this.syncMobileControlsHeightObserver());
+      },
+      { immediate: true }
+    );
   },
   beforeUnmount() {
     this.stopTrackingPoll();
+    this.mobileControlsResizeObserver?.disconnect();
+    document.documentElement.style.removeProperty('--mobile-controls-panel-height');
     document.removeEventListener('keydown', this.keydown_listener);
     if (this.resize_listener) {
       window.removeEventListener('resize', this.resize_listener);
