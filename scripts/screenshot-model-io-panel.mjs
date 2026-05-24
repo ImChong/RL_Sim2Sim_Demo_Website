@@ -32,10 +32,109 @@ async function waitForSimulationReady(page) {
       const policyReady = policySelect
         && !policySelect.closest('.v-input')?.classList?.contains?.('v-input--disabled');
       const modelToggle = document.querySelector('.model-io-toggle');
-      return !loadingVisible && !errorDialog && policyReady && knockdown && !knockdown.disabled && modelToggle;
+      const bodyHasError = /Unexpected runtime error|发生意外运行时错误/.test(document.body.innerText ?? '');
+      return !loadingVisible && !errorDialog && !bodyHasError && policyReady
+        && knockdown && !knockdown.disabled && modelToggle;
     },
     { timeout: MAX_LOAD_MS, polling: 500 }
   );
+}
+
+async function assertSimulationHealthy(page, pageErrors, consoleErrors) {
+  const status = await page.evaluate(() => ({
+    hasError: document.body.textContent?.includes('Unexpected runtime error') ?? false,
+    knockdownDisabled: document.querySelector('[data-test="knockdown-test"]')?.disabled ?? true,
+    liveChip: document.querySelector('.model-io-panel .v-chip')?.textContent?.trim() ?? ''
+  }));
+  if (status.hasError || status.knockdownDisabled) {
+    console.error('Page status:', status);
+    console.error('Page errors:', pageErrors.slice(0, 5));
+    console.error('Console errors:', consoleErrors.slice(0, 10));
+    throw new Error('Simulation not healthy before screenshot');
+  }
+}
+
+async function expandPipelinePanel(page, { mobile = false } = {}) {
+  await page.evaluate(() => {
+    document.querySelector('.model-io-toggle')?.click();
+  });
+  await page.waitForFunction(
+    (isMobile) => {
+      const panel = document.querySelector('.model-io-panel');
+      if (!panel || getComputedStyle(panel).display === 'none') {
+        return false;
+      }
+      if (isMobile) {
+        return panel.classList.contains('model-io-panel-sheet');
+      }
+      return true;
+    },
+    { timeout: 15000 },
+    mobile
+  );
+  await sleep(mobile ? 2000 : 1500);
+}
+
+async function captureDesktop(page, outDir, docsDir, pageErrors, consoleErrors) {
+  await page.setViewport({ width: 1400, height: 900, isMobile: false });
+  console.log('Desktop: loading...');
+  await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await waitForSimulationReady(page);
+  await sleep(SETTLE_MS);
+  await assertSimulationHealthy(page, pageErrors, consoleErrors);
+  await expandPipelinePanel(page, { mobile: false });
+
+  const fullPath = join(outDir, 'model-io-panel-full.png');
+  await page.screenshot({ path: fullPath, fullPage: false });
+  const dock = await page.$('.model-io-dock');
+  const panelPath = join(outDir, 'model-io-panel-crop.png');
+  if (dock) {
+    await dock.screenshot({ path: panelPath });
+  }
+  await copyFile(fullPath, join(docsDir, 'model-io-panel-full.png'));
+  await copyFile(panelPath, join(docsDir, 'model-io-panel-crop.png'));
+  console.log('Desktop full:', fullPath);
+  console.log('Desktop crop:', panelPath);
+}
+
+async function captureMobile(page, outDir, docsDir, pageErrors, consoleErrors) {
+  await page.setViewport({
+    width: 390,
+    height: 844,
+    isMobile: true,
+    hasTouch: true,
+    deviceScaleFactor: 2
+  });
+  console.log('Mobile: loading...');
+  await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await waitForSimulationReady(page);
+  await sleep(SETTLE_MS);
+  await assertSimulationHealthy(page, pageErrors, consoleErrors);
+  await expandPipelinePanel(page, { mobile: true });
+
+  const fullPath = join(outDir, 'model-io-panel-mobile-full.png');
+  await page.screenshot({ path: fullPath, fullPage: false });
+
+  const sheet = await page.$('.model-io-panel-sheet');
+  const sheetPath = join(outDir, 'model-io-panel-mobile-sheet.png');
+  if (sheet) {
+    await sheet.screenshot({ path: sheetPath });
+  }
+
+  const graph = await page.$('.pipeline-viewport-vertical');
+  const graphPath = join(outDir, 'model-io-panel-mobile-graph.png');
+  if (graph) {
+    await graph.screenshot({ path: graphPath });
+  }
+
+  await copyFile(fullPath, join(docsDir, 'model-io-panel-mobile-full.png'));
+  await copyFile(sheetPath, join(docsDir, 'model-io-panel-mobile-sheet.png'));
+  if (graph) {
+    await copyFile(graphPath, join(docsDir, 'model-io-panel-mobile-graph.png'));
+  }
+  console.log('Mobile full:', fullPath);
+  console.log('Mobile sheet:', sheetPath);
+  console.log('Mobile graph:', graphPath);
 }
 
 async function main() {
@@ -59,7 +158,6 @@ async function main() {
   });
   const page = await browser.newPage();
   await page.setBypassCSP(true);
-  await page.setViewport({ width: 1400, height: 900 });
 
   const pageErrors = [];
   const consoleErrors = [];
@@ -71,50 +169,10 @@ async function main() {
   });
 
   console.log(`Opening ${BASE} (max load ${MAX_LOAD_MS}ms, settle ${SETTLE_MS}ms)...`);
-  await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 120000 });
 
-  await waitForSimulationReady(page);
-  console.log('Simulation ready, settling...');
-  await sleep(SETTLE_MS);
+  await captureDesktop(page, OUT_DIR, DOCS_DIR, pageErrors, consoleErrors);
+  await captureMobile(page, OUT_DIR, DOCS_DIR, pageErrors, consoleErrors);
 
-  const status = await page.evaluate(() => ({
-    hasError: document.body.textContent?.includes('Unexpected runtime error') ?? false,
-    knockdownDisabled: document.querySelector('[data-test="knockdown-test"]')?.disabled ?? true,
-    liveChip: document.querySelector('.model-io-panel .v-chip')?.textContent?.trim() ?? ''
-  }));
-  if (status.hasError || status.knockdownDisabled) {
-    console.error('Page status:', status);
-    console.error('Page errors:', pageErrors.slice(0, 5));
-    console.error('Console errors:', consoleErrors.slice(0, 10));
-    throw new Error('Simulation not healthy before screenshot');
-  }
-
-  await page.evaluate(() => {
-    document.querySelector('.model-io-toggle')?.click();
-  });
-  await page.waitForFunction(
-    () => {
-      const panel = document.querySelector('.model-io-panel');
-      return panel && getComputedStyle(panel).display !== 'none';
-    },
-    { timeout: 15000 }
-  );
-  await sleep(1500);
-
-  const fullPath = join(OUT_DIR, 'model-io-panel-full.png');
-  await page.screenshot({ path: fullPath, fullPage: false });
-
-  const panel = await page.$('.model-io-dock');
-  const panelPath = join(OUT_DIR, 'model-io-panel-crop.png');
-  if (panel) {
-    await panel.screenshot({ path: panelPath });
-  }
-
-  await copyFile(fullPath, join(DOCS_DIR, 'model-io-panel-full.png'));
-  await copyFile(panelPath, join(DOCS_DIR, 'model-io-panel-crop.png'));
-
-  console.log('Full page:', fullPath);
-  console.log('Panel crop:', panelPath);
   console.log('Copied to', DOCS_DIR);
 
   const fatal = pageErrors.filter((e) => !e.includes('ResizeObserver'));
