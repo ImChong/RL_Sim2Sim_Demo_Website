@@ -38,7 +38,7 @@ function jointLines(jointNames, values, max = Infinity) {
 }
 
 function nodeHeight(lineCount) {
-  return Math.max(44, 28 + lineCount * 13);
+  return Math.max(50, 34 + lineCount * 14);
 }
 
 function decomposeObsBlock(block, slice, jointNames, lang) {
@@ -194,7 +194,7 @@ function decomposeObsBlock(block, slice, jointNames, lang) {
         })),
         concatOffset: block.offset,
         concatSize: block.size,
-        scrollable: data.length > 6
+        scrollable: data.length > 4
       }];
   }
 }
@@ -214,7 +214,7 @@ export function buildAtomicNodes(runner, state, obsVector, obsLayout, lang = 'zh
   const push = (spec) => {
     const lines = spec.lines ?? [];
     nodes.push({
-      width: spec.kind === 'joints' ? 148 : 118,
+      width: spec.kind === 'joints' ? 172 : 136,
       height: nodeHeight(lines.length),
       scrollable: Boolean(spec.scrollable),
       ...spec

@@ -1,5 +1,5 @@
-const DEFAULT_NODE_WIDTH = 118;
-const DEFAULT_NODE_HEIGHT = 48;
+const DEFAULT_NODE_WIDTH = 136;
+const DEFAULT_NODE_HEIGHT = 50;
 
 /**
  * 从布局数据计算端口在 SVG 画布中的坐标（与节点 translate 同一坐标系）。

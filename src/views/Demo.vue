@@ -27,8 +27,12 @@
   <div
     ref="mobileControlsPanel"
     :class="['controls', { 'controls-mobile': isSmallScreen, 'controls-mobile-collapsed': isSmallScreen && isMobileControlsCollapsed }]"
+    :style="desktopControlsPanelStyle"
   >
-    <v-card class="controls-card">
+    <v-card
+      class="controls-card"
+      :class="{ 'controls-card-resizable': !isSmallScreen }"
+    >
       <v-card-title :class="['controls-title', { 'controls-title-mobile': isSmallScreen }]">
         <span>{{ t.panelTitle }}</span>
         <v-btn
@@ -346,9 +350,30 @@
           @update:modelValue="onReflectionQualityChange"
         ></v-slider>
       </v-card-text>
-      <v-card-actions>
+      <v-card-actions class="controls-actions">
         <v-btn color="primary" block @click="reset">{{ t.reset }}</v-btn>
       </v-card-actions>
+
+      <template v-if="!isSmallScreen">
+        <div
+          class="controls-resize-handle controls-resize-w"
+          role="separator"
+          :aria-label="t.resizeControlWidth"
+          @mousedown.prevent="startControlPanelResize('w', $event)"
+        />
+        <div
+          class="controls-resize-handle controls-resize-s"
+          role="separator"
+          :aria-label="t.resizeControlHeight"
+          @mousedown.prevent="startControlPanelResize('s', $event)"
+        />
+        <div
+          class="controls-resize-handle controls-resize-sw"
+          role="separator"
+          :aria-label="t.resizeControlBoth"
+          @mousedown.prevent="startControlPanelResize('sw', $event)"
+        />
+      </template>
     </v-card>
   </div>
   <v-dialog :model-value="state === 0" persistent max-width="600px" scrollable>
@@ -397,6 +422,11 @@
 import { MuJoCoDemo } from '@/simulation/main.js';
 import loadMujoco from 'mujoco-js';
 import ModelIOFlowchart from '@/components/ModelIOFlowchart.vue';
+import {
+  clampControlPanelSize,
+  loadControlPanelSize,
+  saveControlPanelSize
+} from '@/utils/controlPanelSize.js';
 
 const translations = {
   en: {
@@ -449,7 +479,10 @@ const translations = {
     knockdownTest: 'Knockdown test',
     knockdownTestHint: 'Applies a strong horizontal impulse on the pelvis in a random XY direction (fixed magnitude) for get-up testing.',
     ampPolicyDescription:
-      'AMP policy trained for walk, run, and get-up behaviors.'
+      'AMP policy trained for walk, run, and get-up behaviors.',
+    resizeControlWidth: 'Resize control panel width (left edge)',
+    resizeControlHeight: 'Resize control panel height (bottom edge)',
+    resizeControlBoth: 'Resize control panel (bottom-left corner)'
   },
   zh: {
     mobileModeAlert: '已启用移动端模式，控制面板已精简并停靠到底部，便于触控操作。',
@@ -501,7 +534,10 @@ const translations = {
     knockdownTest: '击倒测试',
     knockdownTestHint: '在骨盆上沿水平面（XY）随机方向施加一次固定大小的强冲击，用于测试倒地起身。',
     ampPolicyDescription:
-      '用于行走、跑步和起身行为的 AMP 策略。'
+      '用于行走、跑步和起身行为的 AMP 策略。',
+    resizeControlWidth: '拖拽左边框调整控制面板宽度',
+    resizeControlHeight: '拖拽下边框调整控制面板高度',
+    resizeControlBoth: '拖拽左下角同时调整控制面板大小'
   }
 };
 
@@ -581,9 +617,21 @@ export default {
     showSafariAlert: true,
     resize_listener: null,
     vvp_listener: null,
-    simulationLoadProgress: 0
+    simulationLoadProgress: 0,
+    controlPanelWidth: loadControlPanelSize().width,
+    controlPanelHeight: loadControlPanelSize().height,
+    controlPanelResize: null
   }),
   computed: {
+    desktopControlsPanelStyle() {
+      if (this.isSmallScreen) {
+        return null;
+      }
+      return {
+        width: `${this.controlPanelWidth}px`,
+        height: `${this.controlPanelHeight}px`
+      };
+    },
     shouldShowProgress() {
       const state = this.trackingState;
       if (!state || !state.available) {
@@ -1205,6 +1253,62 @@ export default {
         this.demo.params.current_motion = name;
       }
       return accepted;
+    },
+    clampControlPanelToViewport() {
+      if (this.isSmallScreen) {
+        return;
+      }
+      const next = clampControlPanelSize(this.controlPanelWidth, this.controlPanelHeight);
+      this.controlPanelWidth = next.width;
+      this.controlPanelHeight = next.height;
+    },
+    startControlPanelResize(edge, event) {
+      if (this.isSmallScreen) {
+        return;
+      }
+      this.controlPanelResize = {
+        edge,
+        startX: event.clientX,
+        startY: event.clientY,
+        startW: this.controlPanelWidth,
+        startH: this.controlPanelHeight
+      };
+      document.addEventListener('mousemove', this._onControlPanelResizeMove);
+      document.addEventListener('mouseup', this._onControlPanelResizeEnd);
+      document.body.classList.add('controls-panel-resizing');
+    },
+    onControlPanelResizeMove(event) {
+      if (!this.controlPanelResize) {
+        return;
+      }
+      const dx = event.clientX - this.controlPanelResize.startX;
+      const dy = event.clientY - this.controlPanelResize.startY;
+      let w = this.controlPanelResize.startW;
+      let h = this.controlPanelResize.startH;
+      const { edge } = this.controlPanelResize;
+      if (edge.includes('w')) {
+        w -= dx;
+      }
+      if (edge.includes('s')) {
+        h += dy;
+      }
+      const clamped = clampControlPanelSize(w, h);
+      this.controlPanelWidth = clamped.width;
+      this.controlPanelHeight = clamped.height;
+      const cursor =
+        edge === 'w' ? 'ew-resize' : edge === 's' ? 'ns-resize' : 'nesw-resize';
+      document.body.style.cursor = cursor;
+    },
+    endControlPanelResize() {
+      if (!this.controlPanelResize) {
+        return;
+      }
+      this.controlPanelResize = null;
+      document.removeEventListener('mousemove', this._onControlPanelResizeMove);
+      document.removeEventListener('mouseup', this._onControlPanelResizeEnd);
+      document.body.classList.remove('controls-panel-resizing');
+      document.body.style.cursor = '';
+      saveControlPanelSize(this.controlPanelWidth, this.controlPanelHeight);
     }
   },
   mounted() {
@@ -1212,9 +1316,12 @@ export default {
     this.isSafari = this.detectSafari();
     this.updateScreenState();
     this.updateVisualViewportOffset();
+    this._onControlPanelResizeMove = (e) => this.onControlPanelResizeMove(e);
+    this._onControlPanelResizeEnd = () => this.endControlPanelResize();
     this.resize_listener = () => {
       this.updateScreenState();
       this.updateVisualViewportOffset();
+      this.clampControlPanelToViewport();
     };
     window.addEventListener('resize', this.resize_listener);
     if (window.visualViewport) {
@@ -1243,6 +1350,7 @@ export default {
     );
   },
   beforeUnmount() {
+    this.endControlPanelResize();
     this.stopTrackingPoll();
     this.mobileControlsResizeObserver?.disconnect();
     document.documentElement.style.removeProperty('--mobile-controls-panel-height');
@@ -1263,7 +1371,6 @@ export default {
   position: fixed;
   top: calc(var(--header-h, 58px) + 20px);
   right: 20px;
-  width: 320px;
   z-index: 1000;
 }
 
@@ -1305,6 +1412,76 @@ export default {
 
 .controls-card {
   max-height: calc(100vh - 40px);
+}
+
+.controls-card-resizable {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: none;
+}
+
+.controls-card-resizable .controls-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+}
+
+.controls-actions {
+  flex-shrink: 0;
+}
+
+.controls-resize-handle {
+  position: absolute;
+  z-index: 3;
+  touch-action: none;
+}
+
+.controls-resize-w {
+  top: 18px;
+  left: 0;
+  width: 8px;
+  bottom: 18px;
+  cursor: ew-resize;
+}
+
+.controls-resize-s {
+  left: 18px;
+  right: 0;
+  bottom: 0;
+  height: 8px;
+  cursor: ns-resize;
+}
+
+.controls-resize-sw {
+  left: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nesw-resize;
+  border-bottom-left-radius: 14px;
+  background: linear-gradient(
+    45deg,
+    transparent 0 45%,
+    rgba(var(--v-theme-primary), 0.35) 45% 55%,
+    rgba(var(--v-theme-primary), 0.55) 55%
+  );
+}
+
+.controls-resize-handle:hover,
+.controls-resize-handle:active {
+  background-color: rgba(var(--v-theme-primary), 0.12);
+}
+
+.controls-resize-sw:hover,
+.controls-resize-sw:active {
+  background: linear-gradient(
+    45deg,
+    transparent 0 40%,
+    rgba(var(--v-theme-primary), 0.5) 40% 60%,
+    rgba(var(--v-theme-primary), 0.75) 60%
+  );
 }
 
 .controls-title {
@@ -1483,5 +1660,11 @@ export default {
     left: 12px;
     right: 12px;
   }
+}
+</style>
+
+<style>
+body.controls-panel-resizing {
+  user-select: none;
 }
 </style>

@@ -33,7 +33,15 @@
 
     <v-card
       v-show="expanded"
-      :class="['model-io-panel', { 'model-io-panel-sheet': isSmallScreen }]"
+      ref="panelCard"
+      :class="[
+        'model-io-panel',
+        {
+          'model-io-panel-sheet': isSmallScreen,
+          'model-io-panel-desktop': !isSmallScreen
+        }
+      ]"
+      :style="desktopPanelStyle"
       elevation="8"
       role="region"
       :aria-label="t.panelTitle"
@@ -74,6 +82,27 @@
           />
         </template>
       </v-card-text>
+
+      <template v-if="!isSmallScreen">
+        <div
+          class="model-io-resize-handle model-io-resize-e"
+          role="separator"
+          :aria-label="t.resizeWidth"
+          @mousedown.prevent="startPanelResize('e', $event)"
+        />
+        <div
+          class="model-io-resize-handle model-io-resize-n"
+          role="separator"
+          :aria-label="t.resizeHeight"
+          @mousedown.prevent="startPanelResize('n', $event)"
+        />
+        <div
+          class="model-io-resize-handle model-io-resize-ne"
+          role="separator"
+          :aria-label="t.resizeBoth"
+          @mousedown.prevent="startPanelResize('ne', $event)"
+        />
+      </template>
     </v-card>
   </div>
 </template>
@@ -81,6 +110,11 @@
 <script>
 import { buildPolicyTelemetry } from '@/simulation/policyTelemetry.js';
 import ModelIOPipelineGraph from '@/components/ModelIOPipelineGraph.vue';
+import {
+  clampPanelSize,
+  loadPanelSize,
+  savePanelSize
+} from '@/utils/modelIoPanelSize.js';
 
 const translations = {
   en: {
@@ -90,7 +124,10 @@ const translations = {
     expandShort: 'Pipeline',
     live: 'Live',
     waiting: 'Waiting',
-    notReady: 'Simulation is loading. The pipeline graph will update once the policy is running.'
+    notReady: 'Simulation is loading. The pipeline graph will update once the policy is running.',
+    resizeWidth: 'Resize panel width (right edge)',
+    resizeHeight: 'Resize panel height (top edge)',
+    resizeBoth: 'Resize panel (top-right corner)'
   },
   zh: {
     panelTitle: '模型 I/O 连接图',
@@ -99,7 +136,10 @@ const translations = {
     expandShort: '流程',
     live: '实时',
     waiting: '等待',
-    notReady: '仿真仍在加载，策略就绪后将显示实时连接图。'
+    notReady: '仿真仍在加载，策略就绪后将显示实时连接图。',
+    resizeWidth: '拖拽右边框调整宽度',
+    resizeHeight: '拖拽上边框调整高度',
+    resizeBoth: '拖拽右上角同时调整'
   }
 };
 
@@ -130,11 +170,27 @@ export default {
       default: true
     }
   },
-  data: () => ({
-    expanded: false,
-    telemetry: { ready: false }
-  }),
+  data: () => {
+    const panelSize = loadPanelSize();
+    return {
+      expanded: false,
+      telemetry: { ready: false },
+      panelWidth: panelSize.width,
+      panelHeight: panelSize.height,
+      panelResize: null
+    };
+  },
   computed: {
+    desktopPanelStyle() {
+      if (this.isSmallScreen) {
+        return null;
+      }
+      return {
+        width: `${this.panelWidth}px`,
+        height: `${this.panelHeight}px`,
+        maxHeight: 'none'
+      };
+    },
     t() {
       return translations[this.language === 'en' ? 'en' : 'zh'];
     },
@@ -181,12 +237,74 @@ export default {
   },
   mounted() {
     this.startPoll();
+    this._onPanelResizeMove = (e) => this.onPanelResizeMove(e);
+    this._onPanelResizeEnd = () => this.endPanelResize();
+    window.addEventListener('resize', this.onWindowResize);
   },
   beforeUnmount() {
     this.stopPoll();
+    this.endPanelResize();
+    window.removeEventListener('resize', this.onWindowResize);
     document.body.classList.remove('model-io-sheet-open');
+    document.body.classList.remove('model-io-panel-resizing');
   },
   methods: {
+    onWindowResize() {
+      if (this.isSmallScreen) {
+        return;
+      }
+      const next = clampPanelSize(this.panelWidth, this.panelHeight);
+      this.panelWidth = next.width;
+      this.panelHeight = next.height;
+    },
+    startPanelResize(edge, event) {
+      if (this.isSmallScreen) {
+        return;
+      }
+      this.panelResize = {
+        edge,
+        startX: event.clientX,
+        startY: event.clientY,
+        startW: this.panelWidth,
+        startH: this.panelHeight
+      };
+      document.addEventListener('mousemove', this._onPanelResizeMove);
+      document.addEventListener('mouseup', this._onPanelResizeEnd);
+      document.body.classList.add('model-io-panel-resizing');
+    },
+    onPanelResizeMove(event) {
+      if (!this.panelResize) {
+        return;
+      }
+      const dx = event.clientX - this.panelResize.startX;
+      const dy = event.clientY - this.panelResize.startY;
+      let w = this.panelResize.startW;
+      let h = this.panelResize.startH;
+      const { edge } = this.panelResize;
+      if (edge.includes('e')) {
+        w += dx;
+      }
+      if (edge.includes('n')) {
+        h -= dy;
+      }
+      const clamped = clampPanelSize(w, h);
+      this.panelWidth = clamped.width;
+      this.panelHeight = clamped.height;
+      const cursor =
+        edge === 'e' ? 'ew-resize' : edge === 'n' ? 'ns-resize' : 'nesw-resize';
+      document.body.style.cursor = cursor;
+    },
+    endPanelResize() {
+      if (!this.panelResize) {
+        return;
+      }
+      this.panelResize = null;
+      document.removeEventListener('mousemove', this._onPanelResizeMove);
+      document.removeEventListener('mouseup', this._onPanelResizeEnd);
+      document.body.classList.remove('model-io-panel-resizing');
+      document.body.style.cursor = '';
+      savePanelSize(this.panelWidth, this.panelHeight);
+    },
     startPoll() {
       this.stopPoll();
       this.pollTimer = setInterval(() => {
@@ -236,7 +354,7 @@ export default {
   flex-direction: column;
   align-items: flex-start;
   gap: 8px;
-  max-width: min(960px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
 }
 
 .model-io-dock-mobile {
@@ -289,13 +407,21 @@ export default {
 }
 
 .model-io-panel {
-  width: min(920px, calc(100vw - 24px));
-  max-height: min(72vh, 640px);
   display: flex;
   flex-direction: column;
   border-radius: 14px;
   overflow: hidden;
   background: rgb(var(--v-theme-surface));
+}
+
+.model-io-panel-desktop {
+  position: relative;
+  max-width: calc(100vw - 24px);
+}
+
+.model-io-panel-desktop .model-io-body {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .model-io-panel-sheet {
@@ -346,6 +472,58 @@ export default {
   padding: 0 2px;
 }
 
+.model-io-resize-handle {
+  position: absolute;
+  z-index: 3;
+  touch-action: none;
+}
+
+.model-io-resize-e {
+  top: 18px;
+  right: 0;
+  width: 8px;
+  bottom: 12px;
+  cursor: ew-resize;
+}
+
+.model-io-resize-n {
+  top: 0;
+  left: 12px;
+  right: 12px;
+  height: 8px;
+  cursor: ns-resize;
+}
+
+.model-io-resize-ne {
+  top: 0;
+  right: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nesw-resize;
+  border-top-right-radius: 14px;
+  background: linear-gradient(
+    315deg,
+    transparent 0 45%,
+    rgba(var(--v-theme-primary), 0.35) 45% 55%,
+    rgba(var(--v-theme-primary), 0.55) 55%
+  );
+}
+
+.model-io-resize-handle:hover,
+.model-io-resize-handle:active {
+  background-color: rgba(var(--v-theme-primary), 0.12);
+}
+
+.model-io-resize-ne:hover,
+.model-io-resize-ne:active {
+  background: linear-gradient(
+    315deg,
+    transparent 0 40%,
+    rgba(var(--v-theme-primary), 0.5) 40% 60%,
+    rgba(var(--v-theme-primary), 0.75) 60%
+  );
+}
+
 @media (max-width: 640px), (max-height: 760px) {
   .model-io-panel:not(.model-io-panel-sheet) {
     width: calc(100vw - 16px);
@@ -358,5 +536,9 @@ export default {
 body.model-io-sheet-open {
   overflow: hidden;
   touch-action: none;
+}
+
+body.model-io-panel-resizing {
+  user-select: none;
 }
 </style>
