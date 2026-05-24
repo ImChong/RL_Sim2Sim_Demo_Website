@@ -91,6 +91,7 @@
 
 <script>
 import { buildPipelineGraph } from '@/simulation/pipelineGraphLayout.js';
+import { portPointInCanvasSpace } from '@/simulation/pipelineGraphEdgeCoords.js';
 
 let graphInstanceCounter = 0;
 
@@ -477,10 +478,7 @@ export default {
         const port = el.querySelector(selector);
         const target = port ?? el;
         const r = target.getBoundingClientRect();
-        return {
-          x: r.left + (side === 'out' ? r.width : 0) - canvasRect.left,
-          y: r.top + r.height / 2 - canvasRect.top
-        };
+        return portPointInCanvasSpace(canvasRect, r, side, this.scale);
       };
 
       this.renderedEdges = this.layout.edges
