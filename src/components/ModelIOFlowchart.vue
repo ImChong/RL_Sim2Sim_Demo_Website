@@ -91,16 +91,16 @@
           @mousedown.prevent="startPanelResize('e', $event)"
         />
         <div
-          class="model-io-resize-handle model-io-resize-s"
+          class="model-io-resize-handle model-io-resize-n"
           role="separator"
           :aria-label="t.resizeHeight"
-          @mousedown.prevent="startPanelResize('s', $event)"
+          @mousedown.prevent="startPanelResize('n', $event)"
         />
         <div
-          class="model-io-resize-handle model-io-resize-se"
+          class="model-io-resize-handle model-io-resize-ne"
           role="separator"
           :aria-label="t.resizeBoth"
-          @mousedown.prevent="startPanelResize('se', $event)"
+          @mousedown.prevent="startPanelResize('ne', $event)"
         />
       </template>
     </v-card>
@@ -125,9 +125,9 @@ const translations = {
     live: 'Live',
     waiting: 'Waiting',
     notReady: 'Simulation is loading. The pipeline graph will update once the policy is running.',
-    resizeWidth: 'Resize panel width',
-    resizeHeight: 'Resize panel height',
-    resizeBoth: 'Resize panel'
+    resizeWidth: 'Resize panel width (right edge)',
+    resizeHeight: 'Resize panel height (top edge)',
+    resizeBoth: 'Resize panel (top-right corner)'
   },
   zh: {
     panelTitle: '模型 I/O 连接图',
@@ -137,9 +137,9 @@ const translations = {
     live: '实时',
     waiting: '等待',
     notReady: '仿真仍在加载，策略就绪后将显示实时连接图。',
-    resizeWidth: '拖拽调整面板宽度',
-    resizeHeight: '拖拽调整面板高度',
-    resizeBoth: '拖拽调整面板大小'
+    resizeWidth: '拖拽右边框调整宽度',
+    resizeHeight: '拖拽上边框调整高度',
+    resizeBoth: '拖拽右上角同时调整'
   }
 };
 
@@ -284,13 +284,14 @@ export default {
       if (edge.includes('e')) {
         w += dx;
       }
-      if (edge.includes('s')) {
-        h += dy;
+      if (edge.includes('n')) {
+        h -= dy;
       }
       const clamped = clampPanelSize(w, h);
       this.panelWidth = clamped.width;
       this.panelHeight = clamped.height;
-      const cursor = edge === 'e' ? 'ew-resize' : edge === 's' ? 'ns-resize' : 'nwse-resize';
+      const cursor =
+        edge === 'e' ? 'ew-resize' : edge === 'n' ? 'ns-resize' : 'nesw-resize';
       document.body.style.cursor = cursor;
     },
     endPanelResize() {
@@ -478,30 +479,30 @@ export default {
 }
 
 .model-io-resize-e {
-  top: 48px;
+  top: 18px;
   right: 0;
   width: 8px;
   bottom: 12px;
   cursor: ew-resize;
 }
 
-.model-io-resize-s {
+.model-io-resize-n {
+  top: 0;
   left: 12px;
   right: 12px;
-  bottom: 0;
   height: 8px;
   cursor: ns-resize;
 }
 
-.model-io-resize-se {
+.model-io-resize-ne {
+  top: 0;
   right: 0;
-  bottom: 0;
   width: 18px;
   height: 18px;
-  cursor: nwse-resize;
-  border-bottom-right-radius: 14px;
+  cursor: nesw-resize;
+  border-top-right-radius: 14px;
   background: linear-gradient(
-    135deg,
+    315deg,
     transparent 0 45%,
     rgba(var(--v-theme-primary), 0.35) 45% 55%,
     rgba(var(--v-theme-primary), 0.55) 55%
@@ -513,10 +514,10 @@ export default {
   background-color: rgba(var(--v-theme-primary), 0.12);
 }
 
-.model-io-resize-se:hover,
-.model-io-resize-se:active {
+.model-io-resize-ne:hover,
+.model-io-resize-ne:active {
   background: linear-gradient(
-    135deg,
+    315deg,
     transparent 0 40%,
     rgba(var(--v-theme-primary), 0.5) 40% 60%,
     rgba(var(--v-theme-primary), 0.75) 60%
@@ -538,7 +539,6 @@ body.model-io-sheet-open {
 }
 
 body.model-io-panel-resizing {
-  cursor: nwse-resize;
   user-select: none;
 }
 </style>
