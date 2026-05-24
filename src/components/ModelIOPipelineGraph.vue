@@ -1,12 +1,12 @@
 <template>
   <div class="pipeline-shell" :class="{ 'pipeline-shell-mobile': isMobile }">
-    <p v-if="isMobile" class="pipeline-scroll-hint text-caption">
+    <p class="pipeline-scroll-hint text-caption">
       {{ scrollHint }}
     </p>
     <div
       ref="viewport"
-      class="pipeline-viewport"
-      :class="{ 'pipeline-viewport-panzoom': isMobile }"
+      class="pipeline-viewport pipeline-viewport-panzoom"
+      :class="{ 'pipeline-viewport-dragging': isDragging }"
       :style="viewportStyle"
     >
       <div
@@ -96,6 +96,7 @@ let graphInstanceCounter = 0;
 
 const MIN_SCALE = 0.25;
 const MAX_SCALE = 3;
+const WHEEL_ZOOM_FACTOR = 1.1;
 
 function touchDistance(touches) {
   const dx = touches[0].clientX - touches[1].clientX;
@@ -108,6 +109,10 @@ function touchCenter(touches) {
     x: (touches[0].clientX + touches[1].clientX) / 2,
     y: (touches[0].clientY + touches[1].clientY) / 2
   };
+}
+
+function clampScale(scale) {
+  return Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
 }
 
 export default {
@@ -138,7 +143,9 @@ export default {
     panX: 0,
     panY: 0,
     scale: 1,
-    gesture: null
+    gesture: null,
+    isDragging: false,
+    userHasGestured: false
   }),
   computed: {
     layout() {
@@ -146,23 +153,25 @@ export default {
       return buildPipelineGraph(this.telemetry, lang, { layout: 'horizontal' });
     },
     scrollHint() {
+      if (this.isMobile) {
+        return this.language === 'en'
+          ? 'Drag to pan · Pinch to zoom'
+          : '单指拖动平移 · 双指捏合缩放';
+      }
       return this.language === 'en'
-        ? 'Drag to pan · Pinch to zoom'
-        : '单指拖动平移 · 双指捏合缩放';
+        ? 'Drag to pan · Scroll wheel to zoom'
+        : '拖动平移 · 滚轮缩放';
     },
     viewportStyle() {
-      if (!this.isMobile) {
-        return {
-          minWidth: `${this.layout.width}px`,
-          minHeight: `${this.layout.height}px`
-        };
-      }
-      return null;
-    },
-    transformStyle() {
-      if (!this.isMobile) {
+      if (this.isMobile) {
         return null;
       }
+      return {
+        minHeight: '240px',
+        maxHeight: 'min(48vh, 420px)'
+      };
+    },
+    transformStyle() {
       return {
         transform: `translate(${this.panX}px, ${this.panY}px) scale(${this.scale})`,
         transformOrigin: '0 0',
@@ -182,18 +191,9 @@ export default {
     live() {
       this.scheduleEdgeUpdate();
     },
-    isMobile(isMobile) {
-      this.teardownTouchHandlers();
-      if (isMobile) {
-        this.$nextTick(() => {
-          this.setupTouchHandlers();
-          this.fitViewport();
-        });
-      } else {
-        this.panX = 0;
-        this.panY = 0;
-        this.scale = 1;
-      }
+    isMobile() {
+      this.userHasGestured = false;
+      this.scheduleViewportFit();
       this.scheduleEdgeUpdate();
     }
   },
@@ -205,14 +205,12 @@ export default {
     if (this.$refs.viewport) {
       this.resizeObserver.observe(this.$refs.viewport);
     }
-    if (this.isMobile) {
-      this.setupTouchHandlers();
-    }
+    this.setupInteractionHandlers();
     this.scheduleEdgeUpdate();
     this.scheduleViewportFit();
   },
   beforeUnmount() {
-    this.teardownTouchHandlers();
+    this.teardownInteractionHandlers();
     this.resizeObserver?.disconnect();
     if (this._edgeRaf) {
       cancelAnimationFrame(this._edgeRaf);
@@ -229,13 +227,20 @@ export default {
         delete this.nodeRefs[id];
       }
     },
-    setupTouchHandlers() {
+    shouldIgnorePanStart(target) {
+      return Boolean(target?.closest?.('.pipeline-node-card-scroll'));
+    },
+    markUserGestured() {
+      this.userHasGestured = true;
+    },
+    setupInteractionHandlers() {
       const viewport = this.$refs.viewport;
-      if (!viewport || this._touchViewport === viewport) {
+      if (!viewport || this._interactionViewport === viewport) {
         return;
       }
-      this.teardownTouchHandlers();
-      this._touchViewport = viewport;
+      this.teardownInteractionHandlers();
+      this._interactionViewport = viewport;
+
       this._onTouchStart = (e) => this.handleTouchStart(e);
       this._onTouchMove = (e) => this.handleTouchMove(e);
       this._onTouchEnd = (e) => this.handleTouchEnd(e);
@@ -243,9 +248,16 @@ export default {
       viewport.addEventListener('touchmove', this._onTouchMove, { passive: false });
       viewport.addEventListener('touchend', this._onTouchEnd, { passive: true });
       viewport.addEventListener('touchcancel', this._onTouchEnd, { passive: true });
+
+      this._onMouseDown = (e) => this.handleMouseDown(e);
+      this._onMouseMove = (e) => this.handleMouseMove(e);
+      this._onMouseUp = (e) => this.handleMouseUp(e);
+      this._onWheel = (e) => this.handleWheel(e);
+      viewport.addEventListener('mousedown', this._onMouseDown);
+      viewport.addEventListener('wheel', this._onWheel, { passive: false });
     },
-    teardownTouchHandlers() {
-      const viewport = this._touchViewport;
+    teardownInteractionHandlers() {
+      const viewport = this._interactionViewport;
       if (!viewport) {
         return;
       }
@@ -253,16 +265,78 @@ export default {
       viewport.removeEventListener('touchmove', this._onTouchMove);
       viewport.removeEventListener('touchend', this._onTouchEnd);
       viewport.removeEventListener('touchcancel', this._onTouchEnd);
-      this._touchViewport = null;
+      viewport.removeEventListener('mousedown', this._onMouseDown);
+      viewport.removeEventListener('wheel', this._onWheel);
+      document.removeEventListener('mousemove', this._onMouseMove);
+      document.removeEventListener('mouseup', this._onMouseUp);
+      this._interactionViewport = null;
       this.gesture = null;
+      this.isDragging = false;
     },
-    handleTouchStart(e) {
-      if (!this.isMobile) {
+    zoomAt(clientX, clientY, nextScale) {
+      const viewport = this.$refs.viewport;
+      if (!viewport) {
         return;
       }
+      const rect = viewport.getBoundingClientRect();
+      const focalX = (clientX - rect.left - this.panX) / this.scale;
+      const focalY = (clientY - rect.top - this.panY) / this.scale;
+      const clamped = clampScale(nextScale);
+      this.scale = clamped;
+      this.panX = clientX - rect.left - focalX * clamped;
+      this.panY = clientY - rect.top - focalY * clamped;
+      this.markUserGestured();
+      this.scheduleEdgeUpdate();
+    },
+    handleWheel(e) {
+      if (!this.$refs.viewport?.contains(e.target)) {
+        return;
+      }
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? WHEEL_ZOOM_FACTOR : 1 / WHEEL_ZOOM_FACTOR;
+      this.zoomAt(e.clientX, e.clientY, this.scale * factor);
+    },
+    handleMouseDown(e) {
+      if (e.button !== 0 || this.shouldIgnorePanStart(e.target)) {
+        return;
+      }
+      e.preventDefault();
+      this.isDragging = true;
+      this.gesture = {
+        mode: 'pan',
+        startX: e.clientX,
+        startY: e.clientY,
+        startPanX: this.panX,
+        startPanY: this.panY
+      };
+      document.addEventListener('mousemove', this._onMouseMove);
+      document.addEventListener('mouseup', this._onMouseUp);
+    },
+    handleMouseMove(e) {
+      if (!this.gesture || this.gesture.mode !== 'pan' || !this.isDragging) {
+        return;
+      }
+      this.panX = this.gesture.startPanX + (e.clientX - this.gesture.startX);
+      this.panY = this.gesture.startPanY + (e.clientY - this.gesture.startY);
+      this.markUserGestured();
+      this.scheduleEdgeUpdate();
+    },
+    handleMouseUp() {
+      if (!this.isDragging) {
+        return;
+      }
+      this.isDragging = false;
+      this.gesture = null;
+      document.removeEventListener('mousemove', this._onMouseMove);
+      document.removeEventListener('mouseup', this._onMouseUp);
+    },
+    handleTouchStart(e) {
       const touches = e.touches;
       const rect = this.$refs.viewport.getBoundingClientRect();
       if (touches.length === 1) {
+        if (this.shouldIgnorePanStart(e.target)) {
+          return;
+        }
         this.gesture = {
           mode: 'pan',
           startX: touches[0].clientX,
@@ -288,7 +362,7 @@ export default {
       }
     },
     handleTouchMove(e) {
-      if (!this.isMobile || !this.gesture) {
+      if (!this.gesture) {
         return;
       }
       const touches = e.touches;
@@ -296,6 +370,7 @@ export default {
         e.preventDefault();
         this.panX = this.gesture.startPanX + (touches[0].clientX - this.gesture.startX);
         this.panY = this.gesture.startPanY + (touches[0].clientY - this.gesture.startY);
+        this.markUserGestured();
         this.scheduleEdgeUpdate();
         return;
       }
@@ -318,10 +393,11 @@ export default {
           };
         }
         const ratio = distance / this.gesture.startDistance;
-        const nextScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, this.gesture.startScale * ratio));
+        const nextScale = clampScale(this.gesture.startScale * ratio);
         this.scale = nextScale;
         this.panX = center.x - this.gesture.rectLeft - this.gesture.focalX * nextScale;
         this.panY = center.y - this.gesture.rectTop - this.gesture.focalY * nextScale;
+        this.markUserGestured();
         this.scheduleEdgeUpdate();
       }
     },
@@ -344,9 +420,6 @@ export default {
       }
     },
     scheduleViewportFit() {
-      if (!this.isMobile) {
-        return;
-      }
       if (this._fitRaf) {
         cancelAnimationFrame(this._fitRaf);
       }
@@ -356,8 +429,11 @@ export default {
       });
     },
     fitViewport() {
+      if (this.userHasGestured) {
+        return;
+      }
       const viewport = this.$refs.viewport;
-      if (!this.isMobile || !viewport || !this.layout.width) {
+      if (!viewport || !this.layout.width) {
         return;
       }
       const pad = 8;
@@ -432,12 +508,15 @@ export default {
 </script>
 
 <style scoped>
-.pipeline-shell-mobile {
+.pipeline-shell {
   display: flex;
   flex-direction: column;
+  gap: 6px;
+}
+
+.pipeline-shell-mobile {
   flex: 1 1 auto;
   min-height: 0;
-  gap: 6px;
 }
 
 .pipeline-scroll-hint {
@@ -449,14 +528,11 @@ export default {
 }
 
 .pipeline-viewport {
-  overflow: auto;
   max-width: 100%;
   border-radius: 10px;
   border: 1px solid rgba(56, 189, 148, 0.15);
   background: #0b1018;
-  -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  touch-action: pan-x pan-y;
 }
 
 .pipeline-viewport-panzoom {
@@ -465,6 +541,11 @@ export default {
   overflow: hidden;
   touch-action: none;
   user-select: none;
+  cursor: grab;
+}
+
+.pipeline-viewport-dragging {
+  cursor: grabbing;
 }
 
 .pipeline-transform {
@@ -526,6 +607,7 @@ export default {
   border: 1px solid rgba(71, 85, 105, 0.65);
   background: linear-gradient(180deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  cursor: default;
 }
 
 .pipeline-node-live .pipeline-node-card {
@@ -606,6 +688,8 @@ export default {
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+  cursor: auto;
+  user-select: text;
 }
 
 .pipeline-shell-mobile .pipeline-node-card-scroll {

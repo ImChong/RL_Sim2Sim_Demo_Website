@@ -325,7 +325,9 @@ export default {
 .model-io-body {
   flex: 1 1 auto;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   overscroll-behavior: contain;
   padding-top: 0;
   padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
