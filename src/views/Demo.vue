@@ -373,6 +373,7 @@
     :ready="state === 1"
     :language="language"
     :is-small-screen="isSmallScreen"
+    :mobile-controls-collapsed="isMobileControlsCollapsed"
   />
   <v-dialog :model-value="state < 0" persistent max-width="600px" scrollable>
     <v-card :title="t.loadingErrorTitle">

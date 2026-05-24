@@ -133,6 +133,8 @@ export function buildObsLayout(runner) {
   return blocks;
 }
 
+import { buildAtomicNodes } from './pipelineAtomicNodes.js';
+
 function buildMotorSample(demo, jointCount = 3) {
   if (!demo?.simulation || !demo.policyRunner) {
     return [];
@@ -211,6 +213,19 @@ export function buildPolicyTelemetry(runner, demo, options = {}) {
     preprocessing.jointPosRelativeSample = sampleArray(runner.cachedJointPosRel, 4);
   }
 
+  if (state?.rootQuat) {
+    preprocessing.rootQuat = [state.rootQuat[0], state.rootQuat[1], state.rootQuat[2], state.rootQuat[3]];
+  }
+  if (state?.jointPos) {
+    preprocessing.jointPosAll = Array.from(state.jointPos);
+  }
+  if (state?.jointVel) {
+    preprocessing.jointVelAll = Array.from(state.jointVel);
+  }
+
+  const motorJoints = buildMotorSample(demo, runner.numActions);
+  const atomicNodes = buildAtomicNodes(runner, state, obsVector, obsLayout, lang, motorJoints);
+
   const onnx = {
     inKeys: onnxMeta.in_keys ?? runner.module?.inKeys ?? ['policy'],
     outKeys: onnxMeta.out_keys ?? runner.module?.outKeys ?? ['action'],
@@ -235,7 +250,7 @@ export function buildPolicyTelemetry(runner, demo, options = {}) {
     controlType: demo?.control_type ?? 'unknown',
     decimation: demo?.decimation ?? 1,
     policyHz: demo?.getSimStepHz?.() ?? demo?.simStepHz ?? 0,
-    joints: buildMotorSample(demo, 3)
+    joints: motorJoints
   };
 
   const normalizerNote = lang === 'zh'
@@ -258,6 +273,8 @@ export function buildPolicyTelemetry(runner, demo, options = {}) {
     },
     preprocessing,
     obsBlocks,
+    atomicNodes,
+    jointNames: runner.policyJointNames.slice(),
     concat: {
       currentFrameSize: runner.numObs,
       historyLength: runner.historyLength,
