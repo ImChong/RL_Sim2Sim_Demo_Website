@@ -88,6 +88,14 @@ class JointPos {
     this.maxStep = Math.max(...this.posSteps);
     this.history = new Float32Array((this.maxStep + 1) * this.numJoints);
     this.out = new Float32Array(this.posSteps.length * this.numJoints);
+
+    // Bolt: Pre-calculate subarray views to avoid allocations in compute()
+    this.cachedViews = new Array(this.posSteps.length);
+    for (let i = 0; i < this.posSteps.length; i++) {
+      const idx = Math.min(this.posSteps[i], this.maxStep);
+      const start = idx * this.numJoints;
+      this.cachedViews[i] = this.history.subarray(start, start + this.numJoints);
+    }
   }
 
   get size() {
@@ -108,10 +116,8 @@ class JointPos {
 
   compute() {
     let offset = 0;
-    for (const step of this.posSteps) {
-      const idx = Math.min(step, this.maxStep);
-      const start = idx * this.numJoints;
-      this.out.set(this.history.subarray(start, start + this.numJoints), offset);
+    for (let i = 0; i < this.cachedViews.length; i++) {
+      this.out.set(this.cachedViews[i], offset);
       offset += this.numJoints;
     }
     return this.out;
@@ -339,6 +345,14 @@ class JointVel {
     this.maxStep = Math.max(...this.velSteps);
     this.history = new Float32Array((this.maxStep + 1) * this.numJoints);
     this.out = new Float32Array(this.velSteps.length * this.numJoints);
+
+    // Bolt: Pre-calculate subarray views to avoid allocations in compute()
+    this.cachedViews = new Array(this.velSteps.length);
+    for (let i = 0; i < this.velSteps.length; i++) {
+      const idx = Math.min(this.velSteps[i], this.maxStep);
+      const start = idx * this.numJoints;
+      this.cachedViews[i] = this.history.subarray(start, start + this.numJoints);
+    }
   }
 
   get size() {
@@ -358,10 +372,10 @@ class JointVel {
   }
 
   compute() {
-    for (let i = 0; i < this.velSteps.length; i++) {
-      const step = Math.min(this.velSteps[i], this.maxStep);
-      const start = step * this.numJoints;
-      this.out.set(this.history.subarray(start, start + this.numJoints), i * this.numJoints);
+    let offset = 0;
+    for (let i = 0; i < this.cachedViews.length; i++) {
+      this.out.set(this.cachedViews[i], offset);
+      offset += this.numJoints;
     }
     return this.out;
   }
