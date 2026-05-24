@@ -70,14 +70,17 @@
             class="pipeline-port pipeline-port-top"
             aria-hidden="true"
           />
-          <div class="pipeline-node-card">
-            <div class="pipeline-node-title">{{ node.title }}</div>
-            <div v-if="node.subtitle" class="pipeline-node-subtitle">{{ node.subtitle }}</div>
-            <div v-for="(line, idx) in node.lines" :key="idx" class="pipeline-node-line">
-              <span class="pipeline-node-key">{{ line.k }}</span>
-              <span class="pipeline-node-val">{{ line.v }}</span>
-            </div>
+        <div
+          class="pipeline-node-card"
+          :class="{ 'pipeline-node-card-scroll': node.scrollable }"
+        >
+          <div class="pipeline-node-title">{{ node.title }}</div>
+          <div v-if="node.subtitle" class="pipeline-node-subtitle">{{ node.subtitle }}</div>
+          <div v-for="(line, idx) in node.lines" :key="idx" class="pipeline-node-line">
+            <span class="pipeline-node-key">{{ line.k }}</span>
+            <span class="pipeline-node-val">{{ line.v }}</span>
           </div>
+        </div>
           <span
             v-if="!isVertical"
             class="pipeline-port pipeline-port-out"
@@ -434,5 +437,16 @@ export default {
 
 .pipeline-node-vertical .pipeline-port-bottom {
   margin: 2px auto 0;
+}
+
+.pipeline-node-card-scroll {
+  max-height: 140px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.pipeline-shell-mobile .pipeline-node-card-scroll {
+  max-height: 120px;
 }
 </style>

@@ -1,6 +1,34 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildPipelineGraph } from '../src/simulation/pipelineGraphLayout.js';
+import { buildAtomicNodes } from '../src/simulation/pipelineAtomicNodes.js';
+
+const baseAtomic = buildAtomicNodes(
+  {
+    policyJointNames: ['hip', 'knee'],
+    numActions: 2,
+    obsJointPosRelative: false,
+    actionClip: 10,
+    cachedJointPosRel: new Float32Array(2),
+    lastActions: new Float32Array([0.1, -0.2]),
+    target: new Float32Array([0.05, -0.1])
+  },
+  {
+    rootPos: new Float32Array([0, 0, 0.9]),
+    rootQuat: new Float32Array([1, 0, 0, 0]),
+    rootAngVel: new Float32Array([0, 0, 0]),
+    jointPos: new Float32Array([0.1, 0.2]),
+    jointVel: new Float32Array([0, 0]),
+    cmd: [0, 0, 0]
+  },
+  new Float32Array([0, 0, 0, 1, 0, 0, 0.1, 0.2]),
+  [
+    { name: 'RootAngVelB', offset: 0, size: 3 },
+    { name: 'Command', offset: 3, size: 3 },
+    { name: 'JointPos', offset: 6, size: 2, kwargs: {} }
+  ],
+  'en'
+);
 
 const baseTelemetry = {
   ready: true,
@@ -14,6 +42,7 @@ const baseTelemetry = {
     { name: 'RootAngVelB', offset: 0, size: 3, values: [0, 0, 0], stats: { mean: 0, min: 0, max: 0 } },
     { name: 'Command', offset: 3, size: 3, values: [1, 0, 0], stats: { mean: 0.3, min: 0, max: 1 } }
   ],
+  atomicNodes: baseAtomic,
   concat: {
     currentFrameSize: 96,
     historyLength: 4,
@@ -44,11 +73,14 @@ test('buildPipelineGraph creates obs fan-in and history node', () => {
   const graph = buildPipelineGraph(baseTelemetry, 'zh');
   assert.ok(graph.nodes.find((n) => n.id === 'warehouse'));
   assert.ok(graph.nodes.find((n) => n.id === 'history'));
-  assert.ok(graph.nodes.find((n) => n.id === 'obs-0'));
+  assert.ok(graph.nodes.find((n) => n.id === 'obs-RootAngVelB'));
+  const obsNodeCount = baseTelemetry.atomicNodes.filter((n) => n.group === 'obs').length;
   assert.equal(
     graph.edges.filter((e) => e.to === 'warehouse').length,
-    baseTelemetry.obsBlocks.length
+    obsNodeCount
   );
+  assert.ok(graph.nodes.find((n) => n.id === 'sim-root-pos'));
+  assert.ok(graph.nodes.find((n) => n.id === 'sim-joint-pos'));
 });
 
 test('buildPipelineGraph skips history node when length is 1', () => {
@@ -65,9 +97,9 @@ test('buildPipelineGraph vertical layout stacks nodes', () => {
   assert.equal(graph.layout, 'vertical');
   assert.ok(graph.width <= 320);
   assert.ok(graph.height > 400);
-  const sim = graph.nodes.find((n) => n.id === 'sim');
-  const motor = graph.nodes.find((n) => n.id === 'motor');
-  assert.ok(sim);
-  assert.ok(motor);
-  assert.ok(motor.y > sim.y);
+  const rootPos = graph.nodes.find((n) => n.id === 'sim-root-pos');
+  const tail = graph.nodes.find((n) => n.id === 'out-target') ?? graph.nodes.find((n) => n.id === 'onnx');
+  assert.ok(rootPos);
+  assert.ok(tail);
+  assert.ok(tail.y > rootPos.y);
 });

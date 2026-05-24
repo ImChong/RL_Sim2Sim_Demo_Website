@@ -1,35 +1,59 @@
 import { formatFloat, sampleArray } from './policyTelemetry.js';
 
-const NODE_W = {
-  source: 132,
-  process: 132,
-  obs: 128,
-  warehouse: 148,
-  model: 152,
-  output: 140,
-  motor: 140
-};
-
-const NODE_H = {
-  source: 58,
-  process: 58,
-  obs: 50,
-  warehouse: 62,
-  model: 66,
-  output: 58,
-  motor: 58
-};
-
-const COL_GAP = 36;
+const COL_GAP = 28;
 const ROW_GAP = 10;
 const ROW_GAP_MOBILE = 8;
+const MARGIN_X = 20;
+const MARGIN_Y = 16;
 
 function colX(index, widths) {
-  let x = 24;
+  let x = MARGIN_X;
   for (let i = 0; i < index; i++) {
     x += widths[i] + COL_GAP;
   }
   return x;
+}
+
+function stackColumn(nodes, x, gap = ROW_GAP) {
+  let y = MARGIN_Y;
+  let maxW = 0;
+  for (const node of nodes) {
+    node.x = x;
+    node.y = y;
+    maxW = Math.max(maxW, node.width ?? 120);
+    y += (node.height ?? 48) + gap;
+  }
+  return { height: y + MARGIN_Y, width: maxW };
+}
+
+function obsSourceId(obsNode, hasPrepRel) {
+  const id = obsNode.id ?? '';
+  if (id.includes('JointPos')) {
+    return hasPrepRel ? 'prep-joint-rel' : 'sim-joint-pos';
+  }
+  if (id.includes('JointVel')) {
+    return 'sim-joint-vel';
+  }
+  if (id.includes('RootAngVel')) {
+    return 'sim-root-angvel';
+  }
+  if (id.includes('ProjectedGravity')) {
+    return 'sim-root-quat';
+  }
+  if (id.includes('Command-vx')) {
+    return 'sim-cmd-vx';
+  }
+  if (id.includes('Command-vy')) {
+    return 'sim-cmd-vy';
+  }
+  if (id.includes('Command-yaw')) {
+    return 'sim-cmd-yaw';
+  }
+  return 'prep-action-clip';
+}
+
+function cloneNodes(list) {
+  return list.map((n) => ({ ...n, lines: n.lines ? [...n.lines] : [] }));
 }
 
 /**
@@ -43,125 +67,108 @@ export function buildPipelineGraph(telemetry, lang = 'zh', options = {}) {
     return { nodes: [], edges: [], width: 480, height: 200, layout: options.layout ?? 'horizontal' };
   }
 
-  if (options.layout === 'vertical') {
-    return buildVerticalPipelineGraph(telemetry, zh);
+  const atomic = telemetry.atomicNodes ?? [];
+  if (atomic.length === 0) {
+    return { nodes: [], edges: [], width: 480, height: 200, layout: options.layout ?? 'horizontal' };
   }
 
-  const obsBlocks = telemetry.obsBlocks ?? [];
-  const obsCount = Math.max(obsBlocks.length, 1);
-  const obsStackHeight = obsCount * (NODE_H.obs + ROW_GAP) - ROW_GAP;
-  const coreY = Math.max(80, obsStackHeight / 2);
+  if (options.layout === 'vertical') {
+    return buildVerticalAtomicGraph(telemetry, zh, atomic);
+  }
+  return buildHorizontalAtomicGraph(telemetry, zh, atomic);
+}
 
+function buildHorizontalAtomicGraph(telemetry, zh, atomic) {
+  const simNodes = cloneNodes(atomic.filter((n) => n.group === 'sim'));
+  const prepNodes = cloneNodes(atomic.filter((n) => n.group === 'preprocess'));
+  const obsNodes = cloneNodes(atomic.filter((n) => n.group === 'obs'));
+  const outputNodes = cloneNodes(atomic.filter((n) => n.group === 'output'));
+  const motorNodes = cloneNodes(atomic.filter((n) => n.group === 'motor'));
+  const hasPrepRel = prepNodes.some((n) => n.id === 'prep-joint-rel');
   const hasHistory = (telemetry.concat?.historyLength ?? 1) > 1;
-  const colWidths = [
-    NODE_W.source,
-    NODE_W.process,
-    NODE_W.obs,
-    NODE_W.warehouse,
-    ...(hasHistory ? [NODE_W.process] : []),
-    NODE_W.model,
-    NODE_W.output,
-    NODE_W.motor
-  ];
 
-  let col = 0;
-  const xSource = colX(col++, colWidths);
-  const xPrep = colX(col++, colWidths);
-  const xObs = colX(col++, colWidths);
-  const xWarehouse = colX(col++, colWidths);
-  const xHistory = hasHistory ? colX(col++, colWidths) : null;
-  const xOnnx = colX(col++, colWidths);
-  const xTarget = colX(col++, colWidths);
-  const xMotor = colX(col++, colWidths);
+  const colWidths = [];
+  colWidths.push(Math.max(118, ...simNodes.map((n) => n.width ?? 118), 118));
+  if (prepNodes.length) {
+    colWidths.push(Math.max(118, ...prepNodes.map((n) => n.width ?? 118), 118));
+  }
+  colWidths.push(Math.max(148, ...obsNodes.map((n) => n.width ?? 128), 128));
+  colWidths.push(148);
+  if (hasHistory) {
+    colWidths.push(132);
+  }
+  colWidths.push(152);
+  for (const out of outputNodes) {
+    colWidths.push(Math.max(140, out.width ?? 140));
+  }
+  if (motorNodes.length) {
+    colWidths.push(Math.max(148, ...motorNodes.map((n) => n.width ?? 148), 148));
+  }
 
   const nodes = [];
   const edges = [];
+  let col = 0;
 
-  const pushNode = (node) => {
-    nodes.push({
-      width: NODE_W[node.kind] ?? 132,
-      height: NODE_H[node.kind] ?? 56,
-      ...node
-    });
-  };
+  const xSim = colX(col, colWidths);
+  const simStack = stackColumn(simNodes, xSim);
+  nodes.push(...simNodes);
+  col += 1;
 
-  pushNode({
-    id: 'sim',
-    kind: 'source',
-    title: 'MuJoCo',
-    subtitle: zh ? '仿真状态' : 'Simulation state',
-    x: xSource,
-    y: coreY - NODE_H.source / 2,
-    lines: [
-      { k: zh ? '根位置' : 'root', v: formatVec(telemetry.preprocessing.rootPos) },
-      { k: zh ? '关节' : 'joint', v: formatVec(telemetry.preprocessing.jointPosSample) }
-    ]
-  });
+  if (prepNodes.length) {
+    const xPrep = colX(col, colWidths);
+    stackColumn(prepNodes, xPrep);
+    nodes.push(...prepNodes);
+    if (hasPrepRel) {
+      edges.push({ id: 'e-sim-prep-joint', from: 'sim-joint-pos', to: 'prep-joint-rel' });
+    }
+    col += 1;
+  }
 
-  pushNode({
-    id: 'prep',
-    kind: 'process',
-    title: zh ? '预处理' : 'Preprocess',
-    subtitle: zh ? '相对关节 / 裁剪' : 'Rel joints / clip',
-    x: xPrep,
-    y: coreY - NODE_H.process / 2,
-    lines: [
-      {
-        k: zh ? '相对默认' : 'rel default',
-        v: telemetry.preprocessing.obsJointPosRelative ? (zh ? '是' : 'yes') : (zh ? '否' : 'no')
-      },
-      { k: 'clip', v: `±${telemetry.preprocessing.actionClip}` }
-    ]
-  });
+  const xObs = colX(col, colWidths);
+  const obsStack = stackColumn(obsNodes, xObs);
+  nodes.push(...obsNodes);
+  for (const obs of obsNodes) {
+    const src = obsSourceId(obs, hasPrepRel);
+    edges.push({ id: `e-${src}-${obs.id}`, from: src, to: obs.id });
+    edges.push({ id: `e-${obs.id}-wh`, from: obs.id, to: 'warehouse' });
+  }
+  col += 1;
 
-  edges.push({ id: 'e-sim-prep', from: 'sim', to: 'prep' });
-
-  const obsStartY = coreY - obsStackHeight / 2;
-  obsBlocks.forEach((block, i) => {
-    const id = `obs-${i}`;
-    pushNode({
-      id,
-      kind: 'obs',
-      title: block.name,
-      subtitle: `${block.size}D · [${block.offset}:${block.offset + block.size})`,
-      x: xObs,
-      y: obsStartY + i * (NODE_H.obs + ROW_GAP),
-      lines: [
-        { k: zh ? '值' : 'val', v: formatVec(block.values) },
-        { k: 'μ', v: formatFloat(block.stats.mean) }
-      ]
-    });
-    edges.push({ id: `e-prep-${id}`, from: 'prep', to: id });
-    edges.push({ id: `e-${id}-wh`, from: id, to: 'warehouse' });
-  });
-
+  const coreY = Math.max(simStack.height, obsStack.height, 200) / 2;
   const historyLabel = hasHistory
     ? `${telemetry.concat.historyCount}/${telemetry.concat.historyLength}`
     : null;
 
-  pushNode({
+  const xWarehouse = colX(col, colWidths);
+  nodes.push({
     id: 'warehouse',
     kind: 'warehouse',
     title: zh ? '观测仓库' : 'Obs Warehouse',
     subtitle: zh ? '向量拼接' : 'Vector concat',
+    width: 148,
+    height: 62,
     x: xWarehouse,
-    y: coreY - NODE_H.warehouse / 2,
+    y: coreY - 31,
     lines: [
       { k: zh ? '单帧' : 'frame', v: `${telemetry.concat.currentFrameSize}D` },
       { k: zh ? '张量' : 'tensor', v: `${telemetry.concat.tensorSize}D` },
       ...(historyLabel ? [{ k: zh ? '历史' : 'hist', v: historyLabel }] : [])
     ]
   });
+  col += 1;
 
   let onnxFrom = 'warehouse';
   if (hasHistory) {
-    pushNode({
+    const xHistory = colX(col, colWidths);
+    nodes.push({
       id: 'history',
       kind: 'process',
       title: zh ? '历史缓冲' : 'History buffer',
       subtitle: `×${telemetry.concat.historyLength}`,
+      width: 132,
+      height: 54,
       x: xHistory,
-      y: coreY - NODE_H.process / 2,
+      y: coreY - 27,
       lines: [
         { k: zh ? '窗口' : 'window', v: historyLabel },
         { k: zh ? '预览' : 'preview', v: formatVec(telemetry.concat.tensorPreview, 4) }
@@ -169,204 +176,146 @@ export function buildPipelineGraph(telemetry, lang = 'zh', options = {}) {
     });
     edges.push({ id: 'e-wh-hist', from: 'warehouse', to: 'history' });
     onnxFrom = 'history';
+    col += 1;
   }
 
   const modelName = telemetry.model.path?.split('/').pop() ?? 'ONNX';
-  pushNode({
+  const xOnnx = colX(col, colWidths);
+  nodes.push({
     id: 'onnx',
     kind: 'model',
     title: zh ? '策略网络' : 'Policy net',
     subtitle: modelName,
+    width: 152,
+    height: 66,
     x: xOnnx,
-    y: coreY - NODE_H.model / 2,
+    y: coreY - 33,
     lines: [
       { k: 'in', v: `${telemetry.onnx.inKeys.join(',')} ${shapeStr(telemetry.onnx.inputShape)}` },
-      { k: 'out', v: telemetry.onnx.outKeys.join(',') },
-      { k: 'action', v: formatVec(telemetry.onnx.clippedAction, 3) }
+      { k: 'out', v: telemetry.onnx.outKeys.join(',') }
     ]
   });
   edges.push({ id: `e-${onnxFrom}-onnx`, from: onnxFrom, to: 'onnx' });
+  col += 1;
 
-  pushNode({
-    id: 'target',
-    kind: 'output',
-    title: zh ? '关节目标' : 'Joint target',
-    subtitle: zh ? '缩放 + 默认姿态' : 'Scale + default',
-    x: xTarget,
-    y: coreY - NODE_H.output / 2,
-    lines: [
-      { k: 'target', v: formatVec(telemetry.postprocess.targetSample, 3) },
-      { k: 'scale', v: formatVec(telemetry.postprocess.actionScaleSample, 2) }
-    ]
-  });
-  edges.push({ id: 'e-onnx-target', from: 'onnx', to: 'target' });
+  let prev = 'onnx';
+  for (const out of outputNodes) {
+    const xOut = colX(col, colWidths);
+    out.x = xOut;
+    out.y = coreY - (out.height ?? 50) / 2;
+    nodes.push(out);
+    edges.push({ id: `e-${prev}-${out.id}`, from: prev, to: out.id });
+    prev = out.id;
+    col += 1;
+  }
 
-  pushNode({
-    id: 'motor',
-    kind: 'motor',
-    title: zh ? '电机控制' : 'Motor ctrl',
-    subtitle: telemetry.motor.controlType,
-    x: xMotor,
-    y: coreY - NODE_H.motor / 2,
-    lines: [
-      { k: 'Hz', v: formatFloat(telemetry.motor.policyHz, 1) },
-      { k: zh ? '子步' : 'decim', v: String(telemetry.motor.decimation) },
-      ...(telemetry.motor.joints[0]
-        ? [{ k: 'τ', v: formatFloat(telemetry.motor.joints[0].ctrl) }]
-        : [])
-    ]
-  });
-  edges.push({ id: 'e-target-motor', from: 'target', to: 'motor' });
+  for (const motor of motorNodes) {
+    const xMotor = colX(col, colWidths);
+    motor.x = xMotor;
+    motor.y = coreY - (motor.height ?? 50) / 2;
+    nodes.push(motor);
+    edges.push({ id: `e-${prev}-${motor.id}`, from: prev, to: motor.id });
+    col += 1;
+  }
 
-  const lastColRight = xMotor + NODE_W.motor;
-  const width = lastColRight + 32;
-  const height = Math.max(280, obsStackHeight + 120, coreY * 2);
+  const width = colX(col, colWidths) + (colWidths[col - 1] ?? 140) + MARGIN_X;
+  const height = Math.max(simStack.height, obsStack.height, 300);
 
   return { nodes, edges, width, height, layout: 'horizontal' };
 }
 
-function buildVerticalPipelineGraph(telemetry, zh) {
-  const mobileW = {
-    source: 280,
-    process: 280,
-    obs: 280,
-    warehouse: 280,
-    model: 280,
-    output: 280,
-    motor: 280
-  };
-  const mobileH = {
-    source: 54,
-    process: 52,
-    obs: 46,
-    warehouse: 58,
-    model: 62,
-    output: 54,
-    motor: 54
+function buildVerticalAtomicGraph(telemetry, zh, atomic) {
+  const nodes = [];
+  const edges = [];
+  const x = MARGIN_X;
+  let y = MARGIN_Y;
+  const gap = ROW_GAP_MOBILE;
+  const hasPrepRel = atomic.some((n) => n.id === 'prep-joint-rel');
+  const hasHistory = (telemetry.concat?.historyLength ?? 1) > 1;
+
+  const place = (node) => {
+    nodes.push({
+      width: Math.min(280, node.width ?? 280),
+      ...node,
+      x,
+      y
+    });
+    y += (node.height ?? 48) + gap;
   };
 
-  const obsBlocks = telemetry.obsBlocks ?? [];
-  const hasHistory = (telemetry.concat?.historyLength ?? 1) > 1;
+  const groups = ['sim', 'preprocess', 'obs'];
+  for (const group of groups) {
+    for (const node of atomic.filter((n) => n.group === group)) {
+      place({ ...node });
+    }
+  }
+
   const historyLabel = hasHistory
     ? `${telemetry.concat.historyCount}/${telemetry.concat.historyLength}`
     : null;
 
-  const nodes = [];
-  const edges = [];
-  const x = 16;
-  let y = 16;
-  const gap = ROW_GAP_MOBILE;
-
-  const pushNode = (node) => {
-    const kind = node.kind;
-    const height = mobileH[kind] ?? 52;
-    const width = mobileW[kind] ?? 280;
-    nodes.push({
-      width,
-      height,
-      x,
-      y,
-      ...node
-    });
-    y += height + gap;
-  };
-
-  pushNode({
-    id: 'sim',
-    kind: 'source',
-    title: 'MuJoCo',
-    subtitle: zh ? '仿真状态' : 'Simulation state',
-    lines: [
-      { k: zh ? '根' : 'root', v: formatVec(telemetry.preprocessing.rootPos, 2) },
-      { k: zh ? '关节' : 'joint', v: formatVec(telemetry.preprocessing.jointPosSample, 2) }
-    ]
-  });
-
-  pushNode({
-    id: 'prep',
-    kind: 'process',
-    title: zh ? '预处理' : 'Preprocess',
-    subtitle: zh ? '相对关节 / 裁剪' : 'Rel joints / clip',
-    lines: [
-      {
-        k: zh ? '相对' : 'rel',
-        v: telemetry.preprocessing.obsJointPosRelative ? (zh ? '是' : 'yes') : (zh ? '否' : 'no')
-      },
-      { k: 'clip', v: `±${telemetry.preprocessing.actionClip}` }
-    ]
-  });
-  edges.push({ id: 'e-sim-prep', from: 'sim', to: 'prep' });
-
-  obsBlocks.forEach((block, i) => {
-    const id = `obs-${i}`;
-    pushNode({
-      id,
-      kind: 'obs',
-      title: block.name,
-      subtitle: `${block.size}D`,
-      lines: [{ k: zh ? '值' : 'val', v: formatVec(block.values, 4) }]
-    });
-    edges.push({ id: `e-prep-${id}`, from: 'prep', to: id });
-    edges.push({ id: `e-${id}-wh`, from: id, to: 'warehouse' });
-  });
-
-  pushNode({
+  place({
     id: 'warehouse',
     kind: 'warehouse',
     title: zh ? '观测仓库' : 'Obs Warehouse',
     subtitle: `${telemetry.concat.tensorSize}D`,
+    height: 58,
     lines: [
       { k: zh ? '单帧' : 'frame', v: `${telemetry.concat.currentFrameSize}D` },
       ...(historyLabel ? [{ k: zh ? '历史' : 'hist', v: historyLabel }] : [])
     ]
   });
 
-  let onnxFrom = 'warehouse';
   if (hasHistory) {
-    pushNode({
+    place({
       id: 'history',
       kind: 'process',
       title: zh ? '历史缓冲' : 'History buffer',
-      subtitle: `×${telemetry.concat.historyLength}`,
+      height: 52,
       lines: [{ k: zh ? '窗口' : 'win', v: historyLabel }]
     });
-    edges.push({ id: 'e-wh-hist', from: 'warehouse', to: 'history' });
-    onnxFrom = 'history';
   }
 
   const modelName = telemetry.model.path?.split('/').pop() ?? 'ONNX';
-  pushNode({
+  place({
     id: 'onnx',
     kind: 'model',
     title: zh ? '策略网络' : 'Policy net',
-    subtitle: modelName.length > 22 ? `${modelName.slice(0, 20)}…` : modelName,
+    subtitle: modelName.length > 24 ? `${modelName.slice(0, 22)}…` : modelName,
+    height: 60,
     lines: [
       { k: 'in', v: shapeStr(telemetry.onnx.inputShape) },
       { k: 'act', v: formatVec(telemetry.onnx.clippedAction, 3) }
     ]
   });
-  edges.push({ id: `e-${onnxFrom}-onnx`, from: onnxFrom, to: 'onnx' });
 
-  pushNode({
-    id: 'target',
-    kind: 'output',
-    title: zh ? '关节目标' : 'Joint target',
-    subtitle: zh ? 'scale × action + default' : 'scale × action + default',
-    lines: [{ k: 'tgt', v: formatVec(telemetry.postprocess.targetSample, 3) }]
-  });
-  edges.push({ id: 'e-onnx-target', from: 'onnx', to: 'target' });
+  for (const node of atomic.filter((n) => n.group === 'output' || n.group === 'motor')) {
+    place({ ...node });
+  }
 
-  pushNode({
-    id: 'motor',
-    kind: 'motor',
-    title: zh ? '电机控制' : 'Motor ctrl',
-    subtitle: telemetry.motor.controlType,
-    lines: [
-      { k: 'Hz', v: formatFloat(telemetry.motor.policyHz, 1) },
-      { k: 'τ', v: telemetry.motor.joints[0] ? formatFloat(telemetry.motor.joints[0].ctrl) : '—' }
-    ]
-  });
-  edges.push({ id: 'e-target-motor', from: 'target', to: 'motor' });
+  if (hasPrepRel) {
+    edges.push({ id: 'e-sim-prep-joint', from: 'sim-joint-pos', to: 'prep-joint-rel' });
+  }
+  for (const obs of atomic.filter((n) => n.group === 'obs')) {
+    const src = obsSourceId(obs, hasPrepRel);
+    edges.push({ id: `e-${src}-${obs.id}`, from: src, to: obs.id });
+    edges.push({ id: `e-${obs.id}-wh`, from: obs.id, to: 'warehouse' });
+  }
+
+  let prev = hasHistory ? 'history' : 'warehouse';
+  if (hasHistory) {
+    edges.push({ id: 'e-wh-hist', from: 'warehouse', to: 'history' });
+  }
+  edges.push({ id: `e-${prev}-onnx`, from: prev, to: 'onnx' });
+  prev = 'onnx';
+  for (const out of atomic.filter((n) => n.group === 'output')) {
+    edges.push({ id: `e-${prev}-${out.id}`, from: prev, to: out.id });
+    prev = out.id;
+  }
+  for (const motor of atomic.filter((n) => n.group === 'motor')) {
+    edges.push({ id: `e-${prev}-${motor.id}`, from: prev, to: motor.id });
+    prev = motor.id;
+  }
 
   return {
     nodes,
