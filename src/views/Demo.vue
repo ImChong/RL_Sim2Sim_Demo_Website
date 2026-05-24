@@ -368,6 +368,12 @@
       </v-card-text>
     </v-card>
   </v-dialog>
+  <ModelIOFlowchart
+    :demo="demo"
+    :ready="state === 1"
+    :language="language"
+    :is-small-screen="isSmallScreen"
+  />
   <v-dialog :model-value="state < 0" persistent max-width="600px" scrollable>
     <v-card :title="t.loadingErrorTitle">
       <v-card-text>
@@ -386,6 +392,7 @@
 <script>
 import { MuJoCoDemo } from '@/simulation/main.js';
 import loadMujoco from 'mujoco-js';
+import ModelIOFlowchart from '@/components/ModelIOFlowchart.vue';
 
 const translations = {
   en: {
@@ -496,6 +503,9 @@ const translations = {
 
 export default {
   name: 'DemoPage',
+  components: {
+    ModelIOFlowchart
+  },
   props: {
     visualTheme: {
       type: String,
