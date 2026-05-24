@@ -15,13 +15,13 @@
       >
         <div
           class="pipeline-canvas"
-          :style="{ width: `${layout.width}px`, height: `${layout.height}px` }"
+          :style="{ width: `${displayLayout.width}px`, height: `${displayLayout.height}px` }"
         >
           <div class="pipeline-grid" aria-hidden="true" />
           <svg
             class="pipeline-edges"
-            :width="layout.width"
-            :height="layout.height"
+            :width="displayLayout.width"
+            :height="displayLayout.height"
             aria-hidden="true"
           >
             <defs>
@@ -47,13 +47,15 @@
           </svg>
 
           <div
-            v-for="node in layout.nodes"
+            v-for="node in displayLayout.nodes"
             :key="node.id"
+            :data-node-id="node.id"
             class="pipeline-node"
             :class="[
               `pipeline-node-${node.kind}`,
               {
-                'pipeline-node-live': live
+                'pipeline-node-live': live,
+                'pipeline-node-active': activeNodeId === node.id
               }
             ]"
             :style="{
@@ -62,24 +64,52 @@
               transform: `translate(${node.x}px, ${node.y}px)`
             }"
           >
-            <span
-              class="pipeline-port pipeline-port-in"
-              aria-hidden="true"
-            />
-            <div
-              class="pipeline-node-card"
-              :class="{ 'pipeline-node-card-scroll': node.scrollable }"
-            >
-              <div class="pipeline-node-title">{{ node.title }}</div>
-              <div v-if="node.subtitle" class="pipeline-node-subtitle">{{ node.subtitle }}</div>
-              <div v-for="(line, idx) in node.lines" :key="idx" class="pipeline-node-line">
-                <span class="pipeline-node-key">{{ line.k }}</span>
-                <span class="pipeline-node-val">{{ line.v }}</span>
+            <div class="pipeline-node-body">
+              <span
+                class="pipeline-port pipeline-port-in"
+                aria-hidden="true"
+              />
+              <div class="pipeline-node-inner">
+                <div
+                  class="pipeline-node-head"
+                  @mousedown.stop="onNodeMoveStart(node.id, $event)"
+                  @touchstart.stop="onNodeMoveStart(node.id, $event)"
+                >
+                  <div class="pipeline-node-title">{{ node.title }}</div>
+                  <div v-if="node.subtitle" class="pipeline-node-subtitle">{{ node.subtitle }}</div>
+                </div>
+                <div
+                  class="pipeline-node-card"
+                  :class="{ 'pipeline-node-card-scroll': node.scrollable }"
+                >
+                  <div v-for="(line, idx) in node.lines" :key="idx" class="pipeline-node-line">
+                    <span class="pipeline-node-key">{{ line.k }}</span>
+                    <span class="pipeline-node-val">{{ line.v }}</span>
+                  </div>
+                </div>
               </div>
+              <span
+                class="pipeline-port pipeline-port-out"
+                aria-hidden="true"
+              />
             </div>
             <span
-              class="pipeline-port pipeline-port-out"
+              class="pipeline-node-resize pipeline-node-resize-e"
               aria-hidden="true"
+              @mousedown.stop="onNodeResizeStart(node.id, 'e', $event)"
+              @touchstart.stop="onNodeResizeStart(node.id, 'e', $event)"
+            />
+            <span
+              class="pipeline-node-resize pipeline-node-resize-s"
+              aria-hidden="true"
+              @mousedown.stop="onNodeResizeStart(node.id, 's', $event)"
+              @touchstart.stop="onNodeResizeStart(node.id, 's', $event)"
+            />
+            <span
+              class="pipeline-node-resize pipeline-node-resize-se"
+              aria-hidden="true"
+              @mousedown.stop="onNodeResizeStart(node.id, 'se', $event)"
+              @touchstart.stop="onNodeResizeStart(node.id, 'se', $event)"
             />
           </div>
         </div>
@@ -91,6 +121,15 @@
 <script>
 import { buildPipelineGraph } from '@/simulation/pipelineGraphLayout.js';
 import { portPointFromLayoutNode } from '@/simulation/pipelineGraphEdgeCoords.js';
+import {
+  clampNodeSize,
+  computeGraphBounds,
+  graphLayoutKey,
+  loadNodeOverrides,
+  mergeNodeLayout,
+  pruneNodeOverrides,
+  saveNodeOverrides
+} from '@/utils/pipelineGraphNodeLayout.js';
 
 let graphInstanceCounter = 0;
 
@@ -143,7 +182,11 @@ export default {
     scale: 1,
     gesture: null,
     isDragging: false,
-    userHasGestured: false
+    userHasGestured: false,
+    layoutKey: '',
+    nodeOverrides: {},
+    activeNodeId: null,
+    nodeGesture: null
   }),
   computed: {
     layout() {
@@ -153,12 +196,12 @@ export default {
     scrollHint() {
       if (this.isMobile) {
         return this.language === 'en'
-          ? 'Drag to pan · Pinch to zoom'
-          : '单指拖动平移 · 双指捏合缩放';
+          ? 'Drag title to move node · Drag border to resize · Pinch to zoom canvas'
+          : '拖标题移动节点 · 拖边框缩放 · 双指缩放画布';
       }
       return this.language === 'en'
-        ? 'Drag to pan · Scroll wheel to zoom'
-        : '拖动平移 · 滚轮缩放';
+        ? 'Drag title to move node · Drag border to resize · Drag canvas to pan · Wheel to zoom'
+        : '拖标题移动节点 · 拖边框缩放 · 拖空白平移 · 滚轮缩放';
     },
     viewportStyle() {
       if (this.isMobile) {
@@ -173,12 +216,26 @@ export default {
       return {
         transform: `translate(${this.panX}px, ${this.panY}px) scale(${this.scale})`,
         transformOrigin: '0 0',
-        width: `${this.layout.width}px`,
-        height: `${this.layout.height}px`
+        width: `${this.displayLayout.width}px`,
+        height: `${this.displayLayout.height}px`
+      };
+    },
+    displayLayout() {
+      const base = this.layout;
+      const nodes = mergeNodeLayout(base.nodes, this.nodeOverrides);
+      const bounds = computeGraphBounds(nodes, {
+        width: base.width,
+        height: base.height
+      });
+      return {
+        ...base,
+        nodes,
+        width: bounds.width,
+        height: bounds.height
       };
     },
     nodeById() {
-      return new Map(this.layout.nodes.map((node) => [node.id, node]));
+      return new Map(this.displayLayout.nodes.map((node) => [node.id, node]));
     },
     renderedEdges() {
       const portPoint = (nodeId, side) =>
@@ -201,7 +258,8 @@ export default {
   },
   watch: {
     layout: {
-      handler() {
+      handler(layout) {
+        this.syncNodeOverrides(layout);
         this.scheduleViewportFit();
       },
       deep: true
@@ -219,9 +277,13 @@ export default {
       this.resizeObserver.observe(this.$refs.viewport);
     }
     this.setupInteractionHandlers();
+    this.syncNodeOverrides(this.layout);
+    this._onNodeGestureMove = (e) => this.onNodeGestureMove(e);
+    this._onNodeGestureEnd = () => this.endNodeGesture();
     this.scheduleViewportFit();
   },
   beforeUnmount() {
+    this.endNodeGesture();
     this.teardownInteractionHandlers();
     this.resizeObserver?.disconnect();
     if (this._fitRaf) {
@@ -230,7 +292,126 @@ export default {
   },
   methods: {
     shouldIgnorePanStart(target) {
-      return Boolean(target?.closest?.('.pipeline-node-card-scroll'));
+      return Boolean(
+        target?.closest?.('.pipeline-node-card-scroll')
+          || target?.closest?.('.pipeline-node-head')
+          || target?.closest?.('.pipeline-node-resize')
+      );
+    },
+    clientPoint(event) {
+      if (event.touches?.length) {
+        return { x: event.touches[0].clientX, y: event.touches[0].clientY };
+      }
+      return { x: event.clientX, y: event.clientY };
+    },
+    syncNodeOverrides(layout) {
+      const nodes = layout?.nodes ?? [];
+      const key = graphLayoutKey(nodes);
+      const ids = nodes.map((n) => n.id);
+      if (key !== this.layoutKey) {
+        this.layoutKey = key;
+        this.nodeOverrides = pruneNodeOverrides(loadNodeOverrides(key), ids);
+      } else {
+        this.nodeOverrides = pruneNodeOverrides(this.nodeOverrides, ids);
+      }
+    },
+    setNodeOverride(nodeId, patch) {
+      const prev = this.nodeOverrides[nodeId] ?? {};
+      this.nodeOverrides = {
+        ...this.nodeOverrides,
+        [nodeId]: { ...prev, ...patch }
+      };
+    },
+    attachNodeGestureListeners() {
+      document.addEventListener('mousemove', this._onNodeGestureMove);
+      document.addEventListener('mouseup', this._onNodeGestureEnd);
+      document.addEventListener('touchmove', this._onNodeGestureMove, { passive: false });
+      document.addEventListener('touchend', this._onNodeGestureEnd);
+      document.addEventListener('touchcancel', this._onNodeGestureEnd);
+      document.body.classList.add('pipeline-node-gesturing');
+    },
+    detachNodeGestureListeners() {
+      document.removeEventListener('mousemove', this._onNodeGestureMove);
+      document.removeEventListener('mouseup', this._onNodeGestureEnd);
+      document.removeEventListener('touchmove', this._onNodeGestureMove);
+      document.removeEventListener('touchend', this._onNodeGestureEnd);
+      document.removeEventListener('touchcancel', this._onNodeGestureEnd);
+      document.body.classList.remove('pipeline-node-gesturing');
+    },
+    onNodeMoveStart(nodeId, event) {
+      const node = this.nodeById.get(nodeId);
+      if (!node) {
+        return;
+      }
+      const point = this.clientPoint(event);
+      this.activeNodeId = nodeId;
+      this.nodeGesture = {
+        mode: 'move',
+        nodeId,
+        startClientX: point.x,
+        startClientY: point.y,
+        startX: node.x,
+        startY: node.y
+      };
+      this.attachNodeGestureListeners();
+      event.preventDefault();
+    },
+    onNodeResizeStart(nodeId, edge, event) {
+      const node = this.nodeById.get(nodeId);
+      if (!node) {
+        return;
+      }
+      const point = this.clientPoint(event);
+      this.activeNodeId = nodeId;
+      this.nodeGesture = {
+        mode: 'resize',
+        edge,
+        nodeId,
+        startClientX: point.x,
+        startClientY: point.y,
+        startW: node.width,
+        startH: node.height
+      };
+      this.attachNodeGestureListeners();
+      event.preventDefault();
+    },
+    onNodeGestureMove(event) {
+      if (!this.nodeGesture) {
+        return;
+      }
+      const point = this.clientPoint(event);
+      const dx = (point.x - this.nodeGesture.startClientX) / this.scale;
+      const dy = (point.y - this.nodeGesture.startClientY) / this.scale;
+      const { mode, nodeId, edge } = this.nodeGesture;
+
+      if (mode === 'move') {
+        this.setNodeOverride(nodeId, {
+          x: Math.round(this.nodeGesture.startX + dx),
+          y: Math.round(this.nodeGesture.startY + dy)
+        });
+      } else if (mode === 'resize') {
+        let width = this.nodeGesture.startW;
+        let height = this.nodeGesture.startH;
+        if (edge.includes('e')) {
+          width = this.nodeGesture.startW + dx;
+        }
+        if (edge.includes('s')) {
+          height = this.nodeGesture.startH + dy;
+        }
+        const clamped = clampNodeSize(width, height);
+        this.setNodeOverride(nodeId, clamped);
+      }
+
+      this.markUserGestured();
+      event.preventDefault();
+    },
+    endNodeGesture() {
+      if (!this.nodeGesture) {
+        return;
+      }
+      saveNodeOverrides(this.layoutKey, this.nodeOverrides);
+      this.nodeGesture = null;
+      this.detachNodeGestureListeners();
     },
     markUserGestured() {
       this.userHasGestured = true;
@@ -314,6 +495,9 @@ export default {
       document.addEventListener('mouseup', this._onMouseUp);
     },
     handleMouseMove(e) {
+      if (this.nodeGesture) {
+        return;
+      }
       if (!this.gesture || this.gesture.mode !== 'pan' || !this.isDragging) {
         return;
       }
@@ -362,6 +546,9 @@ export default {
       }
     },
     handleTouchMove(e) {
+      if (this.nodeGesture) {
+        return;
+      }
       if (!this.gesture) {
         return;
       }
@@ -431,7 +618,7 @@ export default {
         return;
       }
       const viewport = this.$refs.viewport;
-      if (!viewport || !this.layout.width) {
+      if (!viewport || !this.displayLayout.width) {
         return;
       }
       const pad = 8;
@@ -441,13 +628,13 @@ export default {
         return;
       }
       const fitScale = Math.min(
-        (vw - pad * 2) / this.layout.width,
-        (vh - pad * 2) / this.layout.height,
+        (vw - pad * 2) / this.displayLayout.width,
+        (vh - pad * 2) / this.displayLayout.height,
         1
       );
       this.scale = Math.max(MIN_SCALE, fitScale);
-      this.panX = pad + (vw - pad * 2 - this.layout.width * this.scale) / 2;
-      this.panY = pad + (vh - pad * 2 - this.layout.height * this.scale) / 2;
+      this.panX = pad + (vw - pad * 2 - this.displayLayout.width * this.scale) / 2;
+      this.panY = pad + (vh - pad * 2 - this.displayLayout.height * this.scale) / 2;
     },
     horizontalBezierPath(from, to) {
       const dx = Math.max(56, Math.abs(to.x - from.x) * 0.5);
@@ -546,14 +733,89 @@ export default {
   top: 0;
   left: 0;
   z-index: 2;
+}
+
+.pipeline-node-active {
+  z-index: 5;
+}
+
+.pipeline-node-active .pipeline-node-card {
+  border-color: rgba(52, 211, 153, 0.55);
+  box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.25), 0 6px 16px rgba(0, 0, 0, 0.45);
+}
+
+.pipeline-node-body {
   display: flex;
-  align-items: center;
+  align-items: stretch;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.pipeline-node-inner {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin: 0 6px;
+}
+
+.pipeline-node-head {
+  flex-shrink: 0;
+  padding: 5px 8px 2px;
+  cursor: grab;
+  border-radius: 6px 6px 0 0;
+}
+
+.pipeline-node-head:active {
+  cursor: grabbing;
+}
+
+.pipeline-node-resize {
+  position: absolute;
+  z-index: 4;
+  touch-action: none;
+}
+
+.pipeline-node-resize-e {
+  top: 18px;
+  right: 0;
+  width: 7px;
+  bottom: 10px;
+  cursor: ew-resize;
+}
+
+.pipeline-node-resize-s {
+  left: 8px;
+  right: 10px;
+  bottom: 0;
+  height: 7px;
+  cursor: ns-resize;
+}
+
+.pipeline-node-resize-se {
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+  border-bottom-right-radius: 6px;
+  background: linear-gradient(
+    135deg,
+    transparent 0 42%,
+    rgba(52, 211, 153, 0.35) 42% 100%
+  );
+}
+
+.pipeline-node-resize:hover {
+  background-color: rgba(52, 211, 153, 0.15);
 }
 
 .pipeline-node-card {
   flex: 1;
   min-width: 0;
-  margin: 0 6px;
+  min-height: 0;
   padding: 6px 8px;
   border-radius: 8px;
   border: 1px solid rgba(71, 85, 105, 0.65);
@@ -587,6 +849,9 @@ export default {
 
 .pipeline-shell:not(.pipeline-shell-mobile) .pipeline-node-card {
   padding: 8px 10px;
+}
+
+.pipeline-shell:not(.pipeline-shell-mobile) .pipeline-node-inner {
   margin: 0 8px;
 }
 
@@ -673,5 +938,12 @@ export default {
 
 .pipeline-shell-mobile .pipeline-node-card-scroll {
   max-height: 120px;
+}
+</style>
+
+<style>
+body.pipeline-node-gesturing {
+  user-select: none;
+  -webkit-user-select: none;
 }
 </style>
