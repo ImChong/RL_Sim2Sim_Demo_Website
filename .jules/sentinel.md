@@ -16,3 +16,8 @@
 **Vulnerability:** Broad `unsafe-eval` in CSP.
 **Learning:** The application uses WebAssembly (WASM) for MuJoCo and ONNX, which requires evaluation permissions. Using `unsafe-eval` grants permission to evaluate standard JavaScript strings as well, increasing XSS risks. `wasm-unsafe-eval` is a safer modern alternative that permits WASM evaluation while continuing to block regular JS `eval()`.
 **Prevention:** Use `wasm-unsafe-eval` instead of `unsafe-eval` in Content Security Policies when evaluation is only needed for WebAssembly modules.
+
+## 2026-05-24 - [Emscripten CSP Requires unsafe-eval on Mobile Safari]
+**Vulnerability:** Simulation failed to load on iOS/mobile with `EvalError` under CSP (`wasm-unsafe-eval` only).
+**Learning:** MuJoCo and ONNX Runtime Web ship Emscripten glue that calls `new Function()` at runtime. `wasm-unsafe-eval` alone does not satisfy that path; Safari on iOS enforces the restriction strictly. Keep both `'unsafe-eval'` and `'wasm-unsafe-eval'` in `script-src` until dependencies stop using dynamic function construction.
+**Prevention:** When adopting stricter CSP for WASM apps, verify on mobile Safari—not only desktop Chrome—before removing `'unsafe-eval'`.
