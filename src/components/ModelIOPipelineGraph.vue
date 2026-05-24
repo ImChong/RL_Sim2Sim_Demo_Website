@@ -49,7 +49,6 @@
           <div
             v-for="node in layout.nodes"
             :key="node.id"
-            :ref="(el) => setNodeRef(node.id, el)"
             class="pipeline-node"
             :class="[
               `pipeline-node-${node.kind}`,
@@ -91,7 +90,7 @@
 
 <script>
 import { buildPipelineGraph } from '@/simulation/pipelineGraphLayout.js';
-import { portPointInCanvasSpace } from '@/simulation/pipelineGraphEdgeCoords.js';
+import { portPointFromLayoutNode } from '@/simulation/pipelineGraphEdgeCoords.js';
 
 let graphInstanceCounter = 0;
 
@@ -137,8 +136,6 @@ export default {
     }
   },
   data: () => ({
-    nodeRefs: {},
-    renderedEdges: [],
     resizeObserver: null,
     arrowMarkerId: `pipeline-arrow-${++graphInstanceCounter}`,
     panX: 0,
@@ -179,55 +176,59 @@ export default {
         width: `${this.layout.width}px`,
         height: `${this.layout.height}px`
       };
+    },
+    nodeById() {
+      return new Map(this.layout.nodes.map((node) => [node.id, node]));
+    },
+    renderedEdges() {
+      const portPoint = (nodeId, side) =>
+        portPointFromLayoutNode(this.nodeById.get(nodeId), side);
+
+      return this.layout.edges
+        .map((edge) => {
+          const from = portPoint(edge.from, 'out');
+          const to = portPoint(edge.to, 'in');
+          if (!from || !to) {
+            return null;
+          }
+          return {
+            id: edge.id,
+            d: this.horizontalBezierPath(from, to)
+          };
+        })
+        .filter(Boolean);
     }
   },
   watch: {
     layout: {
       handler() {
-        this.scheduleEdgeUpdate();
         this.scheduleViewportFit();
       },
       deep: true
     },
-    live() {
-      this.scheduleEdgeUpdate();
-    },
     isMobile() {
       this.userHasGestured = false;
       this.scheduleViewportFit();
-      this.scheduleEdgeUpdate();
     }
   },
   mounted() {
     this.resizeObserver = new ResizeObserver(() => {
-      this.scheduleEdgeUpdate();
       this.scheduleViewportFit();
     });
     if (this.$refs.viewport) {
       this.resizeObserver.observe(this.$refs.viewport);
     }
     this.setupInteractionHandlers();
-    this.scheduleEdgeUpdate();
     this.scheduleViewportFit();
   },
   beforeUnmount() {
     this.teardownInteractionHandlers();
     this.resizeObserver?.disconnect();
-    if (this._edgeRaf) {
-      cancelAnimationFrame(this._edgeRaf);
-    }
     if (this._fitRaf) {
       cancelAnimationFrame(this._fitRaf);
     }
   },
   methods: {
-    setNodeRef(id, el) {
-      if (el) {
-        this.nodeRefs[id] = el;
-      } else {
-        delete this.nodeRefs[id];
-      }
-    },
     shouldIgnorePanStart(target) {
       return Boolean(target?.closest?.('.pipeline-node-card-scroll'));
     },
@@ -287,7 +288,6 @@ export default {
       this.panX = clientX - rect.left - focalX * clamped;
       this.panY = clientY - rect.top - focalY * clamped;
       this.markUserGestured();
-      this.scheduleEdgeUpdate();
     },
     handleWheel(e) {
       if (!this.$refs.viewport?.contains(e.target)) {
@@ -320,7 +320,6 @@ export default {
       this.panX = this.gesture.startPanX + (e.clientX - this.gesture.startX);
       this.panY = this.gesture.startPanY + (e.clientY - this.gesture.startY);
       this.markUserGestured();
-      this.scheduleEdgeUpdate();
     },
     handleMouseUp() {
       if (!this.isDragging) {
@@ -372,7 +371,6 @@ export default {
         this.panX = this.gesture.startPanX + (touches[0].clientX - this.gesture.startX);
         this.panY = this.gesture.startPanY + (touches[0].clientY - this.gesture.startY);
         this.markUserGestured();
-        this.scheduleEdgeUpdate();
         return;
       }
       if (touches.length >= 2) {
@@ -399,7 +397,6 @@ export default {
         this.panX = center.x - this.gesture.rectLeft - this.gesture.focalX * nextScale;
         this.panY = center.y - this.gesture.rectTop - this.gesture.focalY * nextScale;
         this.markUserGestured();
-        this.scheduleEdgeUpdate();
       }
     },
     handleTouchEnd(e) {
@@ -451,49 +448,6 @@ export default {
       this.scale = Math.max(MIN_SCALE, fitScale);
       this.panX = pad + (vw - pad * 2 - this.layout.width * this.scale) / 2;
       this.panY = pad + (vh - pad * 2 - this.layout.height * this.scale) / 2;
-      this.scheduleEdgeUpdate();
-    },
-    scheduleEdgeUpdate() {
-      if (this._edgeRaf) {
-        cancelAnimationFrame(this._edgeRaf);
-      }
-      this._edgeRaf = requestAnimationFrame(() => {
-        this._edgeRaf = null;
-        this.$nextTick(() => this.updateEdges());
-      });
-    },
-    updateEdges() {
-      const canvas = this.$el?.querySelector('.pipeline-canvas');
-      if (!canvas) {
-        this.renderedEdges = [];
-        return;
-      }
-      const canvasRect = canvas.getBoundingClientRect();
-      const portPoint = (nodeId, side) => {
-        const el = this.nodeRefs[nodeId];
-        if (!el) {
-          return null;
-        }
-        const selector = side === 'out' ? '.pipeline-port-out' : '.pipeline-port-in';
-        const port = el.querySelector(selector);
-        const target = port ?? el;
-        const r = target.getBoundingClientRect();
-        return portPointInCanvasSpace(canvasRect, r, side, this.scale);
-      };
-
-      this.renderedEdges = this.layout.edges
-        .map((edge) => {
-          const from = portPoint(edge.from, 'out');
-          const to = portPoint(edge.to, 'in');
-          if (!from || !to) {
-            return null;
-          }
-          return {
-            id: edge.id,
-            d: this.horizontalBezierPath(from, to)
-          };
-        })
-        .filter(Boolean);
     },
     horizontalBezierPath(from, to) {
       const dx = Math.max(40, Math.abs(to.x - from.x) * 0.45);
