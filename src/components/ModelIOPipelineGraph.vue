@@ -27,10 +27,10 @@
             <defs>
               <marker
                 :id="arrowMarkerId"
-                markerWidth="8"
-                markerHeight="8"
-                refX="7"
-                refY="4"
+                markerWidth="10"
+                markerHeight="10"
+                refX="8"
+                refY="5"
                 orient="auto"
               >
                 <path d="M0,0 L8,4 L0,8 Z" fill="context-stroke" />
@@ -165,8 +165,8 @@ export default {
         return null;
       }
       return {
-        minHeight: '240px',
-        maxHeight: 'min(48vh, 420px)'
+        flex: '1 1 auto',
+        minHeight: '280px'
       };
     },
     transformStyle() {
@@ -450,7 +450,7 @@ export default {
       this.panY = pad + (vh - pad * 2 - this.layout.height * this.scale) / 2;
     },
     horizontalBezierPath(from, to) {
-      const dx = Math.max(40, Math.abs(to.x - from.x) * 0.45);
+      const dx = Math.max(56, Math.abs(to.x - from.x) * 0.5);
       const c1x = from.x + dx;
       const c2x = to.x - dx;
       return `M ${from.x} ${from.y} C ${c1x} ${from.y}, ${c2x} ${to.y}, ${to.x} ${to.y}`;
@@ -572,11 +572,38 @@ export default {
   border-color: rgba(52, 211, 153, 0.35);
 }
 
+.pipeline-shell:not(.pipeline-shell-mobile) .pipeline-node-title {
+  font-size: 0.8rem;
+}
+
+.pipeline-shell:not(.pipeline-shell-mobile) .pipeline-node-subtitle {
+  font-size: 0.68rem;
+}
+
+.pipeline-shell:not(.pipeline-shell-mobile) .pipeline-node-line {
+  font-size: 0.68rem;
+  margin-top: 4px;
+}
+
+.pipeline-shell:not(.pipeline-shell-mobile) .pipeline-node-card {
+  padding: 8px 10px;
+  margin: 0 8px;
+}
+
+.pipeline-shell:not(.pipeline-shell-mobile) .pipeline-port {
+  width: 10px;
+  height: 10px;
+}
+
+.pipeline-shell:not(.pipeline-shell-mobile) .pipeline-node-card-scroll {
+  max-height: 200px;
+}
+
 .pipeline-node-title {
   font-size: 0.72rem;
   font-weight: 700;
   color: #e2e8f0;
-  line-height: 1.2;
+  line-height: 1.25;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -585,7 +612,7 @@ export default {
 .pipeline-node-subtitle {
   font-size: 0.62rem;
   color: #94a3b8;
-  margin-top: 1px;
+  margin-top: 2px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -593,11 +620,11 @@ export default {
 
 .pipeline-node-line {
   display: flex;
-  gap: 4px;
+  gap: 6px;
   margin-top: 3px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.6rem;
-  line-height: 1.25;
+  line-height: 1.3;
 }
 
 .pipeline-shell-mobile .pipeline-node-title {
