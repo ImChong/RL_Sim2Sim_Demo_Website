@@ -290,6 +290,8 @@ export default {
       const clamped = clampPanelSize(w, h);
       this.panelWidth = clamped.width;
       this.panelHeight = clamped.height;
+      const cursor = edge === 'e' ? 'ew-resize' : edge === 's' ? 'ns-resize' : 'nwse-resize';
+      document.body.style.cursor = cursor;
     },
     endPanelResize() {
       if (!this.panelResize) {
@@ -299,6 +301,7 @@ export default {
       document.removeEventListener('mousemove', this._onPanelResizeMove);
       document.removeEventListener('mouseup', this._onPanelResizeEnd);
       document.body.classList.remove('model-io-panel-resizing');
+      document.body.style.cursor = '';
       savePanelSize(this.panelWidth, this.panelHeight);
     },
     startPoll() {
