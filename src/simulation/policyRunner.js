@@ -186,9 +186,18 @@ export class PolicyRunner {
       }
       this._bindPolicyTensor();
 
-      const [result, carry] = await this.module.runInference(this.inputDict);
-      if (carry && Object.keys(carry).length > 0) {
-        Object.assign(this.inputDict, carry);
+      const inferenceOutput = await this.module.runInference(this.inputDict);
+      // Bolt: Avoid array destructuring in hot path to prevent iterator allocation overhead
+      const result = inferenceOutput[0];
+      const carry = inferenceOutput[1];
+
+      if (carry) {
+        // Bolt: Iterate manually instead of Object.keys(carry).length > 0 to avoid array allocation
+        for (const key in carry) {
+          if (Object.prototype.hasOwnProperty.call(carry, key)) {
+            this.inputDict[key] = carry[key];
+          }
+        }
       }
 
       const action = result['action']?.data;
@@ -197,17 +206,35 @@ export class PolicyRunner {
       }
 
       this.lastRawAction.set(action);
-      this.lastExtraOutputs = {};
-      for (const key of Object.keys(result)) {
-        if (key === 'action') {
+
+      // Bolt: Update telemetry in-place to avoid allocating a new object and new arrays per tick
+      this.lastExtraOutputs ??= {};
+
+      for (const key in result) {
+        if (key === 'action' || !Object.prototype.hasOwnProperty.call(result, key)) {
           continue;
         }
         const tensor = result[key];
         if (tensor?.data) {
-          this.lastExtraOutputs[key] = {
-            dims: tensor.dims ? [...tensor.dims] : [],
-            preview: Array.from(tensor.data.subarray(0, Math.min(6, tensor.data.length)))
-          };
+          if (!this.lastExtraOutputs[key]) {
+            this.lastExtraOutputs[key] = { dims: [], preview: [] };
+          }
+          const outputKey = this.lastExtraOutputs[key];
+
+          if (tensor.dims) {
+            outputKey.dims.length = tensor.dims.length;
+            for (let i = 0; i < tensor.dims.length; i++) {
+              outputKey.dims[i] = tensor.dims[i];
+            }
+          } else {
+            outputKey.dims.length = 0;
+          }
+
+          const previewLen = Math.min(6, tensor.data.length);
+          outputKey.preview.length = previewLen;
+          for (let i = 0; i < previewLen; i++) {
+            outputKey.preview[i] = tensor.data[i];
+          }
         }
       }
 
