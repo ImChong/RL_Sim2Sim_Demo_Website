@@ -37,12 +37,11 @@ function jointLines(jointNames, values, max = Infinity) {
   return lines;
 }
 
-function nodeHeight(lineCount, scrollable = false) {
-  if (scrollable) {
-    const visibleLines = Math.min(lineCount, 6);
-    return Math.max(96, 36 + visibleLines * 14);
-  }
-  return Math.max(56, 36 + lineCount * 14);
+function nodeHeight(lineCount) {
+  const HEAD = 38;
+  const CARD_PAD_V = 16;
+  const LINE = 14;
+  return Math.max(60, HEAD + CARD_PAD_V + lineCount * LINE);
 }
 
 function decomposeObsBlock(block, slice, jointNames, lang) {
@@ -217,11 +216,9 @@ export function buildAtomicNodes(runner, state, obsVector, obsLayout, lang = 'zh
 
   const push = (spec) => {
     const lines = spec.lines ?? [];
-    const scrollable = Boolean(spec.scrollable);
     nodes.push({
-      width: spec.kind === 'joints' ? 200 : 160,
-      height: nodeHeight(lines.length, scrollable),
-      scrollable,
+      width: spec.kind === 'joints' ? 248 : 184,
+      height: nodeHeight(lines.length),
       ...spec
     });
   };
@@ -315,7 +312,7 @@ export function buildAtomicNodes(runner, state, obsVector, obsLayout, lang = 'zh
       title: zh ? '关节相对化' : 'Joint relative',
       subtitle: zh ? 'q − default' : 'q − default',
       lines: jointLines(jointNames, runner.cachedJointPosRel),
-      scrollable: true
+      width: 248
     });
   }
 

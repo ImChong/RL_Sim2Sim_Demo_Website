@@ -53,12 +53,12 @@ export function mergeNodeLayout(baseNodes, overrides = {}) {
  * @param {Array<{ x?: number, y?: number, width?: number, height?: number }>} nodes
  * @param {{ width?: number, height?: number }} [fallback]
  */
-export function computeGraphBounds(nodes, fallback = {}, padding = 28) {
+export function computeGraphBounds(nodes, fallback = {}, padding = 32) {
   let maxX = 0;
   let maxY = 0;
   for (const node of nodes) {
-    maxX = Math.max(maxX, (node.x ?? 0) + (node.width ?? 160));
-    maxY = Math.max(maxY, (node.y ?? 0) + (node.height ?? 56));
+    maxX = Math.max(maxX, (node.x ?? 0) + (node.width ?? 184));
+    maxY = Math.max(maxY, (node.y ?? 0) + (node.height ?? 60));
   }
   return {
     width: Math.max(fallback.width ?? 0, maxX + padding, 480),

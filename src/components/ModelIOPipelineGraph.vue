@@ -82,10 +82,7 @@
                     :title="node.subtitle"
                   >{{ node.subtitle }}</div>
                 </div>
-                <div
-                  class="pipeline-node-card"
-                  :class="{ 'pipeline-node-card-scroll': node.scrollable }"
-                >
+                <div class="pipeline-node-card">
                   <div v-for="(line, idx) in node.lines" :key="idx" class="pipeline-node-line">
                     <span class="pipeline-node-key" :title="line.k">{{ line.k }}</span>
                     <span class="pipeline-node-val" :title="line.v">{{ line.v }}</span>
@@ -97,24 +94,6 @@
                 aria-hidden="true"
               />
             </div>
-            <span
-              class="pipeline-node-resize pipeline-node-resize-e"
-              aria-hidden="true"
-              @mousedown.stop="onNodeResizeStart(node.id, 'e', $event)"
-              @touchstart.stop="onNodeResizeStart(node.id, 'e', $event)"
-            />
-            <span
-              class="pipeline-node-resize pipeline-node-resize-s"
-              aria-hidden="true"
-              @mousedown.stop="onNodeResizeStart(node.id, 's', $event)"
-              @touchstart.stop="onNodeResizeStart(node.id, 's', $event)"
-            />
-            <span
-              class="pipeline-node-resize pipeline-node-resize-se"
-              aria-hidden="true"
-              @mousedown.stop="onNodeResizeStart(node.id, 'se', $event)"
-              @touchstart.stop="onNodeResizeStart(node.id, 'se', $event)"
-            />
           </div>
         </div>
       </div>
@@ -126,7 +105,6 @@
 import { buildPipelineGraph } from '@/simulation/pipelineGraphLayout.js';
 import { portPointFromLayoutNode } from '@/simulation/pipelineGraphEdgeCoords.js';
 import {
-  clampNodeSize,
   computeGraphBounds,
   graphLayoutKey,
   loadNodeOverrides,
@@ -201,12 +179,12 @@ export default {
     scrollHint() {
       if (this.isMobile) {
         return this.language === 'en'
-          ? 'Drag title to move node · Drag border to resize · Pinch to zoom canvas'
-          : '拖标题移动节点 · 拖边框缩放 · 双指缩放画布';
+          ? 'Drag title to move node · Drag canvas to pan · Pinch to zoom'
+          : '拖标题移动节点 · 拖空白平移画布 · 双指缩放';
       }
       return this.language === 'en'
-        ? 'Drag title to move node · Drag border to resize · Drag canvas to pan · Wheel to zoom'
-        : '拖标题移动节点 · 拖边框缩放 · 拖空白平移 · 滚轮缩放';
+        ? 'Drag title to move node · Drag canvas to pan · Wheel to zoom'
+        : '拖标题移动节点 · 拖空白平移画布 · 滚轮缩放';
     },
     viewportStyle() {
       if (this.isMobile) {
@@ -297,11 +275,7 @@ export default {
   },
   methods: {
     shouldIgnorePanStart(target) {
-      return Boolean(
-        target?.closest?.('.pipeline-node-card-scroll')
-          || target?.closest?.('.pipeline-node-head')
-          || target?.closest?.('.pipeline-node-resize')
-      );
+      return Boolean(target?.closest?.('.pipeline-node-head'));
     },
     clientPoint(event) {
       if (event.touches?.length) {
@@ -361,25 +335,6 @@ export default {
       this.attachNodeGestureListeners();
       event.preventDefault();
     },
-    onNodeResizeStart(nodeId, edge, event) {
-      const node = this.nodeById.get(nodeId);
-      if (!node) {
-        return;
-      }
-      const point = this.clientPoint(event);
-      this.activeNodeId = nodeId;
-      this.nodeGesture = {
-        mode: 'resize',
-        edge,
-        nodeId,
-        startClientX: point.x,
-        startClientY: point.y,
-        startW: node.width,
-        startH: node.height
-      };
-      this.attachNodeGestureListeners();
-      event.preventDefault();
-    },
     onNodeGestureMove(event) {
       if (!this.nodeGesture) {
         return;
@@ -387,25 +342,12 @@ export default {
       const point = this.clientPoint(event);
       const dx = (point.x - this.nodeGesture.startClientX) / this.scale;
       const dy = (point.y - this.nodeGesture.startClientY) / this.scale;
-      const { mode, nodeId, edge } = this.nodeGesture;
+      const { nodeId } = this.nodeGesture;
 
-      if (mode === 'move') {
-        this.setNodeOverride(nodeId, {
-          x: Math.round(this.nodeGesture.startX + dx),
-          y: Math.round(this.nodeGesture.startY + dy)
-        });
-      } else if (mode === 'resize') {
-        let width = this.nodeGesture.startW;
-        let height = this.nodeGesture.startH;
-        if (edge.includes('e')) {
-          width = this.nodeGesture.startW + dx;
-        }
-        if (edge.includes('s')) {
-          height = this.nodeGesture.startH + dy;
-        }
-        const clamped = clampNodeSize(width, height);
-        this.setNodeOverride(nodeId, clamped);
-      }
+      this.setNodeOverride(nodeId, {
+        x: Math.round(this.nodeGesture.startX + dx),
+        y: Math.round(this.nodeGesture.startY + dy)
+      });
 
       this.markUserGestured();
       event.preventDefault();
@@ -478,15 +420,6 @@ export default {
     handleWheel(e) {
       if (!this.$refs.viewport?.contains(e.target)) {
         return;
-      }
-      const scrollable = e.target?.closest?.('.pipeline-node-card-scroll');
-      if (scrollable && !e.ctrlKey && !e.metaKey) {
-        const canScrollUp = scrollable.scrollTop > 0;
-        const canScrollDown =
-          scrollable.scrollTop < scrollable.scrollHeight - scrollable.clientHeight - 1;
-        if ((e.deltaY < 0 && canScrollUp) || (e.deltaY > 0 && canScrollDown)) {
-          return;
-        }
       }
       e.preventDefault();
       const factor = e.deltaY < 0 ? WHEEL_ZOOM_FACTOR : 1 / WHEEL_ZOOM_FACTOR;
@@ -787,46 +720,6 @@ export default {
   cursor: grabbing;
 }
 
-.pipeline-node-resize {
-  position: absolute;
-  z-index: 4;
-  touch-action: none;
-}
-
-.pipeline-node-resize-e {
-  top: 18px;
-  right: 0;
-  width: 7px;
-  bottom: 10px;
-  cursor: ew-resize;
-}
-
-.pipeline-node-resize-s {
-  left: 8px;
-  right: 10px;
-  bottom: 0;
-  height: 7px;
-  cursor: ns-resize;
-}
-
-.pipeline-node-resize-se {
-  right: 0;
-  bottom: 0;
-  width: 14px;
-  height: 14px;
-  cursor: nwse-resize;
-  border-bottom-right-radius: 6px;
-  background: linear-gradient(
-    135deg,
-    transparent 0 42%,
-    rgba(52, 211, 153, 0.35) 42% 100%
-  );
-}
-
-.pipeline-node-resize:hover {
-  background-color: rgba(52, 211, 153, 0.15);
-}
-
 .pipeline-node-card {
   flex: 1;
   min-width: 0;
@@ -837,6 +730,7 @@ export default {
   background: linear-gradient(180deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
   cursor: default;
+  user-select: text;
 }
 
 .pipeline-node-live .pipeline-node-card {
@@ -875,18 +769,12 @@ export default {
   height: 10px;
 }
 
-.pipeline-shell:not(.pipeline-shell-mobile) .pipeline-node-card-scroll {
-  max-height: 200px;
-}
-
 .pipeline-node-title {
   font-size: 0.72rem;
   font-weight: 700;
   color: #e2e8f0;
   line-height: 1.25;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .pipeline-node-subtitle {
@@ -894,8 +782,8 @@ export default {
   color: #94a3b8;
   margin-top: 2px;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  word-break: break-all;
 }
 
 .pipeline-node-line {
@@ -917,11 +805,9 @@ export default {
 
 .pipeline-node-key {
   color: #64748b;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 0 1 auto;
   min-width: 0;
-  flex: 1 1 auto;
 }
 
 .pipeline-node-val {
@@ -929,7 +815,7 @@ export default {
   white-space: nowrap;
   flex-shrink: 0;
   margin-left: auto;
-  padding-left: 4px;
+  padding-left: 8px;
 }
 
 .pipeline-port {
@@ -947,19 +833,6 @@ export default {
   box-shadow: 0 0 6px rgba(52, 211, 153, 0.5);
 }
 
-.pipeline-node-card-scroll {
-  max-height: 140px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-  cursor: auto;
-  user-select: text;
-  touch-action: pan-y;
-}
-
-.pipeline-shell-mobile .pipeline-node-card-scroll {
-  max-height: 120px;
-}
 </style>
 
 <style>
