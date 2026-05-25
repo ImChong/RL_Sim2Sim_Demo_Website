@@ -27,6 +27,7 @@ This is a **purely client-side SPA** (Vue 3 + Vite + Three.js + MuJoCo WASM + ON
 
 ### Notes for cloud agents
 
+- Humanoid control papers and demo mappings live in [`docs/knowledge/`](docs/knowledge/) (`sources.json` + digests). Run `npm test` includes a check that `sources.json` stays valid.
 - Node.js >= 20 is required. The VM ships with v22 which is fine.
 - Both `package-lock.json` and `pnpm-lock.yaml` exist; use **npm** (matches README and CI).
 - No ESLint or Prettier is configured; there is no lint command.

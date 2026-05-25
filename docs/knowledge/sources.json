@@ -1,0 +1,128 @@
+{
+  "version": 1,
+  "updated": "2026-05-25",
+  "primary": [
+    {
+      "id": "sdamp-2605.18611",
+      "shortName": "SDAMP",
+      "title": "Unified Walking, Running, and Recovery for Humanoids via State-Dependent Adversarial Motion Priors",
+      "authors": [
+        "Yidan Lu",
+        "Yichao Zhong",
+        "Liu Zhao",
+        "Wanyue Li",
+        "Peng Lu"
+      ],
+      "affiliation": "The University of Hong Kong",
+      "year": 2026,
+      "arxivId": "2605.18611",
+      "urls": {
+        "html": "https://arxiv.org/html/2605.18611v1",
+        "abs": "https://arxiv.org/abs/2605.18611",
+        "pdf": "https://arxiv.org/pdf/2605.18611"
+      },
+      "keywords": [
+        "AMP",
+        "Unitree G1",
+        "locomotion",
+        "fall recovery",
+        "LAFAN1",
+        "state-dependent discriminator"
+      ],
+      "repoLinks": [
+        {
+          "label": "AMP_mjlab（本 demo AMP 策略训练来源）",
+          "url": "https://github.com/ccrpRepo/AMP_mjlab"
+        }
+      ],
+      "demoMapping": {
+        "policy": "public/examples/checkpoints/g1/amp_policy_walk_run_getup.json",
+        "onnx": "public/examples/checkpoints/g1/walk_run_getup/model_60000.onnx",
+        "scene": "public/examples/scenes/g1_amp/scene_g1.xml",
+        "referenceMotions": [
+          "walk1_subject1",
+          "run1_subject2",
+          "fallAndGetUp2_subject2"
+        ]
+      },
+      "bibtex": "@article{lu2026sdamp,\n  title={Unified Walking, Running, and Recovery for Humanoids via State-Dependent Adversarial Motion Priors},\n  author={Lu, Yidan and Zhong, Yichao and Zhao, Liu and Li, Wanyue and Lu, Peng},\n  journal={arXiv preprint arXiv:2605.18611},\n  year={2026}\n}"
+    },
+    {
+      "id": "heracles-2603.27756",
+      "shortName": "Heracles",
+      "title": "Heracles: Bridging Precise Tracking and Generative Synthesis for General Humanoid Control",
+      "authors": ["X-Humanoid Heracles Project Team"],
+      "year": 2026,
+      "arxivId": "2603.27756",
+      "urls": {
+        "abs": "https://arxiv.org/abs/2603.27756",
+        "pdf": "https://arxiv.org/pdf/2603.27756",
+        "html": "https://arxiv.org/html/2603.27756v1",
+        "project": "https://heracles-humanoid-control.github.io/"
+      },
+      "keywords": [
+        "motion tracking",
+        "diffusion",
+        "flow matching",
+        "recovery",
+        "middleware",
+        "general humanoid control"
+      ],
+      "repoLinks": [
+        {
+          "label": "项目主页（代码 Coming Soon）",
+          "url": "https://heracles-humanoid-control.github.io/"
+        }
+      ],
+      "demoMapping": {
+        "policy": "public/examples/checkpoints/g1/tracking_policy_latest.json",
+        "onnx": "public/examples/checkpoints/g1/tracking/policy_latest.onnx",
+        "scene": "public/examples/scenes/g1/g1.xml",
+        "note": "本仓库为底层 tracking 策略 sim2sim；Heracles 扩散中间层未集成"
+      },
+      "bibtex": "@misc{heracles2026,\n  title={Heracles: Bridging Precise Tracking and Generative Synthesis for General Humanoid Control},\n  author={{X-Humanoid Heracles Project Team}},\n  year={2026},\n  eprint={2603.27756},\n  archivePrefix={arXiv},\n  primaryClass={cs.RO},\n  url={https://arxiv.org/abs/2603.27756}\n}"
+    }
+  ],
+  "related": [
+    {
+      "id": "amp-peng2021",
+      "title": "AMP: Adversarial Motion Priors for Stylized Physics-Based Character Control",
+      "year": 2021,
+      "urls": { "abs": "https://arxiv.org/abs/2104.02180" },
+      "relation": "SDAMP 的基线方法；本 demo AMP 策略命名与奖励结构均源于 AMP 族"
+    },
+    {
+      "id": "deepmimic-peng2018",
+      "title": "DeepMimic: Example-Guided Deep Reinforcement Learning of Physics-Based Character Skills",
+      "year": 2018,
+      "urls": { "doi": "https://doi.org/10.1145/3197517.3201311" },
+      "relation": "Heracles 底层跟踪与运动模仿范式的先驱"
+    },
+    {
+      "id": "lafan1-harvey2020",
+      "title": "Robust motion in-betweening (LAFAN1)",
+      "year": 2020,
+      "urls": { "doi": "https://doi.org/10.1145/3386569.3392392" },
+      "relation": "SDAMP 三条参考动作来源；本仓库 motions 目录含对应 retarget 片段"
+    },
+    {
+      "id": "isaac-lab-mittal2023",
+      "title": "Orbit / Isaac Lab unified simulation for robot learning",
+      "year": 2023,
+      "urls": { "doi": "https://doi.org/10.1109/LRA.2023.3276203" },
+      "relation": "SDAMP 训练环境（论文 §IV-A）"
+    },
+    {
+      "id": "amp-mjlab",
+      "title": "AMP_mjlab",
+      "urls": { "repo": "https://github.com/ccrpRepo/AMP_mjlab" },
+      "relation": "本 demo 默认 AMP ONNX 的导出与训练仓库（见 amp_policy_walk_run_getup.json onnx.source）"
+    },
+    {
+      "id": "humanoid-policy-viewer",
+      "title": "humanoid-policy-viewer（上游）",
+      "urls": { "repo": "https://github.com/Axellwppr/humanoid-policy-viewer" },
+      "relation": "本仓库 fork 改造的浏览器 MuJoCo + ONNX 查看器基座"
+    }
+  ]
+}

@@ -23,7 +23,11 @@ npm install
 npm run dev
 ```
 
+## 知识库
+人形控制相关论文与资料的消化笔记、原始链接及与本 demo 的映射见 **[`docs/knowledge/`](./docs/knowledge/)**（含 arXiv:2605.18611 SDAMP、arXiv:2603.27756 Heracles）。
+
 ## 项目结构
+- `docs/knowledge/`：论文与相关资料的知识库（`sources.json` + 中文 digest）
 - `src/views/Demo.vue`：演示页面的主要 UI 控件
 - `src/simulation/main.js`：MuJoCo、Three.js 渲染与 policy loop 的启动入口
 - `src/simulation/mujocoUtils.js`：场景 / policy 加载工具与 MuJoCo 文件预加载逻辑

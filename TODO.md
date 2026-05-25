@@ -15,6 +15,8 @@
     - [ ] 将 **AMP_mjlab** 的训练结果集成部署到本网页，并验证推理性能。
 
 ## 🧠 模型训练与学习
+- [x] **知识库：SDAMP / Heracles 论文消化**
+    - [x] 见 [`docs/knowledge/`](docs/knowledge/)：原始链接、`sources.json`、中文 digest 与 sim2sim 映射表。
 - [ ] **学习拟人行走与多算法训练**
     - [ ] 深入研究 [unitree_rl_mjlab](https://github.com/unitreerobotics/unitree_rl_mjlab) 的奖励函数设计与课程学习应用（如走跑切换）。
     - [ ] 复现 [AMP_mjlab](https://github.com/ccrpRepo/AMP_mjlab) 算法，通过对抗运动先验提升机器人动作的拟人度。
