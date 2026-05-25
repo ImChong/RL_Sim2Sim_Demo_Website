@@ -10,6 +10,23 @@
       :style="viewportStyle"
     >
       <div
+        v-if="displayLayout.lanes && displayLayout.lanes.length"
+        class="pipeline-lane-headers"
+        aria-hidden="true"
+      >
+        <div
+          v-for="lane in displayLayout.lanes"
+          :key="`lane-header-${lane.id}`"
+          class="pipeline-lane-header"
+          :style="{
+            left: `${lane.x * scale + panX}px`,
+            width: `${lane.width * scale}px`
+          }"
+        >
+          <span class="pipeline-lane-header-text">{{ lane.label }}</span>
+        </div>
+      </div>
+      <div
         class="pipeline-transform"
         :style="transformStyle"
       >
@@ -18,6 +35,18 @@
           :style="{ width: `${displayLayout.width}px`, height: `${displayLayout.height}px` }"
         >
           <div class="pipeline-grid" aria-hidden="true" />
+          <div
+            v-for="(lane, idx) in displayLayout.lanes"
+            :key="`lane-${lane.id}`"
+            class="pipeline-lane"
+            :class="[`pipeline-lane-${lane.id}`, { 'pipeline-lane-alt': idx % 2 === 1 }]"
+            :style="{
+              transform: `translate(${lane.x}px, 0)`,
+              width: `${lane.width}px`,
+              height: `${displayLayout.height}px`
+            }"
+            aria-hidden="true"
+          />
           <svg
             class="pipeline-edges"
             :width="displayLayout.width"
@@ -617,9 +646,67 @@ export default {
 .pipeline-viewport {
   max-width: 100%;
   border-radius: 10px;
-  border: 1px solid rgba(56, 189, 148, 0.15);
+  border: 1px solid rgba(var(--v-theme-primary), 0.2);
   background: #0b1018;
   overscroll-behavior: contain;
+}
+
+.pipeline-lane {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.018);
+  border-left: 1px dashed rgba(255, 255, 255, 0.06);
+}
+
+.pipeline-lane:first-of-type {
+  border-left: none;
+}
+
+.pipeline-lane-alt {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.pipeline-lane-headers {
+  position: absolute;
+  top: 8px;
+  left: 0;
+  right: 0;
+  height: 26px;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 4;
+}
+
+.pipeline-lane-header {
+  position: absolute;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  padding: 0 8px;
+  box-sizing: border-box;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.pipeline-lane-header-text {
+  display: inline-block;
+  max-width: 100%;
+  padding: 2px 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(11, 16, 24, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .pipeline-viewport-panzoom {
@@ -671,9 +758,9 @@ export default {
 }
 
 .pipeline-edge-active {
-  stroke: rgba(52, 211, 153, 0.85);
+  stroke: rgba(var(--v-theme-primary), 0.85);
   stroke-width: 2;
-  filter: drop-shadow(0 0 4px rgba(52, 211, 153, 0.35));
+  filter: drop-shadow(0 0 4px rgba(var(--v-theme-primary), 0.35));
 }
 
 .pipeline-node {
@@ -688,8 +775,8 @@ export default {
 }
 
 .pipeline-node-active .pipeline-node-card {
-  border-color: rgba(52, 211, 153, 0.55);
-  box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.25), 0 6px 16px rgba(0, 0, 0, 0.45);
+  border-color: rgba(var(--v-theme-primary), 0.55);
+  box-shadow: 0 0 0 1px rgba(var(--v-theme-primary), 0.25), 0 6px 16px rgba(0, 0, 0, 0.45);
 }
 
 .pipeline-node-body {
@@ -734,13 +821,13 @@ export default {
 }
 
 .pipeline-node-live .pipeline-node-card {
-  border-color: rgba(52, 211, 153, 0.45);
-  box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.12), 0 4px 14px rgba(0, 0, 0, 0.4);
+  border-color: rgba(var(--v-theme-primary), 0.45);
+  box-shadow: 0 0 0 1px rgba(var(--v-theme-primary), 0.12), 0 4px 14px rgba(0, 0, 0, 0.4);
 }
 
 .pipeline-node-warehouse .pipeline-node-card,
 .pipeline-node-model .pipeline-node-card {
-  border-color: rgba(52, 211, 153, 0.35);
+  border-color: rgba(var(--v-theme-primary), 0.35);
 }
 
 .pipeline-shell:not(.pipeline-shell-mobile) .pipeline-node-title {
@@ -811,7 +898,7 @@ export default {
 }
 
 .pipeline-node-val {
-  color: #a7f3d0;
+  color: rgba(var(--v-theme-primary), 0.95);
   white-space: nowrap;
   flex-shrink: 0;
   margin-left: auto;
@@ -829,9 +916,9 @@ export default {
 }
 
 .pipeline-node-live .pipeline-port {
-  border-color: #34d399;
-  background: #064e3b;
-  box-shadow: 0 0 6px rgba(52, 211, 153, 0.5);
+  border-color: rgba(var(--v-theme-primary), 0.9);
+  background: rgba(var(--v-theme-primary), 0.25);
+  box-shadow: 0 0 6px rgba(var(--v-theme-primary), 0.5);
 }
 
 </style>

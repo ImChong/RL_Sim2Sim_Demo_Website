@@ -48,10 +48,10 @@
     >
       <v-card-title class="model-io-title">
         <span>{{ t.panelTitle }}</span>
-        <v-chip v-if="telemetry.ready" size="x-small" color="success" variant="tonal">
+        <v-chip v-if="telemetry.ready" size="x-small" color="primary" variant="tonal">
           {{ t.live }}
         </v-chip>
-        <v-chip v-else size="x-small" color="warning" variant="tonal">
+        <v-chip v-else size="x-small" color="on-surface" variant="outlined">
           {{ t.waiting }}
         </v-chip>
         <v-spacer />

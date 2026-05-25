@@ -5,6 +5,8 @@ const ROW_GAP = 16;
 const ROW_GAP_MOBILE = 10;
 const MARGIN_X = 28;
 const MARGIN_Y = 22;
+const LANE_HEADER = 44;
+const LANE_PAD_X = 18;
 
 function colX(index, widths) {
   let x = MARGIN_X;
@@ -14,8 +16,8 @@ function colX(index, widths) {
   return x;
 }
 
-function stackColumn(nodes, x, gap = ROW_GAP) {
-  let y = MARGIN_Y;
+function stackColumn(nodes, x, gap = ROW_GAP, yStart = MARGIN_Y) {
+  let y = yStart;
   let maxW = 0;
   for (const node of nodes) {
     node.x = x;
@@ -24,6 +26,12 @@ function stackColumn(nodes, x, gap = ROW_GAP) {
     y += (node.height ?? 48) + gap;
   }
   return { height: y + MARGIN_Y, width: maxW };
+}
+
+function laneRange(startCol, endCol, colWidths) {
+  const xStart = colX(startCol, colWidths) - LANE_PAD_X;
+  const xEnd = colX(endCol, colWidths) + colWidths[endCol] + LANE_PAD_X;
+  return { x: xStart, width: xEnd - xStart };
 }
 
 function obsSourceId(obsNode, hasPrepRel) {
@@ -64,12 +72,12 @@ function cloneNodes(list) {
 export function buildPipelineGraph(telemetry, lang = 'zh', options = {}) {
   const zh = lang === 'zh';
   if (!telemetry?.ready) {
-    return { nodes: [], edges: [], width: 480, height: 200, layout: options.layout ?? 'horizontal' };
+    return { nodes: [], edges: [], lanes: [], width: 480, height: 200, layout: options.layout ?? 'horizontal' };
   }
 
   const atomic = telemetry.atomicNodes ?? [];
   if (atomic.length === 0) {
-    return { nodes: [], edges: [], width: 480, height: 200, layout: options.layout ?? 'horizontal' };
+    return { nodes: [], edges: [], lanes: [], width: 480, height: 200, layout: options.layout ?? 'horizontal' };
   }
 
   if (options.layout === 'vertical') {
@@ -107,38 +115,60 @@ function buildHorizontalAtomicGraph(telemetry, zh, atomic) {
 
   const nodes = [];
   const edges = [];
+  const lanes = [];
+  const yStart = MARGIN_Y + LANE_HEADER;
   let col = 0;
 
+  const simStartCol = col;
   const xSim = colX(col, colWidths);
-  const simStack = stackColumn(simNodes, xSim);
+  const simStack = stackColumn(simNodes, xSim, ROW_GAP, yStart);
   nodes.push(...simNodes);
+  lanes.push({
+    id: 'sim',
+    label: zh ? '仿真状态' : 'Simulation',
+    ...laneRange(simStartCol, col, colWidths)
+  });
   col += 1;
 
   if (prepNodes.length) {
+    const prepStartCol = col;
     const xPrep = colX(col, colWidths);
-    stackColumn(prepNodes, xPrep);
+    stackColumn(prepNodes, xPrep, ROW_GAP, yStart);
     nodes.push(...prepNodes);
     if (hasPrepRel) {
       edges.push({ id: 'e-sim-prep-joint', from: 'sim-joint-pos', to: 'prep-joint-rel' });
     }
+    lanes.push({
+      id: 'prep',
+      label: zh ? '预处理' : 'Preprocess',
+      ...laneRange(prepStartCol, col, colWidths)
+    });
     col += 1;
   }
 
+  const obsStartCol = col;
   const xObs = colX(col, colWidths);
-  const obsStack = stackColumn(obsNodes, xObs);
+  const obsStack = stackColumn(obsNodes, xObs, ROW_GAP, yStart);
   nodes.push(...obsNodes);
   for (const obs of obsNodes) {
     const src = obsSourceId(obs, hasPrepRel);
     edges.push({ id: `e-${src}-${obs.id}`, from: src, to: obs.id });
     edges.push({ id: `e-${obs.id}-wh`, from: obs.id, to: 'warehouse' });
   }
+  lanes.push({
+    id: 'obs',
+    label: zh ? '观测构造' : 'Observation',
+    ...laneRange(obsStartCol, col, colWidths)
+  });
   col += 1;
 
-  const coreY = Math.max(simStack.height, obsStack.height, 200) / 2;
+  const innerHeight = Math.max(simStack.height, obsStack.height, 200);
+  const coreY = yStart + (innerHeight - yStart) / 2;
   const historyLabel = hasHistory
     ? `${telemetry.concat.historyCount}/${telemetry.concat.historyLength}`
     : null;
 
+  const policyStartCol = col;
   const xWarehouse = colX(col, colWidths);
   nodes.push({
     id: 'warehouse',
@@ -196,16 +226,19 @@ function buildHorizontalAtomicGraph(telemetry, zh, atomic) {
     ]
   });
   edges.push({ id: `e-${onnxFrom}-onnx`, from: onnxFrom, to: 'onnx' });
+  lanes.push({
+    id: 'policy',
+    label: zh ? '策略推理' : 'Policy',
+    ...laneRange(policyStartCol, col, colWidths)
+  });
   col += 1;
 
-  const jointAnchor = simNodes.find((n) => n.id === 'sim-joint-pos');
-  const jointY = jointAnchor?.y ?? MARGIN_Y;
-
+  const outputStartCol = col;
   let prev = 'onnx';
   for (const out of outputNodes) {
     const xOut = colX(col, colWidths);
     out.x = xOut;
-    out.y = jointY;
+    out.y = coreY - (out.height ?? 50) / 2;
     nodes.push(out);
     edges.push({ id: `e-${prev}-${out.id}`, from: prev, to: out.id });
     prev = out.id;
@@ -215,16 +248,23 @@ function buildHorizontalAtomicGraph(telemetry, zh, atomic) {
   for (const motor of motorNodes) {
     const xMotor = colX(col, colWidths);
     motor.x = xMotor;
-    motor.y = jointY;
+    motor.y = coreY - (motor.height ?? 50) / 2;
     nodes.push(motor);
     edges.push({ id: `e-${prev}-${motor.id}`, from: prev, to: motor.id });
     col += 1;
   }
+  if (outputNodes.length || motorNodes.length) {
+    lanes.push({
+      id: 'output',
+      label: zh ? '动作输出' : 'Output',
+      ...laneRange(outputStartCol, col - 1, colWidths)
+    });
+  }
 
   const width = colX(col, colWidths) + (colWidths[col - 1] ?? 140) + MARGIN_X;
-  const height = Math.max(simStack.height, obsStack.height, 300);
+  const height = Math.max(simStack.height, obsStack.height, 300) + MARGIN_Y;
 
-  return { nodes, edges, width, height, layout: 'horizontal' };
+  return { nodes, edges, lanes, width, height, layout: 'horizontal' };
 }
 
 function buildVerticalAtomicGraph(telemetry, zh, atomic) {
@@ -323,6 +363,7 @@ function buildVerticalAtomicGraph(telemetry, zh, atomic) {
   return {
     nodes,
     edges,
+    lanes: [],
     width: 312,
     height: y + 8,
     layout: 'vertical'
