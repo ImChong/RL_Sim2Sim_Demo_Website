@@ -69,6 +69,14 @@ const NETWORK_PADDING_X = 32;
 const NETWORK_MIN_WIDTH = 320;
 const NETWORK_MAX_WIDTH = 960;
 
+const NODE_HEAD = 48;
+const NODE_CARD_PAD_V = 22;
+const NODE_LINE = 19;
+
+function nodeHeightForLines(lineCount) {
+  return Math.max(72, NODE_HEAD + NODE_CARD_PAD_V + lineCount * NODE_LINE);
+}
+
 function networkNodeWidth(columns) {
   const desired = NETWORK_PADDING_X * 2 + columns.length * NETWORK_COL_WIDTH;
   return Math.max(NETWORK_MIN_WIDTH, Math.min(NETWORK_MAX_WIDTH, desired));
@@ -246,39 +254,43 @@ function buildHorizontalAtomicGraph(telemetry, zh, atomic) {
 
   const policyStartCol = col;
   const xWarehouse = colX(col, colWidths);
+  const warehouseLines = [
+    { k: zh ? '单帧' : 'frame', v: `${telemetry.concat.currentFrameSize}D` },
+    { k: zh ? '张量' : 'tensor', v: `${telemetry.concat.tensorSize}D` },
+    ...(historyLabel ? [{ k: zh ? '历史' : 'hist', v: historyLabel }] : [])
+  ];
+  const warehouseHeight = nodeHeightForLines(warehouseLines.length);
   nodes.push({
     id: 'warehouse',
     kind: 'warehouse',
     title: zh ? '观测仓库' : 'Obs Warehouse',
     subtitle: zh ? '向量拼接' : 'Vector concat',
     width: 200,
-    height: 96,
+    height: warehouseHeight,
     x: xWarehouse,
-    y: coreY - 48,
-    lines: [
-      { k: zh ? '单帧' : 'frame', v: `${telemetry.concat.currentFrameSize}D` },
-      { k: zh ? '张量' : 'tensor', v: `${telemetry.concat.tensorSize}D` },
-      ...(historyLabel ? [{ k: zh ? '历史' : 'hist', v: historyLabel }] : [])
-    ]
+    y: coreY - warehouseHeight / 2,
+    lines: warehouseLines
   });
   col += 1;
 
   let onnxFrom = 'warehouse';
   if (hasHistory) {
     const xHistory = colX(col, colWidths);
+    const historyLines = [
+      { k: zh ? '窗口' : 'window', v: historyLabel },
+      { k: zh ? '预览' : 'preview', v: formatVec(telemetry.concat.tensorPreview, 3) }
+    ];
+    const historyHeight = nodeHeightForLines(historyLines.length);
     nodes.push({
       id: 'history',
       kind: 'process',
       title: zh ? '历史缓冲' : 'History buffer',
       subtitle: `×${telemetry.concat.historyLength}`,
       width: 264,
-      height: 82,
+      height: historyHeight,
       x: xHistory,
-      y: coreY - 41,
-      lines: [
-        { k: zh ? '窗口' : 'window', v: historyLabel },
-        { k: zh ? '预览' : 'preview', v: formatVec(telemetry.concat.tensorPreview, 3) }
-      ]
+      y: coreY - historyHeight / 2,
+      lines: historyLines
     });
     edges.push({ id: 'e-wh-hist', from: 'warehouse', to: 'history' });
     onnxFrom = 'history';

@@ -1457,31 +1457,36 @@ export default {
 .controls-resize-sw {
   left: 0;
   bottom: 0;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   cursor: nesw-resize;
-  border-bottom-left-radius: 14px;
-  background: linear-gradient(
-    45deg,
-    transparent 0 45%,
-    rgba(var(--v-theme-primary), 0.35) 45% 55%,
-    rgba(var(--v-theme-primary), 0.55) 55%
-  );
+  background: transparent;
 }
 
-.controls-resize-handle:hover,
-.controls-resize-handle:active {
+.controls-resize-sw::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  width: 8px;
+  height: 8px;
+  border-left: 1.5px solid rgba(var(--v-theme-primary), 0.45);
+  border-bottom: 1.5px solid rgba(var(--v-theme-primary), 0.45);
+  border-bottom-left-radius: 3px;
+  pointer-events: none;
+  transition: border-color 0.18s ease;
+}
+
+.controls-resize-w:hover,
+.controls-resize-w:active,
+.controls-resize-s:hover,
+.controls-resize-s:active {
   background-color: rgba(var(--v-theme-primary), 0.12);
 }
 
-.controls-resize-sw:hover,
-.controls-resize-sw:active {
-  background: linear-gradient(
-    45deg,
-    transparent 0 40%,
-    rgba(var(--v-theme-primary), 0.5) 40% 60%,
-    rgba(var(--v-theme-primary), 0.75) 60%
-  );
+.controls-resize-sw:hover::before,
+.controls-resize-sw:active::before {
+  border-color: rgba(var(--v-theme-primary), 0.9);
 }
 
 .controls-title {

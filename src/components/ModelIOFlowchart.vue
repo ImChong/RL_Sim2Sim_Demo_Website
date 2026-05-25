@@ -500,23 +500,33 @@ export default {
   width: 18px;
   height: 18px;
   cursor: nesw-resize;
-  border-top-right-radius: 14px;
   background: transparent;
 }
 
-.model-io-resize-handle:hover,
-.model-io-resize-handle:active {
+.model-io-resize-ne::before {
+  content: '';
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid rgba(var(--v-theme-primary), 0.5);
+  border-top: 1.5px solid rgba(var(--v-theme-primary), 0.5);
+  border-top-right-radius: 3px;
+  pointer-events: none;
+  transition: border-color 0.18s ease;
+}
+
+.model-io-resize-e:hover,
+.model-io-resize-e:active,
+.model-io-resize-n:hover,
+.model-io-resize-n:active {
   background-color: rgba(var(--v-theme-primary), 0.12);
 }
 
-.model-io-resize-ne:hover,
-.model-io-resize-ne:active {
-  background: linear-gradient(
-    315deg,
-    transparent 0 45%,
-    rgba(var(--v-theme-primary), 0.35) 45% 55%,
-    rgba(var(--v-theme-primary), 0.55) 55%
-  );
+.model-io-resize-ne:hover::before,
+.model-io-resize-ne:active::before {
+  border-color: rgba(var(--v-theme-primary), 0.9);
 }
 
 @media (max-width: 640px), (max-height: 760px) {
