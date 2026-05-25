@@ -112,10 +112,18 @@
                   >{{ node.subtitle }}</div>
                 </div>
                 <div class="pipeline-node-card">
-                  <div v-for="(line, idx) in node.lines" :key="idx" class="pipeline-node-line">
-                    <span class="pipeline-node-key" :title="line.k">{{ line.k }}</span>
-                    <span class="pipeline-node-val" :title="line.v">{{ line.v }}</span>
-                  </div>
+                  <NetworkDiagram
+                    v-if="node.kind === 'network'"
+                    :columns="node.networkColumns"
+                    :architecture="node.architecture"
+                    :live="live"
+                  />
+                  <template v-else>
+                    <div v-for="(line, idx) in node.lines" :key="idx" class="pipeline-node-line">
+                      <span class="pipeline-node-key" :title="line.k">{{ line.k }}</span>
+                      <span class="pipeline-node-val" :title="line.v">{{ line.v }}</span>
+                    </div>
+                  </template>
                 </div>
               </div>
               <span
@@ -133,6 +141,7 @@
 <script>
 import { buildPipelineGraph } from '@/simulation/pipelineGraphLayout.js';
 import { portPointFromLayoutNode } from '@/simulation/pipelineGraphEdgeCoords.js';
+import NetworkDiagram from '@/components/NetworkDiagram.vue';
 import {
   computeGraphBounds,
   graphLayoutKey,
@@ -168,6 +177,7 @@ function clampScale(scale) {
 
 export default {
   name: 'ModelIOPipelineGraph',
+  components: { NetworkDiagram },
   props: {
     telemetry: {
       type: Object,

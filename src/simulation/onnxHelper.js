@@ -1,5 +1,6 @@
 import * as ort from 'onnxruntime-web';
 import { readResponseBodyWithProgress } from './fetchWithProgress.js';
+import { parseOnnxArchitecture } from './onnxArchitecture.js';
 
 export class ONNXModule {
   constructor(config) {
@@ -10,6 +11,7 @@ export class ONNXModule {
     this._result = {};
     this._carry = {};
     this._emptyCarry = {};
+    this.architecture = null;
     console.log("isRecurrent", this.isRecurrent);
   }
 
@@ -25,6 +27,7 @@ export class ONNXModule {
       onProgress?.(0.82 * r);
     });
     const modelArrayBuffer = bytes.slice().buffer;
+    this.architecture = parseOnnxArchitecture(bytes);
 
     this.inKeys = this.metaData["in_keys"];
     this.outKeys = this.metaData["out_keys"];
