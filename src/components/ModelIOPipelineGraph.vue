@@ -654,6 +654,7 @@ export default {
 }
 
 .pipeline-viewport {
+  position: relative;
   max-width: 100%;
   border-radius: 10px;
   border: 1px solid rgba(var(--v-theme-primary), 0.2);
