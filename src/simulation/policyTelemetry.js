@@ -233,7 +233,8 @@ export function buildPolicyTelemetry(runner, demo, options = {}) {
     inputPreview: sampleArray(tensorData, 8),
     rawAction: sampleArray(runner.lastRawAction, 6),
     clippedAction: sampleArray(runner.lastActions, 6),
-    extraOutputs: runner.lastExtraOutputs ?? {}
+    extraOutputs: runner.lastExtraOutputs ?? {},
+    architecture: runner.module?.architecture ?? null
   };
 
   const postprocess = {

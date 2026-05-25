@@ -48,10 +48,10 @@
     >
       <v-card-title class="model-io-title">
         <span>{{ t.panelTitle }}</span>
-        <v-chip v-if="telemetry.ready" size="x-small" color="success" variant="tonal">
+        <v-chip v-if="telemetry.ready" size="x-small" color="primary" variant="tonal">
           {{ t.live }}
         </v-chip>
-        <v-chip v-else size="x-small" color="warning" variant="tonal">
+        <v-chip v-else size="x-small" color="on-surface" variant="outlined">
           {{ t.waiting }}
         </v-chip>
         <v-spacer />
@@ -501,12 +501,7 @@ export default {
   height: 18px;
   cursor: nesw-resize;
   border-top-right-radius: 14px;
-  background: linear-gradient(
-    315deg,
-    transparent 0 45%,
-    rgba(var(--v-theme-primary), 0.35) 45% 55%,
-    rgba(var(--v-theme-primary), 0.55) 55%
-  );
+  background: transparent;
 }
 
 .model-io-resize-handle:hover,
@@ -518,9 +513,9 @@ export default {
 .model-io-resize-ne:active {
   background: linear-gradient(
     315deg,
-    transparent 0 40%,
-    rgba(var(--v-theme-primary), 0.5) 40% 60%,
-    rgba(var(--v-theme-primary), 0.75) 60%
+    transparent 0 45%,
+    rgba(var(--v-theme-primary), 0.35) 45% 55%,
+    rgba(var(--v-theme-primary), 0.55) 55%
   );
 }
 

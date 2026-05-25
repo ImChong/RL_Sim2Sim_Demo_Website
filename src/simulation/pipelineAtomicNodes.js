@@ -38,10 +38,10 @@ function jointLines(jointNames, values, max = Infinity) {
 }
 
 function nodeHeight(lineCount) {
-  const HEAD = 38;
-  const CARD_PAD_V = 16;
-  const LINE = 14;
-  return Math.max(60, HEAD + CARD_PAD_V + lineCount * LINE);
+  const HEAD = 48;
+  const CARD_PAD_V = 22;
+  const LINE = 19;
+  return Math.max(72, HEAD + CARD_PAD_V + lineCount * LINE);
 }
 
 function decomposeObsBlock(block, slice, jointNames, lang) {

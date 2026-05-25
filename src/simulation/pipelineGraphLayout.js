@@ -5,6 +5,8 @@ const ROW_GAP = 16;
 const ROW_GAP_MOBILE = 10;
 const MARGIN_X = 28;
 const MARGIN_Y = 22;
+const LANE_HEADER = 44;
+const LANE_PAD_X = 18;
 
 function colX(index, widths) {
   let x = MARGIN_X;
@@ -14,8 +16,8 @@ function colX(index, widths) {
   return x;
 }
 
-function stackColumn(nodes, x, gap = ROW_GAP) {
-  let y = MARGIN_Y;
+function stackColumn(nodes, x, gap = ROW_GAP, yStart = MARGIN_Y) {
+  let y = yStart;
   let maxW = 0;
   for (const node of nodes) {
     node.x = x;
@@ -24,6 +26,12 @@ function stackColumn(nodes, x, gap = ROW_GAP) {
     y += (node.height ?? 48) + gap;
   }
   return { height: y + MARGIN_Y, width: maxW };
+}
+
+function laneRange(startCol, endCol, colWidths) {
+  const xStart = colX(startCol, colWidths) - LANE_PAD_X;
+  const xEnd = colX(endCol, colWidths) + colWidths[endCol] + LANE_PAD_X;
+  return { x: xStart, width: xEnd - xStart };
 }
 
 function obsSourceId(obsNode, hasPrepRel) {
@@ -56,6 +64,80 @@ function cloneNodes(list) {
   return list.map((n) => ({ ...n, lines: n.lines ? [...n.lines] : [] }));
 }
 
+const NETWORK_COL_WIDTH = 78;
+const NETWORK_PADDING_X = 32;
+const NETWORK_MIN_WIDTH = 320;
+const NETWORK_MAX_WIDTH = 960;
+
+function networkNodeWidth(columns) {
+  const desired = NETWORK_PADDING_X * 2 + columns.length * NETWORK_COL_WIDTH;
+  return Math.max(NETWORK_MIN_WIDTH, Math.min(NETWORK_MAX_WIDTH, desired));
+}
+
+/**
+ * Fold an ONNX architecture into a list of columns suitable for SVG rendering.
+ * Each column carries `dim` (neuron count) and an annotation describing the
+ * transform that produced it (Linear N→M + activation, Concat, etc.).
+ */
+function buildNetworkColumns(architecture, zh) {
+  if (!architecture?.layers?.length) return null;
+  const columns = [];
+  columns.push({
+    id: 'col-input',
+    kind: 'input',
+    dim: architecture.input?.dim ?? architecture.layers[0]?.inDim ?? 0,
+    label: zh ? '输入' : 'Input',
+    transform: null
+  });
+
+  let pending = null;
+  const flushPending = () => {
+    if (pending) {
+      columns.push(pending);
+      pending = null;
+    }
+  };
+
+  for (const layer of architecture.layers) {
+    if (layer.kind === 'linear') {
+      flushPending();
+      pending = {
+        id: `col-linear-${columns.length}`,
+        kind: 'linear',
+        dim: layer.outDim,
+        label: 'Linear',
+        transform: `${layer.inDim}→${layer.outDim}`,
+        post: []
+      };
+    } else if (layer.kind === 'activation') {
+      if (pending) pending.post.push(layer.op);
+      else columns.push({ id: `col-act-${columns.length}`, kind: 'activation', dim: layer.dim, label: layer.op });
+    } else if (layer.kind === 'layernorm') {
+      if (pending) pending.post.push('LN');
+      else columns.push({ id: `col-ln-${columns.length}`, kind: 'layernorm', dim: layer.dim, label: 'LN' });
+    } else if (layer.kind === 'concat') {
+      flushPending();
+      columns.push({
+        id: `col-concat-${columns.length}`,
+        kind: 'concat',
+        dim: layer.dim,
+        label: zh ? '拼接' : 'Concat',
+        transform: zh ? '与输入拼接' : 'with input'
+      });
+    }
+  }
+  flushPending();
+
+  if (columns.length > 1) {
+    columns[columns.length - 1] = {
+      ...columns[columns.length - 1],
+      label: zh ? '输出' : 'Output',
+      kind: 'output'
+    };
+  }
+  return columns;
+}
+
 /**
  * @param {ReturnType<import('./policyTelemetry.js').buildPolicyTelemetry>} telemetry
  * @param {'zh'|'en'} lang
@@ -64,12 +146,12 @@ function cloneNodes(list) {
 export function buildPipelineGraph(telemetry, lang = 'zh', options = {}) {
   const zh = lang === 'zh';
   if (!telemetry?.ready) {
-    return { nodes: [], edges: [], width: 480, height: 200, layout: options.layout ?? 'horizontal' };
+    return { nodes: [], edges: [], lanes: [], width: 480, height: 200, layout: options.layout ?? 'horizontal' };
   }
 
   const atomic = telemetry.atomicNodes ?? [];
   if (atomic.length === 0) {
-    return { nodes: [], edges: [], width: 480, height: 200, layout: options.layout ?? 'horizontal' };
+    return { nodes: [], edges: [], lanes: [], width: 480, height: 200, layout: options.layout ?? 'horizontal' };
   }
 
   if (options.layout === 'vertical') {
@@ -86,6 +168,8 @@ function buildHorizontalAtomicGraph(telemetry, zh, atomic) {
   const motorNodes = cloneNodes(atomic.filter((n) => n.group === 'motor'));
   const hasPrepRel = prepNodes.some((n) => n.id === 'prep-joint-rel');
   const hasHistory = (telemetry.concat?.historyLength ?? 1) > 1;
+  const architectureColumns = buildNetworkColumns(telemetry.onnx.architecture, zh);
+  const onnxColWidth = architectureColumns ? networkNodeWidth(architectureColumns) : 220;
 
   const colWidths = [];
   colWidths.push(Math.max(184, ...simNodes.map((n) => n.width ?? 184)));
@@ -97,7 +181,7 @@ function buildHorizontalAtomicGraph(telemetry, zh, atomic) {
   if (hasHistory) {
     colWidths.push(264);
   }
-  colWidths.push(220);
+  colWidths.push(onnxColWidth);
   for (const out of outputNodes) {
     colWidths.push(Math.max(248, out.width ?? 248));
   }
@@ -107,38 +191,60 @@ function buildHorizontalAtomicGraph(telemetry, zh, atomic) {
 
   const nodes = [];
   const edges = [];
+  const lanes = [];
+  const yStart = MARGIN_Y + LANE_HEADER;
   let col = 0;
 
+  const simStartCol = col;
   const xSim = colX(col, colWidths);
-  const simStack = stackColumn(simNodes, xSim);
+  const simStack = stackColumn(simNodes, xSim, ROW_GAP, yStart);
   nodes.push(...simNodes);
+  lanes.push({
+    id: 'sim',
+    label: zh ? '仿真状态' : 'Simulation',
+    ...laneRange(simStartCol, col, colWidths)
+  });
   col += 1;
 
   if (prepNodes.length) {
+    const prepStartCol = col;
     const xPrep = colX(col, colWidths);
-    stackColumn(prepNodes, xPrep);
+    stackColumn(prepNodes, xPrep, ROW_GAP, yStart);
     nodes.push(...prepNodes);
     if (hasPrepRel) {
       edges.push({ id: 'e-sim-prep-joint', from: 'sim-joint-pos', to: 'prep-joint-rel' });
     }
+    lanes.push({
+      id: 'prep',
+      label: zh ? '预处理' : 'Preprocess',
+      ...laneRange(prepStartCol, col, colWidths)
+    });
     col += 1;
   }
 
+  const obsStartCol = col;
   const xObs = colX(col, colWidths);
-  const obsStack = stackColumn(obsNodes, xObs);
+  const obsStack = stackColumn(obsNodes, xObs, ROW_GAP, yStart);
   nodes.push(...obsNodes);
   for (const obs of obsNodes) {
     const src = obsSourceId(obs, hasPrepRel);
     edges.push({ id: `e-${src}-${obs.id}`, from: src, to: obs.id });
     edges.push({ id: `e-${obs.id}-wh`, from: obs.id, to: 'warehouse' });
   }
+  lanes.push({
+    id: 'obs',
+    label: zh ? '观测构造' : 'Observation',
+    ...laneRange(obsStartCol, col, colWidths)
+  });
   col += 1;
 
-  const coreY = Math.max(simStack.height, obsStack.height, 200) / 2;
+  const innerHeight = Math.max(simStack.height, obsStack.height, 200);
+  const coreY = yStart + (innerHeight - yStart) / 2;
   const historyLabel = hasHistory
     ? `${telemetry.concat.historyCount}/${telemetry.concat.historyLength}`
     : null;
 
+  const policyStartCol = col;
   const xWarehouse = colX(col, colWidths);
   nodes.push({
     id: 'warehouse',
@@ -181,23 +287,33 @@ function buildHorizontalAtomicGraph(telemetry, zh, atomic) {
 
   const modelName = telemetry.model.path?.split('/').pop() ?? 'ONNX';
   const xOnnx = colX(col, colWidths);
+  const onnxWidth = onnxColWidth;
+  const onnxHeight = architectureColumns ? 320 : 96;
   nodes.push({
     id: 'onnx',
-    kind: 'model',
+    kind: architectureColumns ? 'network' : 'model',
     title: zh ? '策略网络' : 'Policy net',
     subtitle: modelName,
-    width: 220,
-    height: 96,
+    width: onnxWidth,
+    height: onnxHeight,
     x: xOnnx,
-    y: coreY - 48,
+    y: coreY - onnxHeight / 2,
     lines: [
       { k: 'in', v: `${telemetry.onnx.inKeys.join(',')} ${shapeStr(telemetry.onnx.inputShape)}` },
       { k: 'out', v: telemetry.onnx.outKeys.join(',') }
-    ]
+    ],
+    architecture: telemetry.onnx.architecture,
+    networkColumns: architectureColumns
   });
   edges.push({ id: `e-${onnxFrom}-onnx`, from: onnxFrom, to: 'onnx' });
+  lanes.push({
+    id: 'policy',
+    label: zh ? '策略推理' : 'Policy',
+    ...laneRange(policyStartCol, col, colWidths)
+  });
   col += 1;
 
+  const outputStartCol = col;
   let prev = 'onnx';
   for (const out of outputNodes) {
     const xOut = colX(col, colWidths);
@@ -217,11 +333,18 @@ function buildHorizontalAtomicGraph(telemetry, zh, atomic) {
     edges.push({ id: `e-${prev}-${motor.id}`, from: prev, to: motor.id });
     col += 1;
   }
+  if (outputNodes.length || motorNodes.length) {
+    lanes.push({
+      id: 'output',
+      label: zh ? '动作输出' : 'Output',
+      ...laneRange(outputStartCol, col - 1, colWidths)
+    });
+  }
 
   const width = colX(col, colWidths) + (colWidths[col - 1] ?? 140) + MARGIN_X;
-  const height = Math.max(simStack.height, obsStack.height, 300);
+  const height = Math.max(simStack.height, obsStack.height, 300) + MARGIN_Y;
 
-  return { nodes, edges, width, height, layout: 'horizontal' };
+  return { nodes, edges, lanes, width, height, layout: 'horizontal' };
 }
 
 function buildVerticalAtomicGraph(telemetry, zh, atomic) {
@@ -320,6 +443,7 @@ function buildVerticalAtomicGraph(telemetry, zh, atomic) {
   return {
     nodes,
     edges,
+    lanes: [],
     width: 312,
     height: y + 8,
     layout: 'vertical'
