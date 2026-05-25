@@ -501,12 +501,7 @@ export default {
   height: 18px;
   cursor: nesw-resize;
   border-top-right-radius: 14px;
-  background: linear-gradient(
-    315deg,
-    transparent 0 45%,
-    rgba(var(--v-theme-primary), 0.35) 45% 55%,
-    rgba(var(--v-theme-primary), 0.55) 55%
-  );
+  background: transparent;
 }
 
 .model-io-resize-handle:hover,
@@ -518,9 +513,9 @@ export default {
 .model-io-resize-ne:active {
   background: linear-gradient(
     315deg,
-    transparent 0 40%,
-    rgba(var(--v-theme-primary), 0.5) 40% 60%,
-    rgba(var(--v-theme-primary), 0.75) 60%
+    transparent 0 45%,
+    rgba(var(--v-theme-primary), 0.35) 45% 55%,
+    rgba(var(--v-theme-primary), 0.55) 55%
   );
 }
 

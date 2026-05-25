@@ -823,6 +823,7 @@ export default {
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
+  align-self: center;
   background: #1e293b;
   border: 2px solid #475569;
 }

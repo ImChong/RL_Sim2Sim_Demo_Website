@@ -198,11 +198,14 @@ function buildHorizontalAtomicGraph(telemetry, zh, atomic) {
   edges.push({ id: `e-${onnxFrom}-onnx`, from: onnxFrom, to: 'onnx' });
   col += 1;
 
+  const jointAnchor = simNodes.find((n) => n.id === 'sim-joint-pos');
+  const jointY = jointAnchor?.y ?? MARGIN_Y;
+
   let prev = 'onnx';
   for (const out of outputNodes) {
     const xOut = colX(col, colWidths);
     out.x = xOut;
-    out.y = coreY - (out.height ?? 50) / 2;
+    out.y = jointY;
     nodes.push(out);
     edges.push({ id: `e-${prev}-${out.id}`, from: prev, to: out.id });
     prev = out.id;
@@ -212,7 +215,7 @@ function buildHorizontalAtomicGraph(telemetry, zh, atomic) {
   for (const motor of motorNodes) {
     const xMotor = colX(col, colWidths);
     motor.x = xMotor;
-    motor.y = coreY - (motor.height ?? 50) / 2;
+    motor.y = jointY;
     nodes.push(motor);
     edges.push({ id: `e-${prev}-${motor.id}`, from: prev, to: motor.id });
     col += 1;
