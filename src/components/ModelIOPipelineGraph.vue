@@ -75,16 +75,20 @@
                   @mousedown.stop="onNodeMoveStart(node.id, $event)"
                   @touchstart.stop="onNodeMoveStart(node.id, $event)"
                 >
-                  <div class="pipeline-node-title">{{ node.title }}</div>
-                  <div v-if="node.subtitle" class="pipeline-node-subtitle">{{ node.subtitle }}</div>
+                  <div class="pipeline-node-title" :title="node.title">{{ node.title }}</div>
+                  <div
+                    v-if="node.subtitle"
+                    class="pipeline-node-subtitle"
+                    :title="node.subtitle"
+                  >{{ node.subtitle }}</div>
                 </div>
                 <div
                   class="pipeline-node-card"
                   :class="{ 'pipeline-node-card-scroll': node.scrollable }"
                 >
                   <div v-for="(line, idx) in node.lines" :key="idx" class="pipeline-node-line">
-                    <span class="pipeline-node-key">{{ line.k }}</span>
-                    <span class="pipeline-node-val">{{ line.v }}</span>
+                    <span class="pipeline-node-key" :title="line.k">{{ line.k }}</span>
+                    <span class="pipeline-node-val" :title="line.v">{{ line.v }}</span>
                   </div>
                 </div>
               </div>
@@ -135,6 +139,7 @@ let graphInstanceCounter = 0;
 
 const MIN_SCALE = 0.25;
 const MAX_SCALE = 3;
+const FIT_MIN_SCALE = 0.12;
 const WHEEL_ZOOM_FACTOR = 1.1;
 
 function touchDistance(touches) {
@@ -474,6 +479,15 @@ export default {
       if (!this.$refs.viewport?.contains(e.target)) {
         return;
       }
+      const scrollable = e.target?.closest?.('.pipeline-node-card-scroll');
+      if (scrollable && !e.ctrlKey && !e.metaKey) {
+        const canScrollUp = scrollable.scrollTop > 0;
+        const canScrollDown =
+          scrollable.scrollTop < scrollable.scrollHeight - scrollable.clientHeight - 1;
+        if ((e.deltaY < 0 && canScrollUp) || (e.deltaY > 0 && canScrollDown)) {
+          return;
+        }
+      }
       e.preventDefault();
       const factor = e.deltaY < 0 ? WHEEL_ZOOM_FACTOR : 1 / WHEEL_ZOOM_FACTOR;
       this.zoomAt(e.clientX, e.clientY, this.scale * factor);
@@ -632,7 +646,7 @@ export default {
         (vh - pad * 2) / this.displayLayout.height,
         1
       );
-      this.scale = Math.max(MIN_SCALE, fitScale);
+      this.scale = Math.max(FIT_MIN_SCALE, fitScale);
       this.panX = pad + (vw - pad * 2 - this.displayLayout.width * this.scale) / 2;
       this.panY = pad + (vh - pad * 2 - this.displayLayout.height * this.scale) / 2;
     },
@@ -651,11 +665,12 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .pipeline-shell-mobile {
-  flex: 1 1 auto;
-  min-height: 0;
+  /* mobile inherits flex sizing from base */
 }
 
 .pipeline-scroll-hint {
@@ -902,14 +917,19 @@ export default {
 
 .pipeline-node-key {
   color: #64748b;
-  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .pipeline-node-val {
   color: #a7f3d0;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: auto;
+  padding-left: 4px;
 }
 
 .pipeline-port {
@@ -934,6 +954,7 @@ export default {
   -webkit-overflow-scrolling: touch;
   cursor: auto;
   user-select: text;
+  touch-action: pan-y;
 }
 
 .pipeline-shell-mobile .pipeline-node-card-scroll {

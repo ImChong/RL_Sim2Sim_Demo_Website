@@ -88,21 +88,21 @@ function buildHorizontalAtomicGraph(telemetry, zh, atomic) {
   const hasHistory = (telemetry.concat?.historyLength ?? 1) > 1;
 
   const colWidths = [];
-  colWidths.push(Math.max(136, ...simNodes.map((n) => n.width ?? 136), 136));
+  colWidths.push(Math.max(160, ...simNodes.map((n) => n.width ?? 160)));
   if (prepNodes.length) {
-    colWidths.push(Math.max(136, ...prepNodes.map((n) => n.width ?? 136), 136));
+    colWidths.push(Math.max(160, ...prepNodes.map((n) => n.width ?? 160)));
   }
-  colWidths.push(Math.max(168, ...obsNodes.map((n) => n.width ?? 168), 168));
-  colWidths.push(172);
+  colWidths.push(Math.max(192, ...obsNodes.map((n) => n.width ?? 192)));
+  colWidths.push(188);
   if (hasHistory) {
-    colWidths.push(156);
+    colWidths.push(176);
   }
-  colWidths.push(184);
+  colWidths.push(196);
   for (const out of outputNodes) {
-    colWidths.push(Math.max(164, out.width ?? 164));
+    colWidths.push(Math.max(200, out.width ?? 200));
   }
   if (motorNodes.length) {
-    colWidths.push(Math.max(172, ...motorNodes.map((n) => n.width ?? 172), 172));
+    colWidths.push(Math.max(200, ...motorNodes.map((n) => n.width ?? 200)));
   }
 
   const nodes = [];
@@ -145,10 +145,10 @@ function buildHorizontalAtomicGraph(telemetry, zh, atomic) {
     kind: 'warehouse',
     title: zh ? '观测仓库' : 'Obs Warehouse',
     subtitle: zh ? '向量拼接' : 'Vector concat',
-    width: 172,
-    height: 68,
+    width: 188,
+    height: 86,
     x: xWarehouse,
-    y: coreY - 34,
+    y: coreY - 43,
     lines: [
       { k: zh ? '单帧' : 'frame', v: `${telemetry.concat.currentFrameSize}D` },
       { k: zh ? '张量' : 'tensor', v: `${telemetry.concat.tensorSize}D` },
@@ -165,10 +165,10 @@ function buildHorizontalAtomicGraph(telemetry, zh, atomic) {
       kind: 'process',
       title: zh ? '历史缓冲' : 'History buffer',
       subtitle: `×${telemetry.concat.historyLength}`,
-      width: 156,
-      height: 58,
+      width: 176,
+      height: 72,
       x: xHistory,
-      y: coreY - 29,
+      y: coreY - 36,
       lines: [
         { k: zh ? '窗口' : 'window', v: historyLabel },
         { k: zh ? '预览' : 'preview', v: formatVec(telemetry.concat.tensorPreview, 4) }
@@ -186,10 +186,10 @@ function buildHorizontalAtomicGraph(telemetry, zh, atomic) {
     kind: 'model',
     title: zh ? '策略网络' : 'Policy net',
     subtitle: modelName,
-    width: 184,
-    height: 74,
+    width: 196,
+    height: 86,
     x: xOnnx,
-    y: coreY - 37,
+    y: coreY - 43,
     lines: [
       { k: 'in', v: `${telemetry.onnx.inKeys.join(',')} ${shapeStr(telemetry.onnx.inputShape)}` },
       { k: 'out', v: telemetry.onnx.outKeys.join(',') }
