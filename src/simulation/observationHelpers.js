@@ -224,6 +224,7 @@ class TargetJointPosObs {
     this._indices = new Int32Array(this.futureSteps.length);
     // We lazily allocate this since size depends on policy.tracking.nJoints
     this.out = null;
+    this._empty = new Float32Array(0);
   }
 
   get size() {
@@ -238,8 +239,11 @@ class TargetJointPosObs {
 
     const tracking = this.policy.tracking;
     if (!tracking || !tracking.isReady()) {
-      if (this.out) this.out.fill(0.0);
-      return this.out ?? new Float32Array(0);
+      if (this.out) {
+        this.out.fill(0.0);
+        return this.out;
+      }
+      return this._empty;
     }
 
     const indices = clampFutureIndices(tracking.refIdx, this.futureSteps, tracking.refLen, this._indices);
