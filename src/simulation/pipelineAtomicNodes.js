@@ -37,8 +37,12 @@ function jointLines(jointNames, values, max = Infinity) {
   return lines;
 }
 
-function nodeHeight(lineCount) {
-  return Math.max(50, 34 + lineCount * 14);
+function nodeHeight(lineCount, scrollable = false) {
+  if (scrollable) {
+    const visibleLines = Math.min(lineCount, 6);
+    return Math.max(96, 36 + visibleLines * 14);
+  }
+  return Math.max(56, 36 + lineCount * 14);
 }
 
 function decomposeObsBlock(block, slice, jointNames, lang) {
@@ -213,10 +217,11 @@ export function buildAtomicNodes(runner, state, obsVector, obsLayout, lang = 'zh
 
   const push = (spec) => {
     const lines = spec.lines ?? [];
+    const scrollable = Boolean(spec.scrollable);
     nodes.push({
-      width: spec.kind === 'joints' ? 172 : 136,
-      height: nodeHeight(lines.length),
-      scrollable: Boolean(spec.scrollable),
+      width: spec.kind === 'joints' ? 200 : 160,
+      height: nodeHeight(lines.length, scrollable),
+      scrollable,
       ...spec
     });
   };

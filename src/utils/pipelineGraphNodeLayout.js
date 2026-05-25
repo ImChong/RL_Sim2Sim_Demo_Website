@@ -57,8 +57,8 @@ export function computeGraphBounds(nodes, fallback = {}, padding = 28) {
   let maxX = 0;
   let maxY = 0;
   for (const node of nodes) {
-    maxX = Math.max(maxX, (node.x ?? 0) + (node.width ?? 136));
-    maxY = Math.max(maxY, (node.y ?? 0) + (node.height ?? 50));
+    maxX = Math.max(maxX, (node.x ?? 0) + (node.width ?? 160));
+    maxY = Math.max(maxY, (node.y ?? 0) + (node.height ?? 56));
   }
   return {
     width: Math.max(fallback.width ?? 0, maxX + padding, 480),
