@@ -863,7 +863,7 @@ export default {
           this.state = 1;
         } else {
           this.state = -1;
-          this.extra_error_message = error.toString();
+          this.extra_error_message = error instanceof Error ? error.message : 'An unexpected error occurred';
         }
         throw error;
       }
@@ -1140,7 +1140,7 @@ export default {
         this.updateTrackingState();
       } catch (error) {
         console.error('Failed to reload policy:', error);
-        this.policyLoadError = error.toString();
+        this.policyLoadError = error instanceof Error ? error.message : 'An unexpected error occurred';
       } finally {
         this.demo.params.paused = wasPaused;
       }
