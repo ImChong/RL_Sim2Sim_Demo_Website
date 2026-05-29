@@ -21,3 +21,8 @@
 **Vulnerability:** Simulation failed to load on iOS/mobile with `EvalError` under CSP (`wasm-unsafe-eval` only).
 **Learning:** MuJoCo and ONNX Runtime Web ship Emscripten glue that calls `new Function()` at runtime. `wasm-unsafe-eval` alone does not satisfy that path; Safari on iOS enforces the restriction strictly. Keep both `'unsafe-eval'` and `'wasm-unsafe-eval'` in `script-src` until dependencies stop using dynamic function construction.
 **Prevention:** When adopting stricter CSP for WASM apps, verify on mobile Safari—not only desktop Chrome—before removing `'unsafe-eval'`.
+
+## 2026-05-24 - [Information Exposure via Error Messages]
+**Vulnerability:** Leaking stack traces or sensitive system information to the user by exposing `error.toString()`.
+**Learning:** Catching and rendering raw errors (`error.toString()`) in the UI can expose sensitive internal application details, stack traces, or environment data which an attacker might find useful.
+**Prevention:** Fail securely by checking if the error is an `Error` instance and rendering only `error.message` combined with a generic fallback message (e.g., "An unexpected error occurred"), rather than the raw error.
