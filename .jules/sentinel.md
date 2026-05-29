@@ -26,3 +26,13 @@
 **Vulnerability:** Leaking stack traces or sensitive system information to the user by exposing `error.toString()`.
 **Learning:** Catching and rendering raw errors (`error.toString()`) in the UI can expose sensitive internal application details, stack traces, or environment data which an attacker might find useful.
 **Prevention:** Fail securely by checking if the error is an `Error` instance and rendering only `error.message` combined with a generic fallback message (e.g., "An unexpected error occurred"), rather than the raw error.
+
+## 2026-05-29 - [Denial of Service via Unbounded Recursive JSON Expansion]
+**Vulnerability:** protobufjs allows recursive JSON descriptor expansion without depth limits (GHSA-jggg-4jg4-v7c6).
+**Learning:** Loading untrusted protobuf JSON descriptors with deeply nested 'nested' namespace objects could cause the JavaScript call stack to be exhausted, resulting in a Denial of Service (DoS) during descriptor loading in dependencies like onnxruntime-web.
+**Prevention:** Override sub-dependencies (like `protobufjs`) via package manager configurations (`pnpm.overrides`) to patched versions to protect the application while awaiting an upstream fix.
+
+## 2026-05-29 - [Uninitialized Memory Disclosure in WebSockets]
+**Vulnerability:** ws implementation is vulnerable to uninitialized memory disclosure when a TypedArray is passed as the reason argument in websocket.close() (GHSA-58qx-3vcg-4xpx).
+**Learning:** Even development dependencies (like puppeteer-core which uses ws) can carry security risks if run on unpatched versions.
+**Prevention:** Regularly audit and override sub-dependencies using tools like `pnpm audit` and `pnpm.overrides` to secure against lower-level API misuses.
