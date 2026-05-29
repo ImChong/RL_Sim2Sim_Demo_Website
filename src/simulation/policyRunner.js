@@ -37,6 +37,7 @@ export class PolicyRunner {
 
     // Pre-allocate arrays to reduce GC pressure during inferencing
     this.cachedJointPosRel = new Float32Array(this.numActions);
+    this.fallbackJointPos = new Float32Array(this.numActions);
     this.historyCount = 0;
     this.fullObs = new Float32Array(this.numObs * this.historyLength);
     this.obsForPolicy = new Float32Array(this.numObs);
@@ -77,7 +78,7 @@ export class PolicyRunner {
     if (!this.obsJointPosRelative) {
       return state;
     }
-    const jointPosAbs = state.jointPos ?? new Float32Array(this.numActions);
+    const jointPosAbs = state.jointPos ?? this.fallbackJointPos;
     const jointPosRel = this.cachedJointPosRel;
     for (let i = 0; i < this.numActions; i++) {
       jointPosRel[i] = jointPosAbs[i] - this.defaultJointPos[i];
