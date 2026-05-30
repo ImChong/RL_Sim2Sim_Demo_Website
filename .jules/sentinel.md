@@ -36,3 +36,8 @@
 **Vulnerability:** ws implementation is vulnerable to uninitialized memory disclosure when a TypedArray is passed as the reason argument in websocket.close() (GHSA-58qx-3vcg-4xpx).
 **Learning:** Even development dependencies (like puppeteer-core which uses ws) can carry security risks if run on unpatched versions.
 **Prevention:** Regularly audit and override sub-dependencies using tools like `pnpm audit` and `pnpm.overrides` to secure against lower-level API misuses.
+
+## 2024-05-30 - Replace unsafe-eval with wasm-unsafe-eval for WebAssembly components
+**Vulnerability:** The application's Content-Security-Policy (CSP) `script-src` directive contained `'unsafe-eval'`.
+**Learning:** This was likely introduced to allow WebAssembly (like MuJoCo and ONNX) to execute, but `'unsafe-eval'` is too broad and permits general JavaScript evaluation vulnerabilities (e.g. from `eval()` and `new Function()`).
+**Prevention:** Always use `'wasm-unsafe-eval'` instead of `'unsafe-eval'` in the CSP when the application needs to run WebAssembly but wants to block general JS execution vulnerabilities.
