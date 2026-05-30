@@ -103,7 +103,10 @@ class JointPos {
   }
 
   reset(state) {
-    const source = state?.jointPos ?? new Float32Array(this.numJoints);
+    if (!this.fallbackJointPos) {
+      this.fallbackJointPos = new Float32Array(this.numJoints);
+    }
+    const source = state?.jointPos ?? this.fallbackJointPos;
     for (let i = 0; i <= this.maxStep; i++) {
       this.history.set(source, i * this.numJoints);
     }
@@ -246,8 +249,12 @@ class TargetJointPosObs {
       return this._empty;
     }
 
+    if (!this.fallbackJointPos) {
+      this.fallbackJointPos = new Float32Array(tracking.nJoints);
+    }
+
     const indices = clampFutureIndices(tracking.refIdx, this.futureSteps, tracking.refLen, this._indices);
-    const current = state?.jointPos ?? new Float32Array(tracking.nJoints);
+    const current = state?.jointPos ?? this.fallbackJointPos;
     let offset = 0;
     const halfLen = indices.length * tracking.nJoints;
 
@@ -312,6 +319,7 @@ class PrevActions {
     this.steps = Math.max(1, Math.floor(history_steps));
     this.numActions = policy.numActions;
     this.actionBuffer = new Float32Array(this.steps * this.numActions);
+    this.fallbackActions = new Float32Array(this.numActions);
   }
 
   /**
@@ -329,7 +337,7 @@ class PrevActions {
 
   update() {
     this.actionBuffer.copyWithin(this.numActions, 0, (this.steps - 1) * this.numActions);
-    const source = this.policy?.lastActions ?? new Float32Array(this.numActions);
+    const source = this.policy?.lastActions ?? this.fallbackActions;
     this.actionBuffer.set(source, 0);
   }
 
@@ -364,7 +372,10 @@ class JointVel {
   }
 
   reset(state) {
-    const source = state?.jointVel ?? new Float32Array(this.numJoints);
+    if (!this.fallbackJointVel) {
+      this.fallbackJointVel = new Float32Array(this.numJoints);
+    }
+    const source = state?.jointVel ?? this.fallbackJointVel;
     for (let i = 0; i <= this.maxStep; i++) {
       this.history.set(source, i * this.numJoints);
     }
@@ -388,6 +399,7 @@ class JointVel {
 class Command {
   constructor() {
     this.out = new Float32Array(3);
+    this.fallbackCmd = new Float32Array([0, 0, 0]);
   }
 
   get size() {
@@ -395,7 +407,7 @@ class Command {
   }
 
   compute(state) {
-    const cmd = state?.cmd ?? [0, 0, 0];
+    const cmd = state?.cmd ?? this.fallbackCmd;
     this.out[0] = cmd[0];
     this.out[1] = cmd[1];
     this.out[2] = cmd[2];
