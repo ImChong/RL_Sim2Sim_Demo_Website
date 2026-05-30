@@ -49,3 +49,6 @@
 ## 2025-06-25 - Avoid fallback array instantiation in hot loops
 **Learning:** Using the nullish coalescing operator `??` with `new Float32Array(...)` (e.g. `const jointPosAbs = state.jointPos ?? new Float32Array(this.numActions);`) inside a hot loop (like `PolicyRunner.step()`) allocates a new typed array *every single tick* when the left side is null/undefined. This creates massive Garbage Collection pressure.
 **Action:** When a fallback typed array is required in a hot path, pre-allocate the fallback array in the constructor (`this.fallbackJointPos = new Float32Array(...)`) and reference it (`state.jointPos ?? this.fallbackJointPos`) to completely eliminate the runtime allocation.
+## 2026-05-30 - Avoid fallback array instantiation in hot loops
+**Learning:** Using the nullish coalescing operator `??` with `new Float32Array(...)` (e.g. `const jointPosAbs = state.jointPos ?? new Float32Array(this.numActions);) inside a hot loop allocates a new typed array *every single tick* when the left side is null/undefined. This creates massive Garbage Collection pressure.
+**Action:** When a fallback typed array is required in a hot path, pre-allocate the fallback array in the constructor (`this.fallbackJointPos = new Float32Array(...)`) and reference it (`state.jointPos ?? this.fallbackJointPos`) to completely eliminate the runtime allocation.
