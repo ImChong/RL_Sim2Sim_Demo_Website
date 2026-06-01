@@ -34,3 +34,4 @@ This is a **purely client-side SPA** (Vue 3 + Vite + Three.js + MuJoCo WASM + ON
 - WASM and ONNX model loading can take several seconds on first page load; wait for the progress dialog to reach 100% before interacting.
 - Motion clip controls are accessible via the robot icon button in the top navigation bar (not immediately visible on the main panel).
 - Commit messages must be in Chinese following the existing convention (see top of this file).
+- **CSP:** `index.html` `script-src` must keep both `'unsafe-eval'` and `'wasm-unsafe-eval'`. MuJoCo/ONNX Emscripten glue calls `new Function()`; removing `'unsafe-eval'` breaks simulation load. `tests/csp.test.mjs` guards this—do not drop the directive for “stricter CSP” without replacing the WASM stack.
