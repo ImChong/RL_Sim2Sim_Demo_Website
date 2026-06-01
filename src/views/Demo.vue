@@ -1,5 +1,25 @@
 <template>
   <div id="mujoco-container"></div>
+  <div v-if="isParkourPolicy" class="parkour-frame-wrap">
+    <iframe
+      ref="parkourFrame"
+      :key="parkourReloadKey"
+      :src="parkourIframeSrc"
+      class="parkour-frame"
+      title="G1 Perceptive Parkour Demo"
+      allow="autoplay; fullscreen"
+      @load="onParkourLoad"
+    ></iframe>
+    <div
+      v-if="parkourLoading"
+      class="parkour-loading"
+      role="status"
+      aria-live="polite"
+    >
+      <v-progress-circular indeterminate color="primary" size="48" />
+      <span class="parkour-loading-text">{{ t.parkourLoading }}</span>
+    </div>
+  </div>
   <div class="global-alerts">
     <v-alert
       v-if="isSmallScreen"
@@ -92,6 +112,27 @@
           @update:modelValue="onPolicyChange"
         ></v-select>
 
+        <div v-if="isParkourPolicy" class="parkour-controls mt-4">
+          <v-alert
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mb-3"
+          >
+            {{ t.parkourHoldW }}
+          </v-alert>
+          <span class="status-name">{{ t.parkourHowToPlay }}</span>
+          <div class="parkour-keys mt-2">
+            <template v-for="row in parkourControls" :key="row.key">
+              <kbd class="parkour-key">{{ row.key }}</kbd>
+              <span class="text-caption">{{ row.label }}</span>
+            </template>
+          </div>
+          <div class="text-caption mt-2">{{ t.parkourClimbNote }}</div>
+          <div class="text-caption mt-2 text-medium-emphasis">{{ t.parkourFocusHint }}</div>
+          <div class="text-caption mt-2 text-medium-emphasis">{{ t.parkourSource }}</div>
+        </div>
+
         <div v-if="isAmpPolicy" class="mt-4">
           <div class="status-legend follow-controls mt-2">
             <span class="status-name">{{ t.velocityX }}</span>
@@ -160,7 +201,7 @@
           {{ policyLoadError }}
         </v-alert>
 
-        <div v-if="!isAmpPolicy" class="status-legend follow-controls mt-2">
+        <div v-if="!isAmpPolicy && !isParkourPolicy" class="status-legend follow-controls mt-2">
           <span class="status-name">{{ t.compliance }}</span>
           <v-btn
             size="x-small"
@@ -175,7 +216,7 @@
           <span class="text-caption">{{ complianceThresholdLabel }}</span>
         </div>
         <v-slider
-          v-if="!isAmpPolicy"
+          v-if="!isAmpPolicy && !isParkourPolicy"
           v-model="complianceThreshold"
           min="10"
           max="20"
@@ -187,7 +228,7 @@
           @update:modelValue="onComplianceThresholdChange"
         ></v-slider>
 
-        <template v-if="!isAmpPolicy">
+        <template v-if="!isAmpPolicy && !isParkourPolicy">
         <v-divider class="my-2"/>
         <div class="motion-status" v-if="trackingState" role="status" aria-live="polite">
           <div class="status-legend" v-if="trackingState.available">
@@ -304,6 +345,7 @@
 
         </template>
 
+        <template v-if="!isParkourPolicy">
         <v-divider class="my-2"/>
         <div class="status-legend follow-controls">
           <span class="status-name">{{ t.cameraFollow }}</span>
@@ -349,9 +391,10 @@
           :aria-label="t.groundReflection"
           @update:modelValue="onReflectionQualityChange"
         ></v-slider>
+        </template>
       </v-card-text>
       <v-card-actions class="controls-actions">
-        <v-btn color="primary" block @click="reset">{{ t.reset }}</v-btn>
+        <v-btn color="primary" block @click="reset">{{ isParkourPolicy ? t.parkourReset : t.reset }}</v-btn>
       </v-card-actions>
 
       <template v-if="!isSmallScreen">
@@ -397,6 +440,7 @@
     </v-card>
   </v-dialog>
   <ModelIOFlowchart
+    v-if="!isParkourPolicy"
     :demo="demo"
     :ready="state === 1"
     :language="language"
@@ -480,6 +524,22 @@ const translations = {
     knockdownTestHint: 'Applies a strong horizontal impulse on the pelvis in a random XY direction (fixed magnitude) for get-up testing.',
     ampPolicyDescription:
       'AMP policy trained for walk, run, and get-up behaviors.',
+    parkourPolicyDescription:
+      'Perceptive humanoid parkour demo (embedded). Drive the G1 over the terrain course with the keyboard.',
+    parkourLoading: 'Loading parkour demo…',
+    parkourHoldW:
+      'Keep holding W during approach, climbing, on top, and descent, until you are back on the ground.',
+    parkourHowToPlay: 'How to play',
+    parkourMoveForward: 'Move forward',
+    parkourTurnLeft: 'Turn left',
+    parkourTurnRight: 'Turn right',
+    parkourSpeed: 'Toggle speed mode',
+    parkourPause: 'Pause',
+    parkourResetRun: 'Reset run',
+    parkourClimbNote: 'Climbing engages automatically while you hold W.',
+    parkourFocusHint: 'Click the demo view first, then use the keys.',
+    parkourSource: 'Embedded build from php-parkour, self-hosted in this site.',
+    parkourReset: 'Restart run',
     resizeControlWidth: 'Resize control panel width (left edge)',
     resizeControlHeight: 'Resize control panel height (bottom edge)',
     resizeControlBoth: 'Resize control panel (bottom-left corner)'
@@ -535,6 +595,22 @@ const translations = {
     knockdownTestHint: '在骨盆上沿水平面（XY）随机方向施加一次固定大小的强冲击，用于测试倒地起身。',
     ampPolicyDescription:
       '用于行走、跑步和起身行为的 AMP 策略。',
+    parkourPolicyDescription:
+      '感知型人形跑酷演示（内嵌）。用键盘驱动 G1 穿越地形障碍课程。',
+    parkourLoading: '正在加载跑酷演示…',
+    parkourHoldW:
+      '在接近、攀爬、登顶和下降的整个过程中持续按住 W，直到重新回到地面。',
+    parkourHowToPlay: '操作说明',
+    parkourMoveForward: '前进',
+    parkourTurnLeft: '左转',
+    parkourTurnRight: '右转',
+    parkourSpeed: '切换速度模式',
+    parkourPause: '暂停',
+    parkourResetRun: '重置当前回合',
+    parkourClimbNote: '按住 W 时会自动触发攀爬。',
+    parkourFocusHint: '请先点击演示画面，再使用键盘按键。',
+    parkourSource: '内嵌自 php-parkour 的构建，已自托管在本站。',
+    parkourReset: '重新开始',
     resizeControlWidth: '拖拽左边框调整控制面板宽度',
     resizeControlHeight: '拖拽下边框调整控制面板高度',
     resizeControlBoth: '拖拽左下角同时调整控制面板大小'
@@ -585,6 +661,13 @@ export default {
         scenePath: 'g1_amp/scene_g1.xml'
       },
       {
+        value: 'g1-parkour',
+        title: 'G1 Perceptive Parkour',
+        descriptionKey: 'parkourPolicyDescription',
+        isExternalDemo: true,
+        iframePath: 'parkour/dist-desktop/index.html'
+      },
+      {
         value: 'g1-tracking-latest',
         title: 'G1 Tracking',
         description: 'Tracking policy with compliance input enabled.',
@@ -620,7 +703,10 @@ export default {
     simulationLoadProgress: 0,
     controlPanelWidth: loadControlPanelSize().width,
     controlPanelHeight: loadControlPanelSize().height,
-    controlPanelResize: null
+    controlPanelResize: null,
+    parkourSuspended: false,
+    parkourLoading: false,
+    parkourReloadKey: 0
   }),
   computed: {
     desktopControlsPanelStyle() {
@@ -733,6 +819,24 @@ export default {
     },
     isAmpPolicy() {
       return this.currentPolicy?.startsWith('g1-amp');
+    },
+    isParkourPolicy() {
+      return this.selectedPolicy?.isExternalDemo === true;
+    },
+    parkourIframeSrc() {
+      const base = import.meta.env.BASE_URL || '/';
+      const path = this.selectedPolicy?.iframePath ?? '';
+      return `${base}${path}`;
+    },
+    parkourControls() {
+      return [
+        { key: 'W', label: this.t.parkourMoveForward },
+        { key: 'A', label: this.t.parkourTurnLeft },
+        { key: 'D', label: this.t.parkourTurnRight },
+        { key: 'Y', label: this.t.parkourSpeed },
+        { key: 'SPACE', label: this.t.parkourPause },
+        { key: 'BACKSPACE', label: this.t.parkourResetRun }
+      ];
     },
     policyDescription() {
       if (!this.selectedPolicy) {
@@ -1106,11 +1210,32 @@ export default {
       }
     },
     async onPolicyChange(value) {
-      if (!this.demo || !value) {
+      if (!value) {
         return;
       }
       const selected = this.policies.find((policy) => policy.value === value);
       if (!selected) {
+        return;
+      }
+      if (selected.isExternalDemo) {
+        // Entering the embedded Parkour demo: pause physics and stop the MuJoCo
+        // render loop so we don't run two WebGL apps at once. The iframe mounts
+        // via v-if="isParkourPolicy".
+        if (this.demo && !this.parkourSuspended) {
+          this.demo.suspendRendering();
+          this.parkourSuspended = true;
+        }
+        this.parkourLoading = true;
+        this.policyLoadError = '';
+        return;
+      }
+      // Leaving the Parkour demo for a MuJoCo policy: resume the render loop.
+      // (The iframe is unmounted by v-if, freeing its WebGL/WASM context.)
+      if (this.parkourSuspended && this.demo) {
+        this.demo.resumeRendering();
+        this.parkourSuspended = false;
+      }
+      if (!this.demo) {
         return;
       }
       const targetScenePath = selected.scenePath ?? 'g1_amp/scene_g1.xml';
@@ -1152,6 +1277,12 @@ export default {
       this.onCmdChange();
     },
     reset() {
+      if (this.isParkourPolicy) {
+        // Reload the embedded demo for a clean restart (remounts via :key).
+        this.parkourLoading = true;
+        this.parkourReloadKey += 1;
+        return;
+      }
       if (!this.demo) {
         return;
       }
@@ -1162,6 +1293,16 @@ export default {
       this.availableMotions = this.getAvailableMotions();
       this.currentMotion = this.demo.params.current_motion ?? this.availableMotions[0] ?? null;
       this.updateTrackingState();
+    },
+    onParkourLoad() {
+      this.parkourLoading = false;
+      // Same-origin iframe: focus it so keyboard input (W/A/D/Y/SPACE) reaches
+      // the demo right away.
+      try {
+        this.$refs.parkourFrame?.contentWindow?.focus();
+      } catch (error) {
+        /* focusing can throw in some browsers; safe to ignore */
+      }
     },
     backToDefault() {
       if (!this.demo) {
@@ -1333,7 +1474,7 @@ export default {
     }
     this.init();
     this.keydown_listener = (event) => {
-      if (event.code === 'Backspace') {
+      if (event.code === 'Backspace' && !this.isParkourPolicy) {
         this.reset();
       }
     };
@@ -1367,6 +1508,64 @@ export default {
 </script>
 
 <style scoped>
+.parkour-frame-wrap {
+  position: fixed;
+  top: var(--header-h, 58px);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 500;
+  background: #0f172a;
+}
+
+.parkour-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.parkour-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: #0f172a;
+  pointer-events: none;
+}
+
+.parkour-loading-text {
+  margin-top: 12px;
+  font-size: 0.9rem;
+}
+
+.parkour-controls {
+  display: flex;
+  flex-direction: column;
+}
+
+.parkour-keys {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 10px;
+  align-items: center;
+}
+
+.parkour-key {
+  justify-self: start;
+  background: rgba(var(--v-theme-on-surface), 0.08);
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.18);
+  border-radius: 6px;
+  padding: 1px 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
 .controls {
   position: fixed;
   top: calc(var(--header-h, 58px) + 20px);
