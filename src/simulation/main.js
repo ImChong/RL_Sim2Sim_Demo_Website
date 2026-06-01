@@ -258,6 +258,26 @@ export class MuJoCoDemo {
     }
   }
 
+  // Pause physics and stop the render loop. Used when the view is covered by an
+  // external embedded demo (e.g. the Parkour iframe) so we don't burn CPU/GPU
+  // running two WebGL apps at once.
+  suspendRendering() {
+    this.params.paused = true;
+    if (this.renderer) {
+      this.renderer.setAnimationLoop(null);
+    }
+  }
+
+  // Restart the render loop and resume physics after the view becomes visible
+  // again. Re-syncs the renderer size in case the viewport changed while hidden.
+  resumeRendering() {
+    if (this.renderer) {
+      this.renderer.setAnimationLoop(this.render.bind(this));
+    }
+    this.onWindowResize();
+    this.params.paused = false;
+  }
+
   setVisualTheme(name) {
     this.visualThemeName = normalizeSimulationThemeName(name);
     this.currentVisualSettings = getSimulationThemeSettings(this.visualThemeName);
