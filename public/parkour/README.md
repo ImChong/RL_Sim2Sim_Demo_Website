@@ -12,11 +12,15 @@ from this same origin, no Content-Security-Policy changes are required.
 
 ## What is here
 
-- `dist-desktop/` — the upstream Vite build, copied verbatim:
+- `dist-desktop/` — the upstream Vite build, copied verbatim except for the one
+  patch noted below:
   - `index.html`, `assets/index-*.js` (the MuJoCo WASM is inlined in this bundle),
-    `assets/ort-wasm-simd-threaded.jsep-*.wasm` (onnxruntime-web),
-    `assets/favicon-*.png`, and the policy ONNX files
-    (`*_student.onnx`, `*_depth_backbone.onnx`, `policy.onnx`).
+    `assets/ort-wasm-simd-threaded.jsep-*.wasm` + `assets/ort-wasm-simd-threaded.jsep.mjs`
+    (onnxruntime-web 1.24.1 runtime), `assets/favicon-*.png`, and the policy ONNX
+    files it actually loads (`*_student.onnx`, `*_depth_backbone.onnx`).
+  - The upstream build also shipped an unused `policy.onnx` (a dead default
+    fallback that is never fetched — the runtime uses `*_student.onnx`); it was
+    dropped to save ~12 MB.
 - `assets/scenes/` — exactly the scene/mesh files the bundle preloads into its
   in-memory filesystem at startup (the upstream `assets/scenes/index.json`
   manifest). The active scene is `g1_with_terrain.xml`; its terrain is made of
@@ -27,6 +31,30 @@ The bundle fetches scenes with `fetch("../assets/scenes/" + name)` relative to
 `dist-desktop/index.html`, so `dist-desktop/` and `assets/` must remain siblings
 (this layout preserves that). All upstream paths are relative, so the mirror
 works correctly under the site's GitHub Pages base path.
+
+## Local modifications
+
+The upstream bundle hard-codes its onnxruntime-web runtime location to a CDN:
+
+```js
+wQ.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/"
+```
+
+That makes the demo depend on `cdn.jsdelivr.net` at runtime — if the CDN is
+unreachable, ORT logs `no available backend found`, the policy never
+initializes, the robot goes limp, and the depth image stays black. To make the
+demo genuinely self-hosted, that one literal in `dist-desktop/assets/index-*.js`
+was replaced with a local object that points at files in this directory:
+
+```js
+{ mjs:  new URL("./ort-wasm-simd-threaded.jsep.mjs",          import.meta.url).href,
+  wasm: new URL("./ort-wasm-simd-threaded.jsep-6MnTkKum.wasm", import.meta.url).href }
+```
+
+`ort-wasm-simd-threaded.jsep.mjs` (the matching onnxruntime-web 1.24.1 loader)
+was added next to the existing hashed `.wasm` (byte-identical to the CDN copy,
+so it is reused rather than duplicated). **If you ever re-pull the upstream
+build, re-apply this patch.**
 
 ## License / attribution
 
