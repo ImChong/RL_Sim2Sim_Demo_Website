@@ -661,6 +661,13 @@ export default {
         scenePath: 'g1_amp/scene_g1.xml'
       },
       {
+        value: 'g1-parkour',
+        title: 'G1 Perceptive Parkour',
+        descriptionKey: 'parkourPolicyDescription',
+        isExternalDemo: true,
+        iframePath: 'parkour/dist-desktop/index.html'
+      },
+      {
         value: 'g1-tracking-latest',
         title: 'G1 Tracking',
         description: 'Tracking policy with compliance input enabled.',
@@ -668,13 +675,6 @@ export default {
         policyPath: './examples/checkpoints/g1/tracking_policy_latest.json',
         onnxPath: './examples/checkpoints/g1/tracking/policy_latest.onnx',
         scenePath: 'g1/g1.xml'
-      },
-      {
-        value: 'g1-parkour',
-        title: 'G1 Perceptive Parkour',
-        descriptionKey: 'parkourPolicyDescription',
-        isExternalDemo: true,
-        iframePath: 'parkour/dist-desktop/index.html'
       }
     ],
     currentPolicy: 'g1-amp-walk-run-getup',
