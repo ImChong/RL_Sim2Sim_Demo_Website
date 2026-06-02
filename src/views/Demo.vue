@@ -982,7 +982,9 @@ export default {
           this.state = 1;
         } else {
           this.state = -1;
-          this.extra_error_message = error instanceof Error ? error.message : 'An unexpected error occurred';
+          // Fail securely: do not expose error.message to the user to prevent leaking sensitive system information.
+          this.extra_error_message = 'An unexpected error occurred';
+          console.error('Simulation load failed:', error);
         }
         throw error;
       }
