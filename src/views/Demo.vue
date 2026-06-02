@@ -16,8 +16,23 @@
       role="status"
       aria-live="polite"
     >
-      <v-progress-circular indeterminate color="primary" size="48" />
-      <span class="parkour-loading-text">{{ t.parkourLoading }}</span>
+      <div class="parkour-loading-card">
+        <div class="parkour-loading-title">{{ t.loadingSimulationTitle }}</div>
+        <div class="parkour-loading-body">{{ t.loadingSimulationBody }}</div>
+        <v-progress-linear
+          :model-value="parkourLoadProgress"
+          height="10"
+          color="primary"
+          rounded
+          class="parkour-loading-progress"
+          :aria-label="t.loadingSimulationTitle"
+          :aria-valuenow="parkourLoadProgress"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          role="progressbar"
+        ></v-progress-linear>
+        <div class="parkour-loading-percent">{{ parkourLoadProgress }}%</div>
+      </div>
     </div>
   </div>
   <div class="global-alerts">
@@ -526,7 +541,6 @@ const translations = {
       'AMP policy trained for walk, run, and get-up behaviors.',
     parkourPolicyDescription:
       'Perceptive humanoid parkour demo (embedded). Drive the G1 over the terrain course with the keyboard.',
-    parkourLoading: 'Loading parkour demo…',
     parkourHoldW:
       'Keep holding W during approach, climbing, on top, and descent, until you are back on the ground.',
     parkourHowToPlay: 'How to play',
@@ -597,7 +611,6 @@ const translations = {
       '用于行走、跑步和起身行为的 AMP 策略。',
     parkourPolicyDescription:
       '感知型人形跑酷演示（内嵌）。用键盘驱动 G1 穿越地形障碍课程。',
-    parkourLoading: '正在加载跑酷演示…',
     parkourHoldW:
       '在接近、攀爬、登顶和下降的整个过程中持续按住 W，直到重新回到地面。',
     parkourHowToPlay: '操作说明',
@@ -706,6 +719,8 @@ export default {
     controlPanelResize: null,
     parkourSuspended: false,
     parkourLoading: false,
+    parkourLoadProgress: 0,
+    parkourReceivedProgress: false,
     parkourReloadKey: 0
   }),
   computed: {
@@ -1225,7 +1240,7 @@ export default {
           this.demo.suspendRendering();
           this.parkourSuspended = true;
         }
-        this.parkourLoading = true;
+        this.startParkourLoad();
         this.policyLoadError = '';
         return;
       }
@@ -1279,7 +1294,7 @@ export default {
     reset() {
       if (this.isParkourPolicy) {
         // Reload the embedded demo for a clean restart (remounts via :key).
-        this.parkourLoading = true;
+        this.startParkourLoad();
         this.parkourReloadKey += 1;
         return;
       }
@@ -1294,8 +1309,23 @@ export default {
       this.currentMotion = this.demo.params.current_motion ?? this.availableMotions[0] ?? null;
       this.updateTrackingState();
     },
-    onParkourLoad() {
-      this.parkourLoading = false;
+    startParkourLoad() {
+      this.clearParkourLoadTimers();
+      this.parkourLoading = true;
+      this.parkourLoadProgress = 0;
+      this.parkourReceivedProgress = false;
+    },
+    clearParkourLoadTimers() {
+      if (this.parkourFallbackTimer) {
+        clearTimeout(this.parkourFallbackTimer);
+        this.parkourFallbackTimer = null;
+      }
+      if (this.parkourHardTimer) {
+        clearTimeout(this.parkourHardTimer);
+        this.parkourHardTimer = null;
+      }
+    },
+    focusParkourFrame() {
       // Same-origin iframe: focus it so keyboard input (W/A/D/Y/SPACE) reaches
       // the demo right away.
       try {
@@ -1303,6 +1333,62 @@ export default {
       } catch (error) {
         /* focusing can throw in some browsers; safe to ignore */
       }
+    },
+    finishParkourLoading() {
+      this.clearParkourLoadTimers();
+      this.parkourLoadProgress = 100;
+      this.parkourLoading = false;
+      this.$nextTick(() => this.focusParkourFrame());
+    },
+    handleParkourMessage(event) {
+      const frame = this.$refs.parkourFrame;
+      if (!frame || event.source !== frame.contentWindow) {
+        return;
+      }
+      if (event.origin !== window.location.origin) {
+        return;
+      }
+      const data = event.data;
+      if (!data || data.source !== 'parkour-loader') {
+        return;
+      }
+      if (data.type === 'progress') {
+        this.parkourReceivedProgress = true;
+        const value = Number(data.value);
+        if (Number.isFinite(value)) {
+          const pct = Math.round(Math.min(100, Math.max(0, value * 100)));
+          // Monotonic: a fresh load resets parkourLoadProgress to 0 first.
+          if (pct > this.parkourLoadProgress) {
+            this.parkourLoadProgress = pct;
+          }
+        }
+      } else if (data.type === 'ready') {
+        this.finishParkourLoading();
+      }
+    },
+    onParkourLoad() {
+      // The iframe's HTML document loaded, but the heavy MuJoCo + ONNX assets
+      // are still downloading/initialising inside it. Keep the overlay until the
+      // embedded reporter posts 'ready' (scene painted); the timers below guard
+      // against the reporter being unavailable so we never hang on the loader.
+      this.clearParkourLoadTimers();
+      if (!this.parkourLoading) {
+        this.focusParkourFrame();
+        return;
+      }
+      // If no progress arrives shortly, assume the reporter is missing and
+      // reveal the demo instead of waiting indefinitely.
+      this.parkourFallbackTimer = setTimeout(() => {
+        if (this.parkourLoading && !this.parkourReceivedProgress) {
+          this.finishParkourLoading();
+        }
+      }, 8000);
+      // Absolute cap so we never stay on the loader for a pathological load.
+      this.parkourHardTimer = setTimeout(() => {
+        if (this.parkourLoading) {
+          this.finishParkourLoading();
+        }
+      }, 180000);
     },
     backToDefault() {
       if (!this.demo) {
@@ -1454,6 +1540,10 @@ export default {
   },
   mounted() {
     this.customMotions = {};
+    this.parkourFallbackTimer = null;
+    this.parkourHardTimer = null;
+    this.parkour_message_listener = (event) => this.handleParkourMessage(event);
+    window.addEventListener('message', this.parkour_message_listener);
     this.isSafari = this.detectSafari();
     this.updateScreenState();
     this.updateVisualViewportOffset();
@@ -1493,6 +1583,10 @@ export default {
   beforeUnmount() {
     this.endControlPanelResize();
     this.stopTrackingPoll();
+    this.clearParkourLoadTimers();
+    if (this.parkour_message_listener) {
+      window.removeEventListener('message', this.parkour_message_listener);
+    }
     this.mobileControlsResizeObserver?.disconnect();
     document.documentElement.style.removeProperty('--mobile-controls-panel-height');
     document.removeEventListener('keydown', this.keydown_listener);
@@ -1529,17 +1623,46 @@ export default {
   position: absolute;
   inset: 0;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  padding: 24px;
+  color: #e2e8f0;
+  /* Opaque backdrop hides the iframe's white background while it initialises. */
   background: #0f172a;
   pointer-events: none;
 }
 
-.parkour-loading-text {
-  margin-top: 12px;
-  font-size: 0.9rem;
+.parkour-loading-card {
+  width: 100%;
+  max-width: 460px;
+  padding: 22px 26px;
+  border-radius: 14px;
+  background: rgba(30, 41, 59, 0.72);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+}
+
+.parkour-loading-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #f8fafc;
+}
+
+.parkour-loading-body {
+  margin-top: 6px;
+  font-size: 0.85rem;
+  color: rgba(226, 232, 240, 0.72);
+}
+
+.parkour-loading-progress {
+  margin-top: 18px;
+}
+
+.parkour-loading-percent {
+  margin-top: 8px;
+  font-size: 0.78rem;
+  text-align: right;
+  color: rgba(226, 232, 240, 0.7);
 }
 
 .parkour-controls {

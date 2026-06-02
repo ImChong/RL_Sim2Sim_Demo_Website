@@ -383,7 +383,11 @@
             <site name="finish_glow" type="sphere" pos="66 0 1.35" size="0.10" rgba="1 0.95 0.3 1"/>
         </body>
 
-        <light pos="0 0 1.5" dir="0 0 -1" directional="true"/>
+        <!-- Key/fill/rim rig copied from the Tracking demo (g1/g1.xml) for
+             consistent modeling and shadows across the demos. -->
+        <light name="key_light" directional="true" diffuse="1.12 1.12 1.12" specular="0.06 0.06 0.06" pos="4 5.5 2" dir="-0.45 -0.55 -0.7" castshadow="true" cutoff="255"/>
+        <light name="fill_light" directional="true" diffuse="0.28 0.32 0.38" specular="0.02 0.02 0.025" pos="-3.5 -3 4" dir="0.42 0.38 -0.82" castshadow="false" cutoff="255"/>
+        <light name="rim_light" directional="true" diffuse="0.22 0.22 0.25" specular="0.02 0.02 0.02" pos="0 4 3.5" dir="0.12 -0.62 -0.77" castshadow="false" cutoff="255"/>
         <geom name="floor" pos="0 0 0" size="0 0 .05" type="plane" material="grid" condim="3" contype="1" conaffinity="1"/>
 
     </worldbody>
@@ -478,16 +482,24 @@
         <framepos name="mid360_pos" objtype="site" objname="mid360"/>
     </sensor>
 
+    <!-- Lighting/background aligned with the main-site AMP (scene_g1.xml) and
+         Tracking (g1/g1.xml) demos so the embedded parkour view matches them.
+         The parkour app renders the MuJoCo skybox as the scene background, so we
+         use a flat fill in the same dark color the main site applies in JS
+         (theme.js dark backgroundRgb = 0.08 0.12 0.18). Headlight diffuse/specular
+         match AMP; ambient is kept higher than AMP's 0.1 to stand in for the soft
+         hemisphere+ambient fill the main site adds in JS (which the embedded app
+         can't), so overall brightness stays consistent. -->
     <visual>
-        <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
+        <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0.9 0.9 0.9"/>
         <rgba haze="0.15 0.25 0.35 1"/>
         <global azimuth="120" elevation="-20"/>
     </visual>
 
     <asset>
-        <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072"/>
-        <texture name="grid" type="2d" builtin="checker" width="512" height="512" rgb1=".1 .2 .3" rgb2=".2 .3 .4"/>
-        <material name="grid" texture="grid" texrepeat="1 1" texuniform="true" reflectance=".2"/>
+        <texture type="skybox" builtin="flat" rgb1="0.08 0.12 0.18" rgb2="0.08 0.12 0.18" width="512" height="3072"/>
+        <texture name="grid" type="2d" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3" markrgb="0.8 0.8 0.8" width="300" height="300"/>
+        <material name="grid" texture="grid" texrepeat="44 44" texuniform="true" reflectance="0.2"/>
     </asset>
 
 </mujoco>
