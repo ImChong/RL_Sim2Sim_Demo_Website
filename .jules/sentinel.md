@@ -41,3 +41,8 @@
 **Vulnerability:** The application's Content-Security-Policy (CSP) `script-src` directive contained `'unsafe-eval'`.
 **Learning:** This was likely introduced to allow WebAssembly (like MuJoCo and ONNX) to execute, but `'unsafe-eval'` is too broad and permits general JavaScript evaluation vulnerabilities (e.g. from `eval()` and `new Function()`).
 **Prevention:** Always use `'wasm-unsafe-eval'` instead of `'unsafe-eval'` in the CSP when the application needs to run WebAssembly but wants to block general JS execution vulnerabilities.
+
+## 2026-06-02 - Secure Error Messages in UI
+**Vulnerability:** The application was exposing raw `error.message` directly to the UI when an internal error occurred during simulation loading in `src/views/Demo.vue`.
+**Learning:** This is considered a security risk as it can leak stack traces or sensitive internal system information to the user.
+**Prevention:** Always fail securely by rendering a generic fallback message (e.g., 'An unexpected error occurred') while logging the actual error to the console for debugging.
