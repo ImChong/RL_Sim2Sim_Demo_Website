@@ -1,4 +1,10 @@
 <template>
+  <AmpMobileJoystick
+    v-if="showAmpMobileJoystick"
+    :disabled="state !== 1"
+    :labels="ampJoystickLabels"
+    @command="onAmpJoystickCommand"
+  />
   <div id="mujoco-container"></div>
   <div v-if="isParkourPolicy" class="parkour-frame-wrap">
     <iframe
@@ -217,7 +223,7 @@
             {{ t.knockdownTest }}
           </v-btn>
           <div class="text-caption mt-1">{{ t.knockdownTestHint }}</div>
-          <div class="amp-keyboard-controls mt-3">
+          <div v-if="!isSmallScreen" class="amp-keyboard-controls mt-3">
             <span class="status-name">{{ t.ampKeyboardHowToPlay }}</span>
             <div class="parkour-keys mt-2">
               <template v-for="row in ampKeyboardControls" :key="row.key">
@@ -227,6 +233,7 @@
             </div>
             <div class="text-caption mt-2 text-medium-emphasis">{{ t.ampKeyboardFocusHint }}</div>
           </div>
+          <div v-else class="text-caption mt-2 text-medium-emphasis">{{ t.ampJoystickPanelHint }}</div>
         </div>
 
         <v-alert
@@ -502,6 +509,7 @@
 import { MuJoCoDemo } from '@/simulation/main.js';
 import loadMujoco from 'mujoco-js';
 import ModelIOFlowchart from '@/components/ModelIOFlowchart.vue';
+import AmpMobileJoystick from '@/components/AmpMobileJoystick.vue';
 import {
   clampControlPanelSize,
   loadControlPanelSize,
@@ -572,6 +580,12 @@ const translations = {
     ampKeyRotateRight: 'Turn in place right',
     ampKeySprint: 'Hold for maximum speed',
     ampKeyboardFocusHint: 'Click the demo view first, then use the keys. Sliders update while keys are held.',
+    ampJoystickPanelHint: 'Use the virtual joystick at the bottom-right of the screen (above this panel).',
+    ampJoystickGroup: 'AMP movement controls',
+    ampJoystickMove: 'Move',
+    ampJoystickRotateLeft: 'Turn left',
+    ampJoystickRotateRight: 'Turn right',
+    ampJoystickHint: 'Drag for walk/run; push to the edge for max speed.',
     ampPolicyDescription:
       'AMP policy trained for walk, run, and get-up behaviors.',
     parkourPolicyDescription:
@@ -651,6 +665,12 @@ const translations = {
     ampKeyRotateRight: '原地向右旋转',
     ampKeySprint: '按住时以最大速度',
     ampKeyboardFocusHint: '请先点击演示画面，再使用键盘。按住按键时滑块会同步显示当前速度。',
+    ampJoystickPanelHint: '请使用画面右下、控制面板上方的虚拟摇杆。',
+    ampJoystickGroup: 'AMP 移动控制',
+    ampJoystickMove: '移动',
+    ampJoystickRotateLeft: '左转',
+    ampJoystickRotateRight: '右转',
+    ampJoystickHint: '拖动摇杆行走；推至外圈为最大速度。',
     ampPolicyDescription:
       '用于行走、跑步和起身行为的 AMP 策略。',
     parkourPolicyDescription:
@@ -677,7 +697,8 @@ const translations = {
 export default {
   name: 'DemoPage',
   components: {
-    ModelIOFlowchart
+    ModelIOFlowchart,
+    AmpMobileJoystick
   },
   props: {
     visualTheme: {
@@ -880,6 +901,18 @@ export default {
     },
     isAmpPolicy() {
       return this.currentPolicy?.startsWith('g1-amp');
+    },
+    showAmpMobileJoystick() {
+      return this.isAmpPolicy && this.isSmallScreen && !this.isParkourPolicy;
+    },
+    ampJoystickLabels() {
+      return {
+        group: this.t.ampJoystickGroup,
+        move: this.t.ampJoystickMove,
+        rotateLeft: this.t.ampJoystickRotateLeft,
+        rotateRight: this.t.ampJoystickRotateRight,
+        hint: this.t.ampJoystickHint
+      };
     },
     isParkourPolicy() {
       return this.selectedPolicy?.isExternalDemo === true;
@@ -1242,6 +1275,15 @@ export default {
       this.demo.params.cmdX = this.cmdX;
       this.demo.params.cmdY = this.cmdY;
       this.demo.params.cmdYaw = this.cmdYaw;
+    },
+    onAmpJoystickCommand({ cmdX, cmdY, cmdYaw }) {
+      if (!this.isAmpPolicy || this.state !== 1) {
+        return;
+      }
+      this.cmdX = cmdX;
+      this.cmdY = cmdY;
+      this.cmdYaw = cmdYaw;
+      this.onCmdChange();
     },
     shouldIgnoreAmpKeyboard(event) {
       const tag = event.target?.tagName;
