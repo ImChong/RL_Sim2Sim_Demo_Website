@@ -157,5 +157,13 @@ replaceOnceAny(
   'this.depthInferenceMaterial.uniforms.cameraNear.value=this.depthCameraView.near,this.depthInferenceMaterial.uniforms.cameraFar.value=this.depthCameraView.far;const _p=this.scene.overrideMaterial,_c=this.renderer.getClearColor(new hB),_a=this.renderer.getClearAlpha();this.scene.overrideMaterial=this.depthInferenceMaterial,this.renderer.setRenderTarget(this.depthInferenceTarget),this.renderer.setClearColor(16777215,1),this.renderer.clear(),this.renderer.render(this.scene,this.depthCameraView),this.renderer.setClearColor(_c,_a),this.scene.overrideMaterial=_p,'
 );
 
+// 9) Depth latent queue: use the last valid/zero depth feature while the async
+//    depth backbone warms up. Pushing null makes Float32Array#set throw and
+//    causes repeated policy inference errors during the first mobile frames.
+replaceOnce(
+  'I&&I.length===32?this.depthLatentQueue.push(Float32Array.from(I)):this.depthLatentQueue.push(null);let C=null;this.depthLatentQueue.length>this.depthLatencySteps?C=this.depthLatentQueue.shift():C=this.depthLatentQueue[0];const E=new Float32Array(g.length+32);E.set(g,0),E.set(C,g.length);',
+  'I&&I.length===32?(this.depthFeature.set(I),this.depthLatentQueue.push(Float32Array.from(this.depthFeature))):this.depthLatentQueue.push(Float32Array.from(this.depthFeature));let C=null;this.depthLatentQueue.length>this.depthLatencySteps?C=this.depthLatentQueue.shift():C=this.depthLatentQueue[0];const E=new Float32Array(g.length+32);E.set(g,0),E.set(C??this.depthFeature,g.length);'
+);
+
 fs.writeFileSync(FILE, src);
 console.log('done');

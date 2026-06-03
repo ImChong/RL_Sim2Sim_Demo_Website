@@ -85,6 +85,16 @@ test('parkour policy depth pass avoids iOS depth texture readback path', () => {
     /this\.renderer\.render\(this\.depthInferenceScene,this\.depthCamera\)/,
     'readback pass should not render the old fullscreen depth-texture quad'
   );
+  assert.doesNotMatch(
+    bundle,
+    /depthLatentQueue\.push\(null\)/,
+    'policy depth latent queue should not enqueue null while depth warms up'
+  );
+  assert.match(
+    bundle,
+    /this\.depthFeature\.set\(I\).*depthLatentQueue\.push\(Float32Array\.from\(this\.depthFeature\)\).*E\.set\(C\?\?this\.depthFeature,g\.length\)/,
+    'policy should fall back to the last valid or zero depth feature'
+  );
 });
 
 test('host bridge defers reflection quality until reflectors exist', () => {
