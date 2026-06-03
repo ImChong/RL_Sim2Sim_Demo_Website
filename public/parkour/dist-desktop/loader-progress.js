@@ -127,36 +127,42 @@
   // that's when we reveal the demo to the user.
   function canvasReady() {
     var canvas = document.querySelector('canvas');
-    return !!(canvas && canvas.width > 0 && canvas.height > 0);
+    if (!canvas || canvas.width <= 0 || canvas.height <= 0) return false;
+    // The MuJoCo app resizes the canvas to fill the window once it starts its
+    // render loop; a tiny default-sized canvas means nothing has been drawn yet.
+    return canvas.width >= Math.min(window.innerWidth, 320) &&
+      canvas.height >= Math.min(window.innerHeight, 240);
   }
 
   function finishWhenPainted() {
-    // Wait two frames so the first real frame is on screen before revealing it.
-    requestAnimationFrame(function () {
-      requestAnimationFrame(signalReady);
-    });
+    // Wait several frames after the canvas is sized so the first real scene frame
+    // is on screen before we reveal it. Revealing too early exposes the blank
+    // canvas, which used to flash white between the loader and the first frame.
+    var framesLeft = 6;
+    (function waitFrame() {
+      if (framesLeft-- <= 0) {
+        signalReady();
+        return;
+      }
+      requestAnimationFrame(waitFrame);
+    })();
   }
 
-  if (canvasReady()) {
-    finishWhenPainted();
-  } else {
-    var observer = new MutationObserver(function () {
-      if (canvasReady()) {
-        observer.disconnect();
-        finishWhenPainted();
-      }
-    });
-    observer.observe(document.documentElement, { childList: true, subtree: true });
-    // Absolute safety net so the host is never stuck on the loader.
-    setTimeout(function () {
-      try {
-        observer.disconnect();
-      } catch (e) {
-        /* already disconnected */
-      }
-      signalReady();
-    }, 120000);
-  }
+  // Poll on each animation frame until the canvas is present and sized; a DOM
+  // MutationObserver alone misses the moment the app resizes the canvas (a
+  // property change rather than a child mutation), which is exactly when the
+  // scene starts drawing.
+  (function waitForCanvas() {
+    if (ready) return;
+    if (canvasReady()) {
+      finishWhenPainted();
+      return;
+    }
+    requestAnimationFrame(waitForCanvas);
+  })();
+
+  // Absolute safety net so the host is never stuck on the loader.
+  setTimeout(signalReady, 120000);
 
   // Show the bar immediately at 0%.
   post('progress', 0);
