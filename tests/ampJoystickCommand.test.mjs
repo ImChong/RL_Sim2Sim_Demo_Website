@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { AMP_CMD_WALK } from '../src/utils/ampKeyboardCommand.js';
+import { AMP_CMD_SPRINT, AMP_CMD_WALK } from '../src/utils/ampKeyboardCommand.js';
 import {
   applyJoystickDeadzone,
   computeAmpCommandFromJoystick,
@@ -40,9 +40,21 @@ describe('ampJoystickCommand', () => {
     assert.equal(computeAmpYawFromStick(0, false), 0);
   });
 
+  test('mobile yaw buttons always use maximum turn rate', () => {
+    assert.equal(computeAmpYawFromStick(1, false, true), AMP_CMD_SPRINT.yaw);
+    assert.equal(computeAmpYawFromStick(-1, false, true), -AMP_CMD_SPRINT.yaw);
+  });
+
   test('combines move stick and yaw hold', () => {
     const cmd = computeAmpCommandFromJoystick(0, 0.5, 1, false);
     assert.ok(cmd.cmdX > 0);
     assert.equal(cmd.cmdYaw, AMP_CMD_WALK.yaw);
+  });
+
+  test('mobile joystick uses max yaw while move stick stays at walk speed', () => {
+    const cmd = computeAmpCommandFromJoystick(0, 0.5, 1, false, true);
+    assert.ok(cmd.cmdX > 0);
+    assert.ok(cmd.cmdX < AMP_CMD_SPRINT.vx);
+    assert.equal(cmd.cmdYaw, AMP_CMD_SPRINT.yaw);
   });
 });

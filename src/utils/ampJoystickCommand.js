@@ -45,18 +45,28 @@ export function computeAmpCommandFromMoveStick(normX, normY, sprint = false) {
 }
 
 /** direction: +1 left (CCW), -1 right (CW), 0 release. */
-export function computeAmpYawFromStick(direction, sprint = false) {
+export function computeAmpYawFromStick(direction, sprint = false, yawAlwaysMax = false) {
   if (!direction) {
     return 0;
   }
-  const speed = sprint ? AMP_CMD_SPRINT : AMP_CMD_WALK;
+  const speed = sprint || yawAlwaysMax ? AMP_CMD_SPRINT : AMP_CMD_WALK;
   const cmdYaw = direction * speed.yaw;
   return clamp(cmdYaw, AMP_CMD_LIMITS.cmdYaw.min, AMP_CMD_LIMITS.cmdYaw.max);
 }
 
-export function computeAmpCommandFromJoystick(moveNormX, moveNormY, yawDirection, sprint = false) {
+export function computeAmpCommandFromJoystick(
+  moveNormX,
+  moveNormY,
+  yawDirection,
+  sprint = false,
+  yawAlwaysMax = false
+) {
   const move = computeAmpCommandFromMoveStick(moveNormX, moveNormY, sprint);
-  const cmdYaw = computeAmpYawFromStick(yawDirection, move.sprint || sprint);
+  const cmdYaw = computeAmpYawFromStick(
+    yawDirection,
+    move.sprint || sprint,
+    yawAlwaysMax
+  );
   return {
     cmdX: move.cmdX,
     cmdY: move.cmdY,
