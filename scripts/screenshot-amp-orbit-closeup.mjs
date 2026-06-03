@@ -21,7 +21,7 @@ await page.goto(process.env.VITE_URL ?? 'http://127.0.0.1:3001/', {
 });
 await page.waitForSelector('[data-test="knockdown-test-mobile"]', { timeout: 240000 });
 await sleep(3000);
-const el = await page.$('.amp-mobile-controls__orbit-hub');
+const el = await page.$('.amp-mobile-controls__pad');
 fs.mkdirSync('/opt/cursor/artifacts/screenshots', { recursive: true });
 await el.screenshot({ path: OUT });
 console.log('OK:', OUT);

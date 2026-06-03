@@ -5,7 +5,7 @@
     role="group"
     :aria-label="labels.group"
   >
-    <div class="amp-mobile-controls__orbit-hub">
+    <div class="amp-mobile-controls__pad">
       <div
         ref="moveBase"
         class="amp-mobile-controls__stick-base"
@@ -20,40 +20,42 @@
           :style="knobStyle"
         ></div>
       </div>
-      <button
-        type="button"
-        class="amp-mobile-controls__action-btn amp-mobile-controls__knockdown-btn amp-mobile-controls__orbit-btn amp-mobile-controls__orbit-btn--knockdown"
-        :aria-label="labels.knockdown"
-        :disabled="disabled"
-        data-test="knockdown-test-mobile"
-        @click.stop="onKnockdownClick"
-      >
-        <v-icon icon="mdi-arrow-down-bold" size="22" />
-      </button>
-      <button
-        type="button"
-        class="amp-mobile-controls__action-btn amp-mobile-controls__orbit-btn amp-mobile-controls__orbit-btn--yaw-left"
-        :aria-label="labels.rotateLeft"
-        :disabled="disabled"
-        @pointerdown.prevent="onYawDown(1, $event)"
-        @pointerup.prevent="onYawUp($event)"
-        @pointercancel.prevent="onYawUp($event)"
-        @pointerleave.prevent="onYawUp($event)"
-      >
-        <v-icon icon="mdi-rotate-left" size="22" />
-      </button>
-      <button
-        type="button"
-        class="amp-mobile-controls__action-btn amp-mobile-controls__orbit-btn amp-mobile-controls__orbit-btn--yaw-right"
-        :aria-label="labels.rotateRight"
-        :disabled="disabled"
-        @pointerdown.prevent="onYawDown(-1, $event)"
-        @pointerup.prevent="onYawUp($event)"
-        @pointercancel.prevent="onYawUp($event)"
-        @pointerleave.prevent="onYawUp($event)"
-      >
-        <v-icon icon="mdi-rotate-right" size="22" />
-      </button>
+      <div class="amp-mobile-controls__orbit-anchor" aria-hidden="true">
+        <button
+          type="button"
+          class="amp-mobile-controls__action-btn amp-mobile-controls__knockdown-btn amp-mobile-controls__orbit-btn amp-mobile-controls__orbit-btn--knockdown"
+          :aria-label="labels.knockdown"
+          :disabled="disabled"
+          data-test="knockdown-test-mobile"
+          @click.stop="onKnockdownClick"
+        >
+          <v-icon icon="mdi-arrow-down-bold" size="22" />
+        </button>
+        <button
+          type="button"
+          class="amp-mobile-controls__action-btn amp-mobile-controls__orbit-btn amp-mobile-controls__orbit-btn--yaw-left"
+          :aria-label="labels.rotateLeft"
+          :disabled="disabled"
+          @pointerdown.prevent="onYawDown(1, $event)"
+          @pointerup.prevent="onYawUp($event)"
+          @pointercancel.prevent="onYawUp($event)"
+          @pointerleave.prevent="onYawUp($event)"
+        >
+          <v-icon icon="mdi-rotate-left" size="22" />
+        </button>
+        <button
+          type="button"
+          class="amp-mobile-controls__action-btn amp-mobile-controls__orbit-btn amp-mobile-controls__orbit-btn--yaw-right"
+          :aria-label="labels.rotateRight"
+          :disabled="disabled"
+          @pointerdown.prevent="onYawDown(-1, $event)"
+          @pointerup.prevent="onYawUp($event)"
+          @pointercancel.prevent="onYawUp($event)"
+          @pointerleave.prevent="onYawUp($event)"
+        >
+          <v-icon icon="mdi-rotate-right" size="22" />
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -221,7 +223,6 @@ export default {
   --amp-mobile-knockdown: rgba(var(--v-theme-secondary), 0.24);
   --amp-stick-size: 128px;
   --amp-btn-size: 48px;
-  /* Stick edge + half button + gap so buttons do not overlap the stick */
   --amp-orbit-radius: calc(var(--amp-stick-size) / 2 + var(--amp-btn-size) / 2 + 14px);
 
   position: fixed;
@@ -245,19 +246,18 @@ export default {
   pointer-events: none;
 }
 
-.amp-mobile-controls__orbit-hub {
+.amp-mobile-controls__pad {
   position: relative;
-  width: calc(var(--amp-orbit-radius) * 2 + var(--amp-btn-size));
-  height: calc(var(--amp-orbit-radius) * 2 + var(--amp-btn-size));
+  width: calc(var(--amp-stick-size) + var(--amp-orbit-radius) + var(--amp-btn-size) / 2);
+  height: calc(var(--amp-stick-size) + var(--amp-orbit-radius) * 0.52);
 }
 
 .amp-mobile-controls__stick-base {
   position: absolute;
-  left: 50%;
-  top: 50%;
+  right: 0;
+  bottom: 0;
   width: var(--amp-stick-size);
   height: var(--amp-stick-size);
-  transform: translate(-50%, -50%);
   border-radius: 50%;
   border: 1px solid var(--amp-mobile-glass-border);
   background: var(--amp-mobile-glass);
@@ -265,6 +265,15 @@ export default {
   -webkit-backdrop-filter: blur(8px);
   touch-action: none;
   z-index: 1;
+}
+
+.amp-mobile-controls__orbit-anchor {
+  position: absolute;
+  right: calc(var(--amp-stick-size) / 2);
+  bottom: calc(var(--amp-stick-size) / 2);
+  width: 0;
+  height: 0;
+  z-index: 2;
 }
 
 .amp-mobile-controls__stick-base::before {
@@ -290,27 +299,26 @@ export default {
   will-change: transform;
 }
 
-/* Equal radius from stick center; CCW from top: knockdown → yaw left → yaw right */
+/* 0deg = 12 o'clock; CCW: 11点 -30deg, 10点 -60deg, 9点 -90deg */
 .amp-mobile-controls__orbit-btn {
   --orbit-deg: 0deg;
   position: absolute;
-  left: 50%;
-  top: 50%;
-  z-index: 2;
+  left: 0;
+  top: 0;
   transform: translate(-50%, -50%) rotate(var(--orbit-deg))
     translateY(calc(-1 * var(--amp-orbit-radius))) rotate(calc(-1 * var(--orbit-deg)));
 }
 
 .amp-mobile-controls__orbit-btn--knockdown {
-  --orbit-deg: 0deg;
+  --orbit-deg: -30deg;
 }
 
 .amp-mobile-controls__orbit-btn--yaw-left {
-  --orbit-deg: -38deg;
+  --orbit-deg: -60deg;
 }
 
 .amp-mobile-controls__orbit-btn--yaw-right {
-  --orbit-deg: -76deg;
+  --orbit-deg: -90deg;
 }
 
 .amp-mobile-controls__action-btn {
