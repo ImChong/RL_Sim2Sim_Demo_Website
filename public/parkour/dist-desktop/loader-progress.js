@@ -123,40 +123,100 @@
     };
   }
 
-  // The visible WebGL canvas is appended once the scene is built and rendering;
-  // that's when we reveal the demo to the user.
-  function canvasReady() {
+  // Reveal the demo only once the scene is actually drawn. The canvas element
+  // (and even the demo's lil-gui panel) can exist for several seconds before the
+  // first populated frame appears; until then the canvas is blank and the dark
+  // page background shows through. Sampling the canvas lets us keep the loading
+  // overlay up until a real, detailed frame is on screen.
+
+  // Force preserveDrawingBuffer so the WebGL canvas can be read back after a
+  // frame is drawn. This runs before the app bundle (a deferred module), so the
+  // demo's context picks up the flag.
+  (function patchGetContext() {
+    var proto = (typeof HTMLCanvasElement !== 'undefined') && HTMLCanvasElement.prototype;
+    if (!proto || proto.__loaderPatched) return;
+    proto.__loaderPatched = true;
+    var orig = proto.getContext;
+    proto.getContext = function (type, attrs) {
+      if (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') {
+        attrs = attrs || {};
+        if (attrs.preserveDrawingBuffer !== true) attrs.preserveDrawingBuffer = true;
+      }
+      return orig.call(this, type, attrs);
+    };
+  })();
+
+  var SAMPLE_W = 40, SAMPLE_H = 30;
+  var sampleCanvas = null, sampleCtx = null;
+
+  function canvasSized(canvas) {
+    return !!(canvas && canvas.width > 0 && canvas.height > 0 &&
+      canvas.width >= Math.min(window.innerWidth, 320) &&
+      canvas.height >= Math.min(window.innerHeight, 240));
+  }
+
+  // True once the canvas holds a real rendered frame. A blank/cleared canvas is
+  // uniform and dark (or fully transparent); a 3D scene has spatial detail (a
+  // wide spread of luminance) and/or is clearly bright.
+  function sceneHasContent() {
     var canvas = document.querySelector('canvas');
-    return !!(canvas && canvas.width > 0 && canvas.height > 0);
+    if (!canvasSized(canvas)) return false;
+    try {
+      if (!sampleCanvas) {
+        sampleCanvas = document.createElement('canvas');
+        sampleCanvas.width = SAMPLE_W;
+        sampleCanvas.height = SAMPLE_H;
+        sampleCtx = sampleCanvas.getContext('2d', { willReadFrequently: true });
+      }
+      sampleCtx.clearRect(0, 0, SAMPLE_W, SAMPLE_H);
+      sampleCtx.drawImage(canvas, 0, 0, SAMPLE_W, SAMPLE_H);
+      var data = sampleCtx.getImageData(0, 0, SAMPLE_W, SAMPLE_H).data;
+      var n = SAMPLE_W * SAMPLE_H, sum = 0, sumSq = 0, opaque = 0;
+      for (var k = 0, q = 0; k < n; k++, q += 4) {
+        var L = 0.299 * data[q] + 0.587 * data[q + 1] + 0.114 * data[q + 2];
+        sum += L;
+        sumSq += L * L;
+        if (data[q + 3] > 16) opaque++;
+      }
+      if (opaque < n * 0.3) return false; // nothing opaque drawn yet
+      var mean = sum / n;
+      var std = Math.sqrt(Math.max(0, sumSq / n - mean * mean));
+      return std > 10 || mean > 60;
+    } catch (e) {
+      // Pixels unreadable for some reason: fall back to "canvas is sized".
+      return canvasSized(canvas);
+    }
   }
 
   function finishWhenPainted() {
-    // Wait two frames so the first real frame is on screen before revealing it.
-    requestAnimationFrame(function () {
-      requestAnimationFrame(signalReady);
-    });
+    // One extra frame so the detected frame is definitely presented.
+    requestAnimationFrame(signalReady);
   }
 
-  if (canvasReady()) {
-    finishWhenPainted();
-  } else {
-    var observer = new MutationObserver(function () {
-      if (canvasReady()) {
-        observer.disconnect();
-        finishWhenPainted();
-      }
-    });
-    observer.observe(document.documentElement, { childList: true, subtree: true });
-    // Absolute safety net so the host is never stuck on the loader.
-    setTimeout(function () {
-      try {
-        observer.disconnect();
-      } catch (e) {
-        /* already disconnected */
-      }
+  // Poll each animation frame until the scene is drawn. A DOM MutationObserver
+  // alone misses the moment the app resizes the canvas / draws its first frame
+  // (property changes rather than child mutations).
+  var canvasFirstSeen = 0;
+  (function waitForScene() {
+    if (ready) return;
+    if (canvasSized(document.querySelector('canvas')) && !canvasFirstSeen) {
+      canvasFirstSeen = Date.now();
+    }
+    if (sceneHasContent()) {
+      finishWhenPainted();
+      return;
+    }
+    // Safety: if the canvas has been up for a while but content is never detected
+    // (e.g. an unusual scene), reveal it rather than hang on the loader.
+    if (canvasFirstSeen && Date.now() - canvasFirstSeen > 45000) {
       signalReady();
-    }, 120000);
-  }
+      return;
+    }
+    requestAnimationFrame(waitForScene);
+  })();
+
+  // Absolute safety net so the host is never stuck on the loader.
+  setTimeout(signalReady, 120000);
 
   // Show the bar immediately at 0%.
   post('progress', 0);
