@@ -43,7 +43,7 @@
       demo.followEnabled = true;
     }
     if (demo.renderScale === undefined) {
-      demo.renderScale = 2;
+      demo.renderScale = 1;
     }
     if (demo.reflectionQuality === undefined) {
       demo.reflectionQuality = 2;
