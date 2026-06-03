@@ -107,7 +107,7 @@
             class="text-capitalize"
           >
             <v-icon icon="mdi-file-document-outline" class="mr-1"></v-icon>
-            Paper
+            G1 Perceptive Parkour Paper
           </v-btn>
           <v-btn
             href="https://github.com/Axellwppr/motion_tracking"
