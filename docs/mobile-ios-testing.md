@@ -133,3 +133,26 @@ npm run verify:record-parkour-ios
 ```
 
 输出：`artifacts/parkour-ios-depth-verify.mp4`（Chrome 模拟 iPhone，用于 CI/回归，**不能代替真机**）。
+
+---
+
+## 没有真机时，iOS 开发一般怎么做？
+
+云 Agent / Linux CI **无法接入物理 iPhone**，这和「做 iOS App 的团队怎么测」是同一类问题，常见分层如下：
+
+| 层级 | 做法 | 能测什么 | 不能替代什么 |
+|------|------|----------|--------------|
+| **1. 自动化回归（CI）** | Puppeteer/Playwright + iPhone UA + 移动端视口；或 WebKit 无头（若环境有） | 逻辑、布局、脚本是否报错、深度值是否非零 | 真机 GPU、内存、Safari 内核差异 |
+| **2. Mac + iOS Simulator** | Xcode 自带 **Simulator**，跑 Mobile Safari，Web Inspector 调试 | 比 Chrome 伪装 UA **更接近** iOS Safari；WebGL 路径更像真机 | 仍非真实 GPU/内存压力 |
+| **3. Mac + 真机 USB** | iPhone 连 Mac，Safari → 开发 → 选设备，**远程 Web Inspector** | **金标准**之一：真实 Safari、真实 WebGL、真实内存 | 需要 Mac + 线 |
+| **4. 云真机平台** | [BrowserStack](https://www.browserstack.com/)、[LambdaTest](https://www.lambdatest.com/)、[Sauce Labs](https://saucelabs.com/) 等租用远程 iPhone | 无 Mac 也能点真机 Safari、录屏、看控制台 | 付费、排队、网络到被测 URL |
+| **5. 内网穿透 + 自测** | `npm run dev` + 局域网 IP / cloudflared，开发者用自己的 iPhone 打开 | 真实用户路径，零平台费 | 人工、不可全自动 |
+
+**原生 iOS App** 还会用：Xcode Simulator（UI/逻辑）、TestFlight（外测）、App Store Connect（崩溃日志）。  
+**Web / WASM（本项目）** 没有 TestFlight，核心是：**Simulator 或云真机 + 至少一台 physical iPhone 抽测**。
+
+本仓库当前策略：
+
+- **CI / Agent**：`npm run verify:record-parkour-ios` 录屏 + 深度亮度/越障断言（Chrome 模拟）。
+- **合并前建议**：作者在 Mac Simulator 或真机 Safari 过一遍（见上文方式一～三）。
+- **真机仍黑时**：用 Web Inspector 看 `depthCaptureMaterial` 与 `depthAvg`（上文自检脚本）。
