@@ -53,8 +53,13 @@ was replaced with a local object that points at files in this directory:
 
 `ort-wasm-simd-threaded.jsep.mjs` (the matching onnxruntime-web 1.24.1 loader)
 was added next to the existing hashed `.wasm` (byte-identical to the CDN copy,
-so it is reused rather than duplicated). **If you ever re-pull the upstream
-build, re-apply this patch.**
+so it is reused rather than duplicated).
+
+The upstream renderer multiplies floor `mat_texrepeat` by 30 on a 300×300
+`PlaneGeometry`, which makes the checker grid far denser than the main-site G1
+AMP demo (`100×100` plane, `texrepeat="44 44"` in `scene_g1.xml`). The bundle was
+patched to use `100×100` and the MJCF repeat values as-is. **If you ever re-pull
+the upstream build, re-apply both patches.**
 
 ## License / attribution
 
