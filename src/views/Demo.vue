@@ -1,4 +1,10 @@
 <template>
+  <AmpMobileJoystick
+    v-if="showAmpMobileJoystick"
+    :disabled="state !== 1"
+    :labels="ampJoystickLabels"
+    @command="onAmpJoystickCommand"
+  />
   <div id="mujoco-container"></div>
   <div v-if="isParkourPolicy" class="parkour-frame-wrap">
     <iframe
@@ -217,6 +223,16 @@
             {{ t.knockdownTest }}
           </v-btn>
           <div class="text-caption mt-1">{{ t.knockdownTestHint }}</div>
+          <div v-if="!isSmallScreen" class="amp-keyboard-controls mt-3">
+            <span class="status-name">{{ t.ampKeyboardHowToPlay }}</span>
+            <div class="parkour-keys mt-2">
+              <template v-for="row in ampKeyboardControls" :key="row.key">
+                <kbd class="parkour-key">{{ row.key }}</kbd>
+                <span class="text-caption">{{ row.label }}</span>
+              </template>
+            </div>
+            <div class="text-caption mt-2 text-medium-emphasis">{{ t.ampKeyboardFocusHint }}</div>
+          </div>
         </div>
 
         <v-alert
@@ -492,11 +508,17 @@
 import { MuJoCoDemo } from '@/simulation/main.js';
 import loadMujoco from 'mujoco-js';
 import ModelIOFlowchart from '@/components/ModelIOFlowchart.vue';
+import AmpMobileJoystick from '@/components/AmpMobileJoystick.vue';
 import {
   clampControlPanelSize,
   loadControlPanelSize,
   saveControlPanelSize
 } from '@/utils/controlPanelSize.js';
+import {
+  AMP_KEYBOARD_CONTROL_ROWS,
+  computeAmpCommandFromKeys,
+  isAmpMovementKey
+} from '@/utils/ampKeyboardCommand.js';
 
 const translations = {
   en: {
@@ -548,6 +570,19 @@ const translations = {
     noMotionsAdded: 'No motions were added.',
     knockdownTest: 'Knockdown test',
     knockdownTestHint: 'Applies a strong horizontal impulse on the pelvis in a random XY direction (fixed magnitude) for get-up testing.',
+    ampKeyboardHowToPlay: 'PC keyboard (AMP)',
+    ampKeyForward: 'Walk forward',
+    ampKeyBackward: 'Walk backward',
+    ampKeyLeft: 'Strafe left',
+    ampKeyRight: 'Strafe right',
+    ampKeyRotateLeft: 'Turn in place left',
+    ampKeyRotateRight: 'Turn in place right',
+    ampKeySprint: 'Hold for maximum speed',
+    ampKeyboardFocusHint: 'Click the demo view first, then use the keys. Sliders update while keys are held.',
+    ampJoystickGroup: 'AMP movement controls',
+    ampJoystickMove: 'Move',
+    ampJoystickRotateLeft: 'Turn left',
+    ampJoystickRotateRight: 'Turn right',
     ampPolicyDescription:
       'AMP policy trained for walk, run, and get-up behaviors.',
     parkourPolicyDescription:
@@ -618,6 +653,19 @@ const translations = {
     noMotionsAdded: '没有添加任何动作。',
     knockdownTest: '击倒测试',
     knockdownTestHint: '在骨盆上沿水平面（XY）随机方向施加一次固定大小的强冲击，用于测试倒地起身。',
+    ampKeyboardHowToPlay: 'PC 键盘（AMP）',
+    ampKeyForward: '向前行走',
+    ampKeyBackward: '向后行走',
+    ampKeyLeft: '向左平移',
+    ampKeyRight: '向右平移',
+    ampKeyRotateLeft: '原地向左旋转',
+    ampKeyRotateRight: '原地向右旋转',
+    ampKeySprint: '按住时以最大速度',
+    ampKeyboardFocusHint: '请先点击演示画面，再使用键盘。按住按键时滑块会同步显示当前速度。',
+    ampJoystickGroup: 'AMP 移动控制',
+    ampJoystickMove: '移动',
+    ampJoystickRotateLeft: '左转',
+    ampJoystickRotateRight: '右转',
     ampPolicyDescription:
       '用于行走、跑步和起身行为的 AMP 策略。',
     parkourPolicyDescription:
@@ -644,7 +692,8 @@ const translations = {
 export default {
   name: 'DemoPage',
   components: {
-    ModelIOFlowchart
+    ModelIOFlowchart,
+    AmpMobileJoystick
   },
   props: {
     visualTheme: {
@@ -714,6 +763,8 @@ export default {
     cmdX: 0.0,
     cmdY: 0.0,
     cmdYaw: 0.0,
+    ampKeysHeld: new Set(),
+    ampShiftHeld: false,
     renderScale: 2.0,
     reflectionQuality: 2,
     simStepHz: 0,
@@ -846,6 +897,17 @@ export default {
     isAmpPolicy() {
       return this.currentPolicy?.startsWith('g1-amp');
     },
+    showAmpMobileJoystick() {
+      return this.isAmpPolicy && this.isSmallScreen && !this.isParkourPolicy;
+    },
+    ampJoystickLabels() {
+      return {
+        group: this.t.ampJoystickGroup,
+        move: this.t.ampJoystickMove,
+        rotateLeft: this.t.ampJoystickRotateLeft,
+        rotateRight: this.t.ampJoystickRotateRight
+      };
+    },
     isParkourPolicy() {
       return this.selectedPolicy?.isExternalDemo === true;
     },
@@ -863,6 +925,12 @@ export default {
         { key: 'SPACE', label: this.t.parkourPause },
         { key: 'BACKSPACE', label: this.t.parkourResetRun }
       ];
+    },
+    ampKeyboardControls() {
+      return AMP_KEYBOARD_CONTROL_ROWS.map((row) => ({
+        key: row.key,
+        label: this.t[row.labelKey] ?? row.labelKey
+      }));
     },
     policyDescription() {
       if (!this.selectedPolicy) {
@@ -1202,6 +1270,81 @@ export default {
       this.demo.params.cmdY = this.cmdY;
       this.demo.params.cmdYaw = this.cmdYaw;
     },
+    onAmpJoystickCommand({ cmdX, cmdY, cmdYaw }) {
+      if (!this.isAmpPolicy || this.state !== 1) {
+        return;
+      }
+      this.cmdX = cmdX;
+      this.cmdY = cmdY;
+      this.cmdYaw = cmdYaw;
+      this.onCmdChange();
+    },
+    shouldIgnoreAmpKeyboard(event) {
+      const tag = event.target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+        return true;
+      }
+      return event.target?.isContentEditable === true;
+    },
+    clearAmpKeyboardState() {
+      this.ampKeysHeld.clear();
+      this.ampShiftHeld = false;
+    },
+    applyAmpKeyboardCommand() {
+      if (!this.isAmpPolicy || this.state !== 1) {
+        return;
+      }
+      const { cmdX, cmdY, cmdYaw } = computeAmpCommandFromKeys(
+        this.ampKeysHeld,
+        this.ampShiftHeld
+      );
+      this.cmdX = cmdX;
+      this.cmdY = cmdY;
+      this.cmdYaw = cmdYaw;
+      this.onCmdChange();
+    },
+    handleAmpKeyDown(event) {
+      if (!this.isAmpPolicy || this.state !== 1 || this.shouldIgnoreAmpKeyboard(event)) {
+        return;
+      }
+      if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
+        this.ampShiftHeld = event.getModifierState('Shift');
+        this.applyAmpKeyboardCommand();
+        return;
+      }
+      if (!isAmpMovementKey(event.code)) {
+        return;
+      }
+      if (event.repeat && this.ampKeysHeld.has(event.code)) {
+        return;
+      }
+      event.preventDefault();
+      this.ampKeysHeld.add(event.code);
+      this.applyAmpKeyboardCommand();
+    },
+    handleAmpKeyUp(event) {
+      if (!this.isAmpPolicy) {
+        return;
+      }
+      if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
+        this.ampShiftHeld = event.getModifierState('Shift');
+        this.applyAmpKeyboardCommand();
+        return;
+      }
+      if (!isAmpMovementKey(event.code)) {
+        return;
+      }
+      event.preventDefault();
+      this.ampKeysHeld.delete(event.code);
+      this.applyAmpKeyboardCommand();
+    },
+    onAmpKeyboardBlur() {
+      if (!this.isAmpPolicy) {
+        return;
+      }
+      this.clearAmpKeyboardState();
+      this.applyAmpKeyboardCommand();
+    },
     onKnockdownTest() {
       if (!this.demo || this.state !== 1) {
         return;
@@ -1277,6 +1420,9 @@ export default {
       if (!selected) {
         return;
       }
+      if (!value?.startsWith('g1-amp')) {
+        this.clearAmpKeyboardState();
+      }
       if (selected.isExternalDemo) {
         // Entering the embedded Parkour demo: pause physics and stop the MuJoCo
         // render loop so we don't run two WebGL apps at once. The iframe mounts
@@ -1331,6 +1477,7 @@ export default {
       }
     },
     resetAmpCommandSliders() {
+      this.clearAmpKeyboardState();
       this.cmdX = 0.0;
       this.cmdY = 0.0;
       this.cmdYaw = 0.0;
@@ -1636,11 +1783,20 @@ export default {
     }
     this.init();
     this.keydown_listener = (event) => {
+      this.handleAmpKeyDown(event);
       if (event.code === 'Backspace' && !this.isParkourPolicy) {
         this.reset();
       }
     };
+    this.keyup_listener = (event) => {
+      this.handleAmpKeyUp(event);
+    };
+    this.amp_blur_listener = () => {
+      this.onAmpKeyboardBlur();
+    };
     document.addEventListener('keydown', this.keydown_listener);
+    document.addEventListener('keyup', this.keyup_listener);
+    window.addEventListener('blur', this.amp_blur_listener);
     this.mobileControlsResizeObserver = new ResizeObserver(() => {
       this.updateMobileControlsHeight();
     });
@@ -1662,6 +1818,12 @@ export default {
     this.mobileControlsResizeObserver?.disconnect();
     document.documentElement.style.removeProperty('--mobile-controls-panel-height');
     document.removeEventListener('keydown', this.keydown_listener);
+    if (this.keyup_listener) {
+      document.removeEventListener('keyup', this.keyup_listener);
+    }
+    if (this.amp_blur_listener) {
+      window.removeEventListener('blur', this.amp_blur_listener);
+    }
     if (this.resize_listener) {
       window.removeEventListener('resize', this.resize_listener);
     }
