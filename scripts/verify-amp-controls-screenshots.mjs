@@ -131,7 +131,7 @@ async function main() {
     keyboard: !!document.querySelector('.amp-keyboard-controls'),
     joystick: !!document.querySelector('.amp-mobile-controls'),
     stickBase: !!document.querySelector('.amp-mobile-controls__stick-base'),
-    yawBtns: document.querySelectorAll('.amp-mobile-controls__yaw .amp-mobile-controls__action-btn').length,
+    yawBtns: document.querySelectorAll('.amp-mobile-controls__orbit-btn--yaw-left, .amp-mobile-controls__orbit-btn--yaw-right').length,
     knockdownMobile: !!document.querySelector('[data-test="knockdown-test-mobile"]')
   }));
   if (

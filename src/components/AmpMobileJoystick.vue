@@ -5,45 +5,7 @@
     role="group"
     :aria-label="labels.group"
   >
-    <div class="amp-mobile-controls__cluster">
-      <div class="amp-mobile-controls__side">
-        <button
-          type="button"
-          class="amp-mobile-controls__action-btn amp-mobile-controls__knockdown-btn"
-          :aria-label="labels.knockdown"
-          :disabled="disabled"
-          data-test="knockdown-test-mobile"
-          @click.stop="onKnockdownClick"
-        >
-          <v-icon icon="mdi-arrow-down-bold" size="22" />
-        </button>
-        <div class="amp-mobile-controls__yaw">
-          <button
-            type="button"
-            class="amp-mobile-controls__action-btn"
-            :aria-label="labels.rotateLeft"
-            :disabled="disabled"
-            @pointerdown.prevent="onYawDown(1, $event)"
-            @pointerup.prevent="onYawUp($event)"
-            @pointercancel.prevent="onYawUp($event)"
-            @pointerleave.prevent="onYawUp($event)"
-          >
-            <v-icon icon="mdi-rotate-left" size="22" />
-          </button>
-          <button
-            type="button"
-            class="amp-mobile-controls__action-btn"
-            :aria-label="labels.rotateRight"
-            :disabled="disabled"
-            @pointerdown.prevent="onYawDown(-1, $event)"
-            @pointerup.prevent="onYawUp($event)"
-            @pointercancel.prevent="onYawUp($event)"
-            @pointerleave.prevent="onYawUp($event)"
-          >
-            <v-icon icon="mdi-rotate-right" size="22" />
-          </button>
-        </div>
-      </div>
+    <div class="amp-mobile-controls__orbit">
       <div
         ref="moveBase"
         class="amp-mobile-controls__stick-base"
@@ -58,6 +20,40 @@
           :style="knobStyle"
         ></div>
       </div>
+      <button
+        type="button"
+        class="amp-mobile-controls__action-btn amp-mobile-controls__knockdown-btn amp-mobile-controls__orbit-btn amp-mobile-controls__orbit-btn--knockdown"
+        :aria-label="labels.knockdown"
+        :disabled="disabled"
+        data-test="knockdown-test-mobile"
+        @click.stop="onKnockdownClick"
+      >
+        <v-icon icon="mdi-arrow-down-bold" size="22" />
+      </button>
+      <button
+        type="button"
+        class="amp-mobile-controls__action-btn amp-mobile-controls__orbit-btn amp-mobile-controls__orbit-btn--yaw-left"
+        :aria-label="labels.rotateLeft"
+        :disabled="disabled"
+        @pointerdown.prevent="onYawDown(1, $event)"
+        @pointerup.prevent="onYawUp($event)"
+        @pointercancel.prevent="onYawUp($event)"
+        @pointerleave.prevent="onYawUp($event)"
+      >
+        <v-icon icon="mdi-rotate-left" size="22" />
+      </button>
+      <button
+        type="button"
+        class="amp-mobile-controls__action-btn amp-mobile-controls__orbit-btn amp-mobile-controls__orbit-btn--yaw-right"
+        :aria-label="labels.rotateRight"
+        :disabled="disabled"
+        @pointerdown.prevent="onYawDown(-1, $event)"
+        @pointerup.prevent="onYawUp($event)"
+        @pointercancel.prevent="onYawUp($event)"
+        @pointerleave.prevent="onYawUp($event)"
+      >
+        <v-icon icon="mdi-rotate-right" size="22" />
+      </button>
     </div>
   </div>
 </template>
@@ -223,6 +219,9 @@ export default {
   --amp-mobile-glass-border: rgba(var(--v-theme-on-surface), 0.16);
   --amp-mobile-glass-active: rgba(var(--v-theme-primary), 0.22);
   --amp-mobile-knockdown: rgba(var(--v-theme-secondary), 0.24);
+  --amp-stick-size: 128px;
+  --amp-btn-size: 48px;
+  --amp-orbit-radius: calc(var(--amp-stick-size) / 2 + var(--amp-btn-size) / 2 + 10px);
 
   position: fixed;
   right: 12px;
@@ -245,29 +244,73 @@ export default {
   pointer-events: none;
 }
 
-.amp-mobile-controls__cluster {
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
+.amp-mobile-controls__orbit {
+  position: relative;
+  width: calc(var(--amp-stick-size) + var(--amp-btn-size) + 20px);
+  height: calc(var(--amp-stick-size) + var(--amp-btn-size) + 20px);
 }
 
-.amp-mobile-controls__side {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding-bottom: 6px;
+.amp-mobile-controls__stick-base {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--amp-stick-size);
+  height: var(--amp-stick-size);
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 1px solid var(--amp-mobile-glass-border);
+  background: var(--amp-mobile-glass);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  touch-action: none;
+  z-index: 1;
 }
 
-.amp-mobile-controls__yaw {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.amp-mobile-controls__stick-base::before {
+  content: '';
+  position: absolute;
+  inset: 22%;
+  border-radius: 50%;
+  border: 1px dashed rgba(var(--v-theme-on-surface), 0.12);
+  pointer-events: none;
+}
+
+.amp-mobile-controls__stick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 1px solid rgba(var(--v-theme-primary), 0.45);
+  background: rgba(var(--v-theme-primary), 0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  pointer-events: none;
+  will-change: transform;
+}
+
+.amp-mobile-controls__orbit-btn {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+}
+
+.amp-mobile-controls__orbit-btn--knockdown {
+  transform: translate(-50%, -50%) translateY(calc(-1 * var(--amp-orbit-radius)));
+}
+
+.amp-mobile-controls__orbit-btn--yaw-left {
+  transform: translate(-50%, -50%) translateX(calc(-1 * var(--amp-orbit-radius)));
+}
+
+.amp-mobile-controls__orbit-btn--yaw-right {
+  transform: translate(-50%, -50%) translateX(var(--amp-orbit-radius));
 }
 
 .amp-mobile-controls__action-btn {
-  width: 48px;
-  height: 48px;
+  width: var(--amp-btn-size);
+  height: var(--amp-btn-size);
   border-radius: 50%;
   border: 1px solid var(--amp-mobile-glass-border);
   background: var(--amp-mobile-glass);
@@ -294,40 +337,5 @@ export default {
 .amp-mobile-controls__knockdown-btn:active:not(:disabled) {
   background: rgba(var(--v-theme-secondary), 0.38);
   border-color: rgba(var(--v-theme-secondary), 0.55);
-}
-
-.amp-mobile-controls__stick-base {
-  position: relative;
-  width: 128px;
-  height: 128px;
-  border-radius: 50%;
-  border: 1px solid var(--amp-mobile-glass-border);
-  background: var(--amp-mobile-glass);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  touch-action: none;
-}
-
-.amp-mobile-controls__stick-base::before {
-  content: '';
-  position: absolute;
-  inset: 22%;
-  border-radius: 50%;
-  border: 1px dashed rgba(var(--v-theme-on-surface), 0.12);
-  pointer-events: none;
-}
-
-.amp-mobile-controls__stick-knob {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  border: 1px solid rgba(var(--v-theme-primary), 0.45);
-  background: rgba(var(--v-theme-primary), 0.2);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-  pointer-events: none;
-  will-change: transform;
 }
 </style>
