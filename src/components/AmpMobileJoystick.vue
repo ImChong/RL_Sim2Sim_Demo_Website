@@ -6,31 +6,43 @@
     :aria-label="labels.group"
   >
     <div class="amp-mobile-controls__cluster">
-      <div class="amp-mobile-controls__yaw">
+      <div class="amp-mobile-controls__side">
         <button
           type="button"
-          class="amp-mobile-controls__yaw-btn"
-          :aria-label="labels.rotateLeft"
+          class="amp-mobile-controls__action-btn amp-mobile-controls__knockdown-btn"
+          :aria-label="labels.knockdown"
           :disabled="disabled"
-          @pointerdown.prevent="onYawDown(1, $event)"
-          @pointerup.prevent="onYawUp($event)"
-          @pointercancel.prevent="onYawUp($event)"
-          @pointerleave.prevent="onYawUp($event)"
+          data-test="knockdown-test-mobile"
+          @click.stop="onKnockdownClick"
         >
-          <v-icon icon="mdi-rotate-left" size="22" />
+          <v-icon icon="mdi-arrow-down-bold" size="22" />
         </button>
-        <button
-          type="button"
-          class="amp-mobile-controls__yaw-btn"
-          :aria-label="labels.rotateRight"
-          :disabled="disabled"
-          @pointerdown.prevent="onYawDown(-1, $event)"
-          @pointerup.prevent="onYawUp($event)"
-          @pointercancel.prevent="onYawUp($event)"
-          @pointerleave.prevent="onYawUp($event)"
-        >
-          <v-icon icon="mdi-rotate-right" size="22" />
-        </button>
+        <div class="amp-mobile-controls__yaw">
+          <button
+            type="button"
+            class="amp-mobile-controls__action-btn"
+            :aria-label="labels.rotateLeft"
+            :disabled="disabled"
+            @pointerdown.prevent="onYawDown(1, $event)"
+            @pointerup.prevent="onYawUp($event)"
+            @pointercancel.prevent="onYawUp($event)"
+            @pointerleave.prevent="onYawUp($event)"
+          >
+            <v-icon icon="mdi-rotate-left" size="22" />
+          </button>
+          <button
+            type="button"
+            class="amp-mobile-controls__action-btn"
+            :aria-label="labels.rotateRight"
+            :disabled="disabled"
+            @pointerdown.prevent="onYawDown(-1, $event)"
+            @pointerup.prevent="onYawUp($event)"
+            @pointercancel.prevent="onYawUp($event)"
+            @pointerleave.prevent="onYawUp($event)"
+          >
+            <v-icon icon="mdi-rotate-right" size="22" />
+          </button>
+        </div>
       </div>
       <div
         ref="moveBase"
@@ -65,7 +77,7 @@ export default {
       required: true
     }
   },
-  emits: ['command'],
+  emits: ['command', 'knockdown'],
   data: () => ({
     moveNormX: 0,
     moveNormY: 0,
@@ -115,6 +127,12 @@ export default {
     },
     emitZero() {
       this.$emit('command', { cmdX: 0, cmdY: 0, cmdYaw: 0 });
+    },
+    onKnockdownClick() {
+      if (this.disabled) {
+        return;
+      }
+      this.$emit('knockdown');
     },
     updateMoveFromClient(clientX, clientY) {
       const base = this.$refs.moveBase;
@@ -201,6 +219,11 @@ export default {
 
 <style scoped>
 .amp-mobile-controls {
+  --amp-mobile-glass: rgba(var(--v-theme-on-surface), 0.12);
+  --amp-mobile-glass-border: rgba(var(--v-theme-on-surface), 0.16);
+  --amp-mobile-glass-active: rgba(var(--v-theme-primary), 0.22);
+  --amp-mobile-knockdown: rgba(var(--v-theme-secondary), 0.24);
+
   position: fixed;
   right: 12px;
   z-index: 1050;
@@ -212,10 +235,6 @@ export default {
     12px + env(safe-area-inset-bottom, 0px) + var(--vvp-offset-bottom, 0px) +
       var(--mobile-controls-panel-height, 140px) + 12px
   );
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
   touch-action: none;
   user-select: none;
   pointer-events: auto;
@@ -228,8 +247,16 @@ export default {
 
 .amp-mobile-controls__cluster {
   display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.amp-mobile-controls__side {
+  display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 10px;
+  padding-bottom: 6px;
 }
 
 .amp-mobile-controls__yaw {
@@ -238,24 +265,35 @@ export default {
   gap: 8px;
 }
 
-.amp-mobile-controls__yaw-btn {
-  width: 44px;
-  height: 44px;
+.amp-mobile-controls__action-btn {
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
-  border: 1px solid rgba(var(--v-theme-on-surface), 0.22);
-  background: rgba(var(--v-theme-surface), 0.82);
+  border: 1px solid var(--amp-mobile-glass-border);
+  background: var(--amp-mobile-glass);
   color: rgb(var(--v-theme-on-surface));
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
-.amp-mobile-controls__yaw-btn:active:not(:disabled) {
-  background: rgba(var(--v-theme-primary), 0.2);
-  border-color: rgba(var(--v-theme-primary), 0.45);
+.amp-mobile-controls__action-btn:active:not(:disabled) {
+  background: var(--amp-mobile-glass-active);
+  border-color: rgba(var(--v-theme-primary), 0.4);
+}
+
+.amp-mobile-controls__knockdown-btn {
+  background: var(--amp-mobile-knockdown);
+  border-color: rgba(var(--v-theme-secondary), 0.35);
+  color: rgb(var(--v-theme-secondary));
+}
+
+.amp-mobile-controls__knockdown-btn:active:not(:disabled) {
+  background: rgba(var(--v-theme-secondary), 0.38);
+  border-color: rgba(var(--v-theme-secondary), 0.55);
 }
 
 .amp-mobile-controls__stick-base {
@@ -263,10 +301,10 @@ export default {
   width: 128px;
   height: 128px;
   border-radius: 50%;
-  border: 1px solid rgba(var(--v-theme-on-surface), 0.2);
-  background: rgba(var(--v-theme-surface), 0.72);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid var(--amp-mobile-glass-border);
+  background: var(--amp-mobile-glass);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   touch-action: none;
 }
 
@@ -275,7 +313,7 @@ export default {
   position: absolute;
   inset: 22%;
   border-radius: 50%;
-  border: 1px dashed rgba(var(--v-theme-on-surface), 0.14);
+  border: 1px dashed rgba(var(--v-theme-on-surface), 0.12);
   pointer-events: none;
 }
 
@@ -286,9 +324,9 @@ export default {
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  border: 1px solid rgba(var(--v-theme-primary), 0.55);
-  background: rgba(var(--v-theme-primary), 0.28);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(var(--v-theme-primary), 0.45);
+  background: rgba(var(--v-theme-primary), 0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
   pointer-events: none;
   will-change: transform;
 }

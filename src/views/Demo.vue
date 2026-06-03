@@ -4,6 +4,7 @@
     :disabled="state !== 1"
     :labels="ampJoystickLabels"
     @command="onAmpJoystickCommand"
+    @knockdown="onKnockdownTest"
   />
   <div id="mujoco-container"></div>
   <div v-if="isParkourPolicy" class="parkour-frame-wrap">
@@ -905,7 +906,8 @@ export default {
         group: this.t.ampJoystickGroup,
         move: this.t.ampJoystickMove,
         rotateLeft: this.t.ampJoystickRotateLeft,
-        rotateRight: this.t.ampJoystickRotateRight
+        rotateRight: this.t.ampJoystickRotateRight,
+        knockdown: this.t.knockdownTest
       };
     },
     isParkourPolicy() {
