@@ -373,7 +373,6 @@
 
         </template>
 
-        <template v-if="!isParkourPolicy">
         <v-divider class="my-2"/>
         <div class="status-legend follow-controls">
           <span class="status-name">{{ t.cameraFollow }}</span>
@@ -419,7 +418,6 @@
           :aria-label="t.groundReflection"
           @update:modelValue="onReflectionQualityChange"
         ></v-slider>
-        </template>
       </v-card-text>
       <v-card-actions class="controls-actions">
         <v-btn color="primary" block @click="reset">{{ isParkourPolicy ? t.parkourReset : t.reset }}</v-btn>
@@ -1148,9 +1146,41 @@ export default {
     },
     toggleCameraFollow() {
       this.cameraFollowEnabled = !this.cameraFollowEnabled;
+      if (this.isParkourPolicy) {
+        this.postParkourHostControl({ cameraFollow: this.cameraFollowEnabled });
+        return;
+      }
       if (this.demo?.setFollowEnabled) {
         this.demo.setFollowEnabled(this.cameraFollowEnabled);
       }
+    },
+    postParkourHostControl(partial) {
+      const win = this.$refs.parkourFrame?.contentWindow;
+      if (!win) {
+        return;
+      }
+      try {
+        win.postMessage(
+          {
+            source: 'parkour-host-control',
+            type: 'apply',
+            ...partial
+          },
+          window.location.origin
+        );
+      } catch (error) {
+        /* iframe may not be ready */
+      }
+    },
+    syncParkourHostControls() {
+      if (!this.isParkourPolicy) {
+        return;
+      }
+      this.postParkourHostControl({
+        cameraFollow: this.cameraFollowEnabled,
+        renderScale: this.renderScale,
+        reflectionQuality: this.reflectionQuality
+      });
     },
     toggleCompliance() {
       const nextEnabled = !this.complianceEnabled;
@@ -1329,6 +1359,7 @@ export default {
       this.parkourLoading = true;
       this.parkourLoadProgress = 0;
       this.parkourReceivedProgress = false;
+      this.simStepHz = 0;
     },
     clearParkourLoadTimers() {
       if (this.parkourFallbackTimer) {
@@ -1353,7 +1384,10 @@ export default {
       this.clearParkourLoadTimers();
       this.parkourLoadProgress = 100;
       this.parkourLoading = false;
-      this.$nextTick(() => this.focusParkourFrame());
+      this.$nextTick(() => {
+        this.syncParkourHostControls();
+        this.focusParkourFrame();
+      });
     },
     handleParkourMessage(event) {
       const frame = this.$refs.parkourFrame;
@@ -1364,7 +1398,19 @@ export default {
         return;
       }
       const data = event.data;
-      if (!data || data.source !== 'parkour-loader') {
+      if (!data || typeof data !== 'object') {
+        return;
+      }
+      if (data.source === 'parkour-host') {
+        if (data.type === 'stats') {
+          const hz = Number(data.simStepHz);
+          if (Number.isFinite(hz)) {
+            this.simStepHz = hz;
+          }
+        }
+        return;
+      }
+      if (data.source !== 'parkour-loader') {
         return;
       }
       if (data.type === 'progress') {
@@ -1455,6 +1501,9 @@ export default {
       }
     },
     updatePerformanceStats() {
+      if (this.isParkourPolicy) {
+        return;
+      }
       if (!this.demo) {
         this.simStepHz = 0;
         return;
@@ -1462,12 +1511,20 @@ export default {
       this.simStepHz = this.demo.getSimStepHz?.() ?? this.demo.simStepHz ?? 0;
     },
     onRenderScaleChange(value) {
+      if (this.isParkourPolicy) {
+        this.postParkourHostControl({ renderScale: value });
+        return;
+      }
       if (!this.demo) {
         return;
       }
       this.demo.setRenderScale(value);
     },
     onReflectionQualityChange(value) {
+      if (this.isParkourPolicy) {
+        this.postParkourHostControl({ reflectionQuality: value });
+        return;
+      }
       if (!this.demo) {
         return;
       }
