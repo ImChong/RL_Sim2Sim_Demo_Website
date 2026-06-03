@@ -630,7 +630,7 @@ const translations = {
     parkourMoveForward: '前进',
     parkourTurnLeft: '左转',
     parkourTurnRight: '右转',
-    parkourSpeed: '切换速度模式',
+    parkourSpeed: '按住快速（松开恢复慢速）',
     parkourPause: '暂停',
     parkourResetRun: '重置当前回合',
     parkourClimbNote: '按住 W 时会自动触发攀爬。',
