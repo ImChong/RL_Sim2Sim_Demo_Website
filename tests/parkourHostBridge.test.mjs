@@ -8,7 +8,7 @@ import vm from 'node:vm';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const bundlePath = join(
   __dirname,
-  '../public/parkour/dist-desktop/assets/index-BLR_wER3.js'
+  '../public/parkour/dist-desktop/assets/index-Cq8mDpv1.js'
 );
 const bridgePath = join(__dirname, '../public/parkour/dist-desktop/host-bridge.js');
 
