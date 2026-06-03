@@ -82,15 +82,18 @@ otherwise the host panel slider stops changing reflection after the first move.
 ### iOS depth readback (`scripts/patch-parkour-ios-depth.mjs`)
 
 Safari on iOS often cannot read **FloatType** render targets via
-`readRenderTargetPixels`, which leaves the depth inset black and breaks
-perceptive locomotion. Re-apply this patch after re-pulling the upstream bundle:
+`readRenderTargetPixels`, and may also fail sampling **Float DepthTexture**.
+Re-apply this patch after re-pulling the upstream bundle:
 
-- Linearized depth is rendered into an **UnsignedByteType** color target and
-  decoded back to meters on the CPU.
+- Depth is captured with **`scene.overrideMaterial`** (`depthCaptureMaterial`)
+  writing linear depth directly into an RGBA8 target (no DepthTexture sampling).
+- Linearized depth is decoded back to meters on the CPU from **Uint8** readback.
 - The depth preview is refreshed immediately via `_prepareDepthInput()` after
   each capture (no longer waits for the first backbone inference).
 - On iPhone/iPad, ORT is forced to **single-threaded** mode with the worker
   proxy disabled.
+
+Real-device testing: `docs/mobile-ios-testing.md`
 
 **If you ever re-pull the upstream build, re-apply all bundle patches.**
 

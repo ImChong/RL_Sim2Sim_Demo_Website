@@ -40,6 +40,16 @@ test('parkour bundle uses Uint8 depth readback for iOS Safari compatibility', ()
   );
   assert.match(
     bundle,
+    /this\._depthCapPrev=this\.scene\.overrideMaterial,this\.scene\.overrideMaterial=this\.depthCaptureMaterial,this\.renderer\.setRenderTarget\(this\.depthInferenceTarget\)/,
+    'depth capture should render via overrideMaterial into RGBA8 target'
+  );
+  assert.match(
+    bundle,
+    /this\.depthCaptureMaterial=new Sg\(\{uniforms:\{depthMin:/,
+    'depthCaptureMaterial should exist for Safari-compatible capture'
+  );
+  assert.match(
+    bundle,
     /_iosDepthFix=\/iPad\|iPhone\|iPod\//,
     'ORT init should detect iOS and tune wasm threading'
   );
