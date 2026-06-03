@@ -299,7 +299,7 @@ export default {
   will-change: transform;
 }
 
-/* 0deg = 12 o'clock; CCW: 11点 -30deg, 10点 -60deg, 9点 -90deg */
+/* 0deg = 12 o'clock; CCW: 10:30 -45deg, 9:30 -75deg, 8:30 -105deg */
 .amp-mobile-controls__orbit-btn {
   --orbit-deg: 0deg;
   position: absolute;
@@ -310,15 +310,15 @@ export default {
 }
 
 .amp-mobile-controls__orbit-btn--knockdown {
-  --orbit-deg: -30deg;
+  --orbit-deg: -45deg;
 }
 
 .amp-mobile-controls__orbit-btn--yaw-left {
-  --orbit-deg: -60deg;
+  --orbit-deg: -75deg;
 }
 
 .amp-mobile-controls__orbit-btn--yaw-right {
-  --orbit-deg: -90deg;
+  --orbit-deg: -105deg;
 }
 
 .amp-mobile-controls__action-btn {
