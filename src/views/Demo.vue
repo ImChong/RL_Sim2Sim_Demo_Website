@@ -861,7 +861,7 @@ export default {
         { key: 'W', label: this.t.parkourMoveForward },
         { key: 'A', label: this.t.parkourTurnLeft },
         { key: 'D', label: this.t.parkourTurnRight },
-        { key: 'Y', label: this.t.parkourSpeed },
+        { key: 'SHIFT', label: this.t.parkourSpeed },
         { key: 'SPACE', label: this.t.parkourPause },
         { key: 'BACKSPACE', label: this.t.parkourResetRun }
       ];
@@ -1341,7 +1341,7 @@ export default {
       }
     },
     focusParkourFrame() {
-      // Same-origin iframe: focus it so keyboard input (W/A/D/Y/SPACE) reaches
+      // Same-origin iframe: focus it so keyboard input (W/A/D/Shift/SPACE) reaches
       // the demo right away.
       try {
         this.$refs.parkourFrame?.contentWindow?.focus();
