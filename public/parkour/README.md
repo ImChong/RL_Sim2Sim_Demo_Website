@@ -73,8 +73,12 @@ so it is reused rather than duplicated).
 The upstream renderer multiplies floor `mat_texrepeat` by 30 on a 300×300
 `PlaneGeometry`, which makes the checker grid far denser than the main-site G1
 AMP demo (`100×100` plane, `texrepeat="44 44"` in `scene_g1.xml`). The bundle was
-patched to use `100×100` and the MJCF repeat values as-is. **If you ever re-pull
-the upstream build, re-apply both patches.**
+patched to use `100×100` and the MJCF repeat values as-is.
+
+`Reflector.setReflectionQuality` in the bundle must update its internal size /
+multisample tracking (`let I` / `let w` and assign `I=ea,w=sa` after resizing);
+otherwise the host panel slider stops changing reflection after the first move.
+**If you ever re-pull the upstream build, re-apply all bundle patches.**
 
 ## License / attribution
 

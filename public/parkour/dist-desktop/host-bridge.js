@@ -70,9 +70,15 @@
       this.reflectionQuality = index;
       const preset = getPreset(index);
       const reflectors = this.reflectors || [];
+      if (reflectors.length === 0) {
+        this._pendingReflectionQuality = index;
+        return;
+      }
+      this._pendingReflectionQuality = undefined;
       for (const reflector of reflectors) {
         reflector.setReflectionQuality?.(preset.size, preset.multisample);
       }
+      this.render?.();
     };
 
     demo.getSimStepHz = function () {
@@ -122,12 +128,26 @@
       if (!demo || !attachHostApi(demo)) {
         return;
       }
+      applyPendingReflectionQuality(demo);
       post('stats', { simStepHz: demo.getSimStepHz() });
     }, 500);
   }
 
+  function applyPendingReflectionQuality(demo) {
+    if (demo._pendingReflectionQuality === undefined) {
+      return;
+    }
+    const reflectors = demo.reflectors || [];
+    if (reflectors.length === 0) {
+      return;
+    }
+    demo.setReflectionQuality(demo._pendingReflectionQuality);
+  }
+
   function waitForDemo() {
-    if (attachHostApi(window.__parkourDemo)) {
+    const demo = window.__parkourDemo;
+    if (attachHostApi(demo)) {
+      applyPendingReflectionQuality(demo);
       startStatsReporter();
       return;
     }
