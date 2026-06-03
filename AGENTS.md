@@ -23,7 +23,7 @@ This is a **purely client-side SPA** (Vue 3 + Vite + Three.js + MuJoCo WASM + ON
 | Dev server | `npm run dev` (port 3000, `--host` enabled) |
 | Unit tests | `npm test` (Node.js built-in test runner, 28 tests) |
 | Production build | `npm run build` |
-| E2E smoke test | `node scripts/verify-knockdown-button.mjs` (needs `CHROME_PATH`) |
+| E2E smoke test | `VITE_URL=http://127.0.0.1:3000/ node scripts/verify-knockdown-button.mjs` (needs `CHROME_PATH`; script default URL is port 5173) |
 
 ### Notes for cloud agents
 
