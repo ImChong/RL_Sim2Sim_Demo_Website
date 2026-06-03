@@ -131,9 +131,17 @@ async function main() {
     keyboard: !!document.querySelector('.amp-keyboard-controls'),
     joystick: !!document.querySelector('.amp-mobile-controls'),
     stickBase: !!document.querySelector('.amp-mobile-controls__stick-base'),
-    yawBtns: document.querySelectorAll('.amp-mobile-controls__yaw-btn').length
+    yawBtns: document.querySelectorAll(
+      '.amp-mobile-controls__orbit-btn--yaw-left, .amp-mobile-controls__orbit-btn--yaw-right'
+    ).length,
+    knockdownMobile: !!document.querySelector('[data-test="knockdown-test-mobile"]')
   }));
-  if (mobileChecks.keyboard || !mobileChecks.joystick || mobileChecks.yawBtns < 2) {
+  if (
+    mobileChecks.keyboard
+    || !mobileChecks.joystick
+    || mobileChecks.yawBtns < 2
+    || !mobileChecks.knockdownMobile
+  ) {
     throw new Error(`Mobile checks failed: ${JSON.stringify(mobileChecks)}`);
   }
 
