@@ -1898,6 +1898,14 @@ export default {
   gap: 4px;
 }
 
+.training-links .v-btn {
+  justify-content: flex-start;
+}
+
+.training-links :deep(.v-btn__content) {
+  justify-content: flex-start;
+}
+
 .controls-mobile .controls-body {
   flex: 1 1 auto;
   min-height: 0;
