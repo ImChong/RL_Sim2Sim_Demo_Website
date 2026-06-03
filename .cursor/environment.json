@@ -1,0 +1,10 @@
+{
+  "install": "npm ci",
+  "start": "npm run dev -- --host 127.0.0.1 --port 3000",
+  "ports": [
+    {
+      "name": "vite-dev",
+      "port": 3000
+    }
+  ]
+}
