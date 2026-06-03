@@ -1341,7 +1341,7 @@ export default {
       }
     },
     focusParkourFrame() {
-      // Same-origin iframe: focus it so keyboard input (W/A/D/Y/SPACE) reaches
+      // Same-origin iframe: focus it so keyboard input (W/A/D/Shift/SPACE) reaches
       // the demo right away.
       try {
         this.$refs.parkourFrame?.contentWindow?.focus();

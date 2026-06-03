@@ -14,9 +14,12 @@
           /* Hide the embedded demo's built-in lil-gui control panel;
              the host page already provides its own controls UI. */
           .lil-gui, .lil-gui.root, .lil-gui.autoPlace { display: none !important; }
+          /* Speed HUD is shown in the host control panel instead. */
+          [data-parkour-speed-hud] { display: none !important; }
         </style>
       <script src="./loader-progress.js"></script>
       <script type="module" crossorigin src="./assets/index-BLR_wER3.js"></script>
+      <script src="./host-bridge.js"></script>
     </head>
 
     <body style="margin:0px; background-color:#0f172a; overflow:hidden; position:fixed; min-height: 100%;

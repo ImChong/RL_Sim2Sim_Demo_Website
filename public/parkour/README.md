@@ -34,6 +34,21 @@ works correctly under the site's GitHub Pages base path.
 
 ## Local modifications
 
+### Host control bridge (`dist-desktop/host-bridge.js`)
+
+The parent site's control panel drives camera follow, render scale, ground
+reflection quality, and reads simulation step rate from the embedded demo via
+`postMessage`. The bridge attaches `setFollowEnabled`, `setRenderScale`,
+`setReflectionQuality`, and `getSimStepHz` to `window.__parkourDemo`.
+
+### Speed mode (Shift)
+
+Policy keyboard control defaults to **low** speed. Hold **Shift** for fast
+speed (replacing the upstream **Y** toggle). The in-demo speed HUD is hidden;
+the host panel documents the Shift binding.
+
+### Bundle patches (`dist-desktop/assets/index-*.js`)
+
 The upstream bundle hard-codes its onnxruntime-web runtime location to a CDN:
 
 ```js
