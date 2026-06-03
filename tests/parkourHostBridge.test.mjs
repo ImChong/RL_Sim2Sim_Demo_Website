@@ -35,6 +35,58 @@ test('parkour Reflector setReflectionQuality updates cached size and multisample
   );
 });
 
+test('parkour policy depth pass avoids iOS depth texture readback path', () => {
+  const bundle = readFileSync(bundlePath, 'utf8');
+  const materialStart = bundle.indexOf('this.depthInferenceMaterial=new Sg');
+  assert.ok(materialStart >= 0, 'depth inference material should exist');
+  const materialSnippet = bundle.slice(materialStart, materialStart + 1400);
+
+  assert.match(
+    materialSnippet,
+    /gl_FragCoord\.z/,
+    'policy depth pass should pack fragment depth directly from the scene render'
+  );
+  assert.doesNotMatch(
+    materialSnippet,
+    /texture2D\(tDepth, vUv\)\.x/,
+    'policy depth pass should not sample a depth texture on iOS'
+  );
+  assert.match(
+    bundle,
+    /depthInferenceTarget=new QI\(this\.depthInset\.width,this\.depthInset\.height,\{type:1009,format:SQ,minFilter:MQ,magFilter:MQ,depthBuffer:!0,stencilBuffer:!1\}\)/,
+    'direct scene depth render needs a depth buffer on the RGBA8 target'
+  );
+
+  const readbackStart = bundle.indexOf('this.renderer.readRenderTargetPixels(this.depthInferenceTarget');
+  assert.ok(readbackStart >= 0, 'depth readback should exist');
+  const readbackSnippet = bundle.slice(Math.max(0, readbackStart - 700), readbackStart);
+  assert.match(
+    readbackSnippet,
+    /this\.scene\.overrideMaterial=this\.depthInferenceMaterial/,
+    'readback pass should temporarily override scene materials'
+  );
+  assert.match(
+    readbackSnippet,
+    /this\.renderer\.render\(this\.scene,this\.depthCameraView\)/,
+    'readback pass should render scene geometry with the depth camera'
+  );
+  assert.match(
+    readbackSnippet,
+    /getClearColor\(new hB\).*getClearAlpha\(\).*setClearColor\(16777215,1\)/,
+    'readback pass should clear background pixels to packed far depth'
+  );
+  assert.match(
+    readbackSnippet,
+    /setClearColor\(_c,_a\)/,
+    'readback pass should restore the renderer clear color'
+  );
+  assert.doesNotMatch(
+    readbackSnippet,
+    /this\.renderer\.render\(this\.depthInferenceScene,this\.depthCamera\)/,
+    'readback pass should not render the old fullscreen depth-texture quad'
+  );
+});
+
 test('host bridge defers reflection quality until reflectors exist', () => {
   const bridgeSource = readFileSync(bridgePath, 'utf8');
   const reflectorCalls = [];
