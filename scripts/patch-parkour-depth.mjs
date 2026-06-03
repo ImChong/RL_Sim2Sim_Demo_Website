@@ -92,10 +92,10 @@ replaceOnce(
 );
 
 // 5) Decode RGBA8 back to linear depth in metres (matches THREE unpackRGBAToDepth
-//    times the far plane). 0.99609375 === 255/256 (UnpackDownscale).
+//    times the far plane). R/G/B use THREE UnpackDownscale (255/256); A uses the final 1/256^3 byte.
 replaceOnce(
   'for(let R=0;R<s;R++)this.depthFrame[R]=this.depthPixels[R*4];',
-  'for(let R=0;R<s;R++){const _t=R*4,_f=this.depthCameraView.far,_d=0.99609375*(this.depthPixels[_t]/255/16777216+this.depthPixels[_t+1]/255/65536+this.depthPixels[_t+2]/255/256+this.depthPixels[_t+3]/255);this.depthFrame[R]=_d*_f;}'
+  'for(let R=0;R<s;R++){const _t=R*4,_f=this.depthCameraView.far,_d=0.99609375*(this.depthPixels[_t]/255+this.depthPixels[_t+1]/255/256+this.depthPixels[_t+2]/255/65536)+this.depthPixels[_t+3]/255/16777216;this.depthFrame[R]=_d*_f;}'
 );
 
 // 6) Depth attachment: DEPTH_COMPONENT32F (FloatType, hg) -> DEPTH_COMPONENT24

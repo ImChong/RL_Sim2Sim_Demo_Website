@@ -95,6 +95,14 @@ test('parkour policy depth pass avoids iOS depth texture readback path', () => {
     /this\.depthFeature\.set\(I\).*depthLatentQueue\.push\(Float32Array\.from\(this\.depthFeature\)\).*E\.set\(C\?\?this\.depthFeature,g\.length\)/,
     'policy should fall back to the last valid or zero depth feature'
   );
+  assert.ok(
+    bundle.includes('this.depthPixels[_t]/255+this.depthPixels[_t+1]/255/256+this.depthPixels[_t+2]/255/65536)+this.depthPixels[_t+3]/255/16777216'),
+    'RGBA8 depth decode should match THREE unpackRGBAToDepth channel order'
+  );
+  assert.ok(
+    !bundle.includes('this.depthPixels[_t]/255/16777216+this.depthPixels[_t+1]/255/65536+this.depthPixels[_t+2]/255/256+this.depthPixels[_t+3]/255'),
+    'RGBA8 depth decode must not treat alpha as the most significant byte'
+  );
   assert.match(
     bundle,
     /this\.depthSession&&this\.latestDepth/,
