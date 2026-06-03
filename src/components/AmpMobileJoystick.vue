@@ -108,7 +108,8 @@ export default {
         this.moveNormX,
         this.moveNormY,
         this.yawDirection,
-        false
+        false,
+        true
       );
       this.$emit('command', { cmdX, cmdY, cmdYaw });
     },
