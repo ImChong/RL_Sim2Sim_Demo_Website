@@ -233,7 +233,6 @@
             </div>
             <div class="text-caption mt-2 text-medium-emphasis">{{ t.ampKeyboardFocusHint }}</div>
           </div>
-          <div v-else class="text-caption mt-2 text-medium-emphasis">{{ t.ampJoystickPanelHint }}</div>
         </div>
 
         <v-alert
@@ -580,7 +579,6 @@ const translations = {
     ampKeyRotateRight: 'Turn in place right',
     ampKeySprint: 'Hold for maximum speed',
     ampKeyboardFocusHint: 'Click the demo view first, then use the keys. Sliders update while keys are held.',
-    ampJoystickPanelHint: 'Use the virtual joystick at the bottom-right of the screen (above this panel).',
     ampJoystickGroup: 'AMP movement controls',
     ampJoystickMove: 'Move',
     ampJoystickRotateLeft: 'Turn left',
@@ -664,7 +662,6 @@ const translations = {
     ampKeyRotateRight: '原地向右旋转',
     ampKeySprint: '按住时以最大速度',
     ampKeyboardFocusHint: '请先点击演示画面，再使用键盘。按住按键时滑块会同步显示当前速度。',
-    ampJoystickPanelHint: '请使用画面右下、控制面板上方的虚拟摇杆。',
     ampJoystickGroup: 'AMP 移动控制',
     ampJoystickMove: '移动',
     ampJoystickRotateLeft: '左转',
