@@ -78,6 +78,32 @@ patched to use `100×100` and the MJCF repeat values as-is.
 `Reflector.setReflectionQuality` in the bundle must update its internal size /
 multisample tracking (`let I` / `let w` and assign `I=ea,w=sa` after resizing);
 otherwise the host panel slider stops changing reflection after the first move.
+
+#### Mobile-compatible depth readback (RGBA8 instead of float)
+
+The depth backbone is fed a per-pixel linear-depth image. Upstream renders that
+image into an **RGBA32F** (`FloatType`) render target and reads it back with
+`readRenderTargetPixels` into a `Float32Array`. Reading a floating-point colour
+buffer with `gl.readPixels` is **not supported on most mobile GPUs** (iOS Safari
+and many Android drivers): the read returns all zeros, so the depth preview is
+black and the depth backbone receives a blank image, which makes the policy
+walk off cliffs / fall over on phones.
+
+The fix packs the linear depth into an **RGBA8** target (universally readable)
+and unpacks it in JS, so the pipeline works identically on desktop and mobile:
+
+- inference shader: `gl_FragColor = vec4(linearDepth,0,0,1)` →
+  `gl_FragColor = packDepthToRGBA(clamp(linearDepth / cameraFar, 0.0, 1.0))`
+  (the shader already `#include <packing>`);
+- `depthInferenceTarget` type `FloatType` (`hg`) → `UnsignedByteType` (`1009`);
+- the two `depthPixels` allocations: `Float32Array` → `Uint8Array`;
+- the readback decode loop reconstructs metres with THREE's `unpackRGBAToDepth`
+  factor (`255/256`) times `depthCameraView.far`.
+
+This patch is applied by `scripts/patch-parkour-depth.mjs`; re-run it after a
+re-pull. `scripts/verify-parkour-depth.mjs` is a headless smoke test that asserts
+`window.__parkourDemo.depthFrame` is populated and varied (not all-zero).
+
 **If you ever re-pull the upstream build, re-apply all bundle patches.**
 
 ## License / attribution
