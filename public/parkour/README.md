@@ -78,6 +78,20 @@ patched to use `100×100` and the MJCF repeat values as-is.
 `Reflector.setReflectionQuality` in the bundle must update its internal size /
 multisample tracking (`let I` / `let w` and assign `I=ea,w=sa` after resizing);
 otherwise the host panel slider stops changing reflection after the first move.
+
+### iOS depth readback (`scripts/patch-parkour-ios-depth.mjs`)
+
+Safari on iOS often cannot read **FloatType** render targets via
+`readRenderTargetPixels`, which leaves the depth inset black and breaks
+perceptive locomotion. Re-apply this patch after re-pulling the upstream bundle:
+
+- Linearized depth is rendered into an **UnsignedByteType** color target and
+  decoded back to meters on the CPU.
+- The depth preview is refreshed immediately via `_prepareDepthInput()` after
+  each capture (no longer waits for the first backbone inference).
+- On iPhone/iPad, ORT is forced to **single-threaded** mode with the worker
+  proxy disabled.
+
 **If you ever re-pull the upstream build, re-apply all bundle patches.**
 
 ## License / attribution
