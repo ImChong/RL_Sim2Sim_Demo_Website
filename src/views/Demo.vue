@@ -16,23 +16,24 @@
       role="status"
       aria-live="polite"
     >
-      <div class="parkour-loading-card">
-        <div class="parkour-loading-title">{{ t.loadingSimulationTitle }}</div>
-        <div class="parkour-loading-body">{{ t.loadingSimulationBody }}</div>
-        <v-progress-linear
-          :model-value="parkourLoadProgress"
-          height="10"
-          color="primary"
-          rounded
-          class="parkour-loading-progress"
-          :aria-label="t.loadingSimulationTitle"
-          :aria-valuenow="parkourLoadProgress"
-          aria-valuemin="0"
-          aria-valuemax="100"
-          role="progressbar"
-        ></v-progress-linear>
-        <div class="parkour-loading-percent">{{ parkourLoadProgress }}%</div>
-      </div>
+      <v-card :title="t.loadingSimulationTitle" class="parkour-loading-card">
+        <v-card-text>
+          <p class="text-body-2 mb-3">{{ t.loadingSimulationBody }}</p>
+          <v-progress-linear
+            :model-value="parkourLoadProgress"
+            height="10"
+            color="primary"
+            rounded
+            class="loading-simulation-progress"
+            :aria-label="t.loadingSimulationTitle"
+            :aria-valuenow="parkourLoadProgress"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            role="progressbar"
+          ></v-progress-linear>
+          <div class="text-caption text-medium-emphasis mt-2 text-end">{{ parkourLoadProgress }}%</div>
+        </v-card-text>
+      </v-card>
     </div>
   </div>
   <div class="global-alerts">
@@ -1628,43 +1629,17 @@ export default {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  color: #e2e8f0;
-  /* Opaque backdrop hides the iframe's white background while it initialises. */
-  background: #0f172a;
+  /* Opaque backdrop (app theme background) hides the iframe while it
+     initialises. The card below reuses the same themed Vuetify v-card as the
+     AMP / Tracking "Loading Simulation Environment" dialog so the colour scheme
+     matches across all policies and both light/dark themes. */
+  background: rgb(var(--v-theme-background));
   pointer-events: none;
 }
 
 .parkour-loading-card {
   width: 100%;
-  max-width: 460px;
-  padding: 22px 26px;
-  border-radius: 14px;
-  background: rgba(30, 41, 59, 0.72);
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(6px);
-}
-
-.parkour-loading-title {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #f8fafc;
-}
-
-.parkour-loading-body {
-  margin-top: 6px;
-  font-size: 0.85rem;
-  color: rgba(226, 232, 240, 0.72);
-}
-
-.parkour-loading-progress {
-  margin-top: 18px;
-}
-
-.parkour-loading-percent {
-  margin-top: 8px;
-  font-size: 0.78rem;
-  text-align: right;
-  color: rgba(226, 232, 240, 0.7);
+  max-width: 600px;
 }
 
 .parkour-controls {
