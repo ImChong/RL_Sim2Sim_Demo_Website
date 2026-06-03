@@ -47,7 +47,6 @@
         ></div>
       </div>
     </div>
-    <div class="amp-mobile-controls__hint text-caption">{{ labels.hint }}</div>
   </div>
 </template>
 
@@ -291,13 +290,5 @@ export default {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
   pointer-events: none;
   will-change: transform;
-}
-
-.amp-mobile-controls__hint {
-  max-width: 190px;
-  text-align: right;
-  color: rgba(var(--v-theme-on-surface), 0.72);
-  text-shadow: 0 1px 2px rgba(var(--v-theme-surface), 0.9);
-  line-height: 1.3;
 }
 </style>

@@ -585,7 +585,6 @@ const translations = {
     ampJoystickMove: 'Move',
     ampJoystickRotateLeft: 'Turn left',
     ampJoystickRotateRight: 'Turn right',
-    ampJoystickHint: 'Drag for walk/run; push to the edge for max speed.',
     ampPolicyDescription:
       'AMP policy trained for walk, run, and get-up behaviors.',
     parkourPolicyDescription:
@@ -670,7 +669,6 @@ const translations = {
     ampJoystickMove: '移动',
     ampJoystickRotateLeft: '左转',
     ampJoystickRotateRight: '右转',
-    ampJoystickHint: '拖动摇杆行走；推至外圈为最大速度。',
     ampPolicyDescription:
       '用于行走、跑步和起身行为的 AMP 策略。',
     parkourPolicyDescription:
@@ -910,8 +908,7 @@ export default {
         group: this.t.ampJoystickGroup,
         move: this.t.ampJoystickMove,
         rotateLeft: this.t.ampJoystickRotateLeft,
-        rotateRight: this.t.ampJoystickRotateRight,
-        hint: this.t.ampJoystickHint
+        rotateRight: this.t.ampJoystickRotateRight
       };
     },
     isParkourPolicy() {
