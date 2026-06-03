@@ -98,6 +98,18 @@
             G1 AMP Walk/Run/Getup Training Code
           </v-btn>
           <v-btn
+            href="https://php-parkour.github.io/index.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            variant="text"
+            size="small"
+            color="primary"
+            class="text-capitalize"
+          >
+            <v-icon icon="mdi-file-document-outline" class="mr-1"></v-icon>
+            Paper
+          </v-btn>
+          <v-btn
             href="https://github.com/Axellwppr/motion_tracking"
             target="_blank"
             rel="noopener noreferrer"
