@@ -165,5 +165,13 @@ replaceOnce(
   'I&&I.length===32?(this.depthFeature.set(I),this.depthLatentQueue.push(Float32Array.from(this.depthFeature))):this.depthLatentQueue.push(Float32Array.from(this.depthFeature));let C=null;this.depthLatentQueue.length>this.depthLatencySteps?C=this.depthLatentQueue.shift():C=this.depthLatentQueue[0];const E=new Float32Array(g.length+32);E.set(g,0),E.set(C??this.depthFeature,g.length);'
 );
 
+// 10) Depth backbone guard: the first policy tick can happen before the render
+//     pass has submitted the first depth image. Skip that warm-up tick instead
+//     of logging a caught destructuring error from _prepareDepthInput().
+replaceOnce(
+  'if(this.depthSession)try{I=await this._runDepthBackbone()}catch(Y){console.warn("Depth backbone inference failed:",Y)}',
+  'if(this.depthSession&&this.latestDepth)try{I=await this._runDepthBackbone()}catch(Y){console.warn("Depth backbone inference failed:",Y)}'
+);
+
 fs.writeFileSync(FILE, src);
 console.log('done');

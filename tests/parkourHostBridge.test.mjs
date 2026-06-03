@@ -95,6 +95,11 @@ test('parkour policy depth pass avoids iOS depth texture readback path', () => {
     /this\.depthFeature\.set\(I\).*depthLatentQueue\.push\(Float32Array\.from\(this\.depthFeature\)\).*E\.set\(C\?\?this\.depthFeature,g\.length\)/,
     'policy should fall back to the last valid or zero depth feature'
   );
+  assert.match(
+    bundle,
+    /this\.depthSession&&this\.latestDepth/,
+    'depth backbone should wait until the first depth frame is available'
+  );
 });
 
 test('host bridge defers reflection quality until reflectors exist', () => {
