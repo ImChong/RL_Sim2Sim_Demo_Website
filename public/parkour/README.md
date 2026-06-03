@@ -98,11 +98,24 @@ and unpacks it in JS, so the pipeline works identically on desktop and mobile:
 - `depthInferenceTarget` type `FloatType` (`hg`) → `UnsignedByteType` (`1009`);
 - the two `depthPixels` allocations: `Float32Array` → `Uint8Array`;
 - the readback decode loop reconstructs metres with THREE's `unpackRGBAToDepth`
-  factor (`255/256`) times `depthCameraView.far`.
+  factor (`255/256`) times `depthCameraView.far`;
+- the depth attachment `depthTarget.depthTexture.type` `FloatType` (`hg`) ->
+  `UnsignedIntType` (`1014`), i.e. `DEPTH_COMPONENT32F` -> `DEPTH_COMPONENT24`.
+  32-bit-float depth textures are not reliably renderable on iOS; 24-bit unorm
+  depth is core WebGL2 and universally supported.
 
-This patch is applied by `scripts/patch-parkour-depth.mjs`; re-run it after a
-re-pull. `scripts/verify-parkour-depth.mjs` is a headless smoke test that asserts
+This patch is applied by `scripts/patch-parkour-depth.mjs`; idempotent; re-run it after a re-pull. `scripts/verify-parkour-depth.mjs` is a headless smoke test that asserts
 `window.__parkourDemo.depthFrame` is populated and varied (not all-zero).
+
+> **Cache busting:** the upstream build ships a content-hashed bundle filename.
+> Because these patches edit the bundle *in place*, the filename must change
+> whenever the patched contents change, otherwise browsers (especially iOS, which
+> caches aggressively and has no service-worker override here) keep serving the
+> stale pre-patch copy. The current bundle is `assets/index-Cq8mDpv1.js`; if you
+> re-pull upstream and re-apply patches, rename it again and update the `<script>`
+> tag in `dist-desktop/index.html`, the `FILE` path in
+> `scripts/patch-parkour-depth.mjs`, and the bundle path in
+> `tests/parkourHostBridge.test.mjs`.
 
 **If you ever re-pull the upstream build, re-apply all bundle patches.**
 

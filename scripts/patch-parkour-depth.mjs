@@ -1,27 +1,37 @@
 // One-off patch script: make the vendored G1 Perceptive Parkour depth pipeline
-// mobile-compatible by replacing the float (RGBA32F) depth readback with an
-// RGBA8 packed readback. Float color-buffer readPixels is unsupported on most
-// mobile GPUs (iOS Safari / many Android), which left the depth image black and
-// fed garbage to the depth backbone, making the robot fall.
+// mobile-compatible (iOS Safari / iOS Chrome, many Android).
 //
+// The upstream depth pipeline renders linear depth into an RGBA32F (FloatType)
+// render target with a DEPTH_COMPONENT32F depth attachment and reads it back as
+// a Float32Array. On most mobile GPUs neither RGBA32F rendering nor float
+// gl.readPixels is supported, so the depth image came back all-zero (black), the
+// depth backbone received a blank image, and the robot fell over.
+//
+// This rewrites the pipeline to use only mobile-safe formats:
+//   - linear depth packed into RGBA8 (UnsignedByteType) via packDepthToRGBA,
+//     read back as Uint8Array and decoded with THREE's unpackRGBAToDepth;
+//   - the depth attachment downgraded from DEPTH_COMPONENT32F to the universally
+//     renderable DEPTH_COMPONENT24 (UnsignedIntType).
+//
+// The script is idempotent: re-run it after re-pulling the upstream build.
 // Run: node scripts/patch-parkour-depth.mjs
 import fs from 'node:fs';
 
-const FILE = 'public/parkour/dist-desktop/assets/index-BLR_wER3.js';
+const FILE = 'public/parkour/dist-desktop/assets/index-Cq8mDpv1.js';
 let src = fs.readFileSync(FILE, 'utf8');
 
 function replaceOnce(from, to) {
+  if (src.includes(to)) {
+    console.log('already patched (skip):', to.slice(0, 56));
+    return;
+  }
   const first = src.indexOf(from);
   if (first === -1) throw new Error('NOT FOUND:\n' + from.slice(0, 120));
   if (src.indexOf(from, first + from.length) !== -1) {
     throw new Error('NOT UNIQUE:\n' + from.slice(0, 120));
   }
-  if (src.includes(to)) {
-    console.log('already patched (skip):', to.slice(0, 60));
-    return;
-  }
   src = src.slice(0, first) + to + src.slice(first + from.length);
-  console.log('patched:', to.slice(0, 60));
+  console.log('patched:', to.slice(0, 56));
 }
 
 // 1) Inference shader: pack linear depth (normalised by far plane) into RGBA8
@@ -54,6 +64,14 @@ replaceOnce(
 replaceOnce(
   'for(let R=0;R<s;R++)this.depthFrame[R]=this.depthPixels[R*4];',
   'for(let R=0;R<s;R++){const _t=R*4,_f=this.depthCameraView.far,_d=0.99609375*(this.depthPixels[_t]/255/16777216+this.depthPixels[_t+1]/255/65536+this.depthPixels[_t+2]/255/256+this.depthPixels[_t+3]/255);this.depthFrame[R]=_d*_f;}'
+);
+
+// 6) Depth attachment: DEPTH_COMPONENT32F (FloatType, hg) -> DEPTH_COMPONENT24
+//    (UnsignedIntType, 1014). 32F depth textures are not reliably renderable on
+//    iOS; 24-bit unorm depth is core and universally supported in WebGL2.
+replaceOnce(
+  'this.depthTarget.depthTexture.type=hg',
+  'this.depthTarget.depthTexture.type=1014'
 );
 
 fs.writeFileSync(FILE, src);
