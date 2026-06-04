@@ -62,7 +62,6 @@
       return;
     }
     material.__depthHudRoundedPatched = true;
-    material.transparent = true;
     material.depthWrite = false;
     material.depthTest = false;
     if (!material.__depthHudCornerRadiusUniform) {
@@ -86,8 +85,7 @@
         'vec2 depthHudR = uDepthHudCornerRadius;',
         'vec2 depthHudBox = abs(depthHudUv) - (vec2(0.5) - depthHudR);',
         'float depthHudDist = length(max(depthHudBox, 0.0)) - min(depthHudR.x, depthHudR.y);',
-        'float depthHudAlpha = 1.0 - smoothstep(0.0, 0.003, depthHudDist);',
-        'gl_FragColor.a *= depthHudAlpha;'
+        'if (depthHudDist > 0.0) discard;'
       ].join('\n');
       if (shader.fragmentShader.includes('#include <colorspace_fragment>')) {
         shader.fragmentShader = shader.fragmentShader.replace(
@@ -101,7 +99,7 @@
         );
       }
     };
-    material.customProgramCacheKey = () => 'depth-hud-rounded-v3';
+    material.customProgramCacheKey = () => 'depth-hud-rounded-v4';
     material.needsUpdate = true;
   }
 
@@ -116,7 +114,7 @@
     }
     demo.__depthHudRenderPatched = true;
     const originalRender = demo.render.bind(demo);
-    demo.render = function depthHudRenderWrapper(...args) {
+    demo.render = async function depthHudRenderWrapper(...args) {
       const renderer = this.renderer;
       if (!renderer) {
         return originalRender(...args);
@@ -124,7 +122,7 @@
       const previousAutoClear = renderer.autoClear;
       renderer.autoClear = false;
       try {
-        return originalRender(...args);
+        return await originalRender(...args);
       } finally {
         renderer.autoClear = previousAutoClear;
       }

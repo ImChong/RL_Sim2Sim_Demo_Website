@@ -244,32 +244,36 @@ test('host bridge rounds depth HUD materials without touching inference', () => 
   assert.equal(typeof depthPreviewMaterial.onBeforeCompile, 'function');
   assert.equal(depthPreviewMaterial.depthWrite, false);
   assert.equal(depthPreviewMaterial.depthTest, false);
-  assert.equal(depthPreviewMaterial.transparent, true);
+  assert.notEqual(depthPreviewMaterial.transparent, true);
 
   const shader = { uniforms: {}, fragmentShader: 'void main() {\n#include <colorspace_fragment>\n}' };
   depthPreviewMaterial.onBeforeCompile(shader);
   assert.match(shader.fragmentShader, /uDepthHudCornerRadius/);
-  assert.match(shader.fragmentShader, /gl_FragColor\.a \*= depthHudAlpha/);
+  assert.match(shader.fragmentShader, /discard/);
   assert.equal(shader.uniforms.uDepthHudCornerRadius.value.x, 0);
   assert.equal(shader.uniforms.uDepthHudCornerRadius.value.y, 0);
 });
 
-test('host bridge disables renderer autoClear during demo render', () => {
+test('host bridge disables renderer autoClear during async demo render', () => {
   const demo = {
     reflectors: [],
     renderer: { autoClear: true },
-    render(time) {
+    async render(time) {
       this.renderCalls = (this.renderCalls ?? 0) + 1;
       this.autoClearDuringRender = this.renderer.autoClear;
       this.renderTime = time;
+      await Promise.resolve();
+      this.autoClearAfterAwait = this.renderer.autoClear;
     }
   };
   runBridgeInVm(demo);
-  demo.render(123.456);
-  assert.equal(demo.renderCalls, 1);
-  assert.equal(demo.autoClearDuringRender, false);
-  assert.equal(demo.renderTime, 123.456);
-  assert.equal(demo.renderer.autoClear, true);
+  return demo.render(123.456).then(() => {
+    assert.equal(demo.renderCalls, 1);
+    assert.equal(demo.autoClearDuringRender, false);
+    assert.equal(demo.autoClearAfterAwait, false);
+    assert.equal(demo.renderTime, 123.456);
+    assert.equal(demo.renderer.autoClear, true);
+  });
 });
 
 test('host bridge maps panel corner radius px to depth HUD normalized radius', () => {

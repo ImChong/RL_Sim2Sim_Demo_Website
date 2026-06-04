@@ -42,14 +42,13 @@ reflection quality, and reads simulation step rate from the embedded demo via
 `setReflectionQuality`, and `getSimStepHz` to `window.__parkourDemo`.
 
 The depth HUD (raw + processed previews) gets rounded corners via a display-only
-`onBeforeCompile` alpha mask on `depthRawMaterial` / `depthPreviewMaterial`. The
+`onBeforeCompile` discard on `depthRawMaterial` / `depthPreviewMaterial`. The
 host page sends `depthPreviewCornerRadiusPx` (read from the control panel's
 computed `border-radius`) so the preview matches the panel; corner radii are
 computed separately for width/height so mobile previews stay circular in pixel
-space. Materials use transparent alpha blending with `depthWrite`/`depthTest`
-disabled so rounded-outside pixels reveal the scene instead of black.
-The bridge also disables `renderer.autoClear` during the demo render loop so the
-depth HUD scissor pass does not clear its bounds to black before compositing.
+space. Materials stay opaque with `depthWrite`/`depthTest` disabled.
+The bridge wraps async `demo.render()` and keeps `autoClear` off until the frame
+finishes so the depth HUD scissor pass is not cleared to black.
 The `depthInferenceMaterial` render target and `setDepthImage` path are untouched.
 
 ### Speed mode (Shift)
