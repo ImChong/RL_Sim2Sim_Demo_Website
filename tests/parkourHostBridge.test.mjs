@@ -292,7 +292,8 @@ test('host bridge relays iframe keyboard to parent for joystick sync', () => {
 test('host bridge rounds depth HUD materials without touching inference', () => {
   const bridgeSource = readFileSync(bridgePath, 'utf8');
   assert.match(bridgeSource, /applyDepthHudRoundedCorners/);
-  assert.match(bridgeSource, /depthHudBox/);
+  assert.match(bridgeSource, /depthHudQ/);
+  assert.match(bridgeSource, /patchDepthHudRender/);
   assert.doesNotMatch(bridgeSource, /depthInferenceMaterial/);
 
   const depthPreviewMaterial = { needsUpdate: false };
@@ -308,11 +309,70 @@ test('host bridge rounds depth HUD materials without touching inference', () => 
   assert.equal(depthPreviewMaterial.__depthHudRoundedPatched, true);
   assert.equal(depthRawMaterial.__depthHudRoundedPatched, true);
   assert.equal(typeof depthPreviewMaterial.onBeforeCompile, 'function');
-  assert.equal(depthPreviewMaterial.transparent, true);
+  assert.equal(depthPreviewMaterial.depthWrite, false);
+  assert.equal(depthPreviewMaterial.depthTest, false);
+  assert.notEqual(depthPreviewMaterial.transparent, true);
 
   const shader = { uniforms: {}, fragmentShader: 'void main() {\n#include <colorspace_fragment>\n}' };
   depthPreviewMaterial.onBeforeCompile(shader);
-  assert.match(shader.fragmentShader, /uDepthHudCornerRadius/);
+  assert.match(shader.fragmentShader, /uDepthHudCornerRadiusPx/);
+  assert.match(shader.fragmentShader, /uDepthHudSize/);
   assert.match(shader.fragmentShader, /discard/);
-  assert.equal(shader.uniforms.uDepthHudCornerRadius.value, 0.11);
+  assert.equal(shader.uniforms.uDepthHudCornerRadiusPx.value, 0);
+  assert.equal(shader.uniforms.uDepthHudSize.value.x, 1);
+  assert.equal(shader.uniforms.uDepthHudSize.value.y, 1);
+});
+
+test('host bridge disables renderer autoClear during async demo render', () => {
+  const demo = {
+    reflectors: [],
+    renderer: { autoClear: true },
+    async render(time) {
+      this.renderCalls = (this.renderCalls ?? 0) + 1;
+      this.autoClearDuringRender = this.renderer.autoClear;
+      this.renderTime = time;
+      await Promise.resolve();
+      this.autoClearAfterAwait = this.renderer.autoClear;
+    }
+  };
+  runBridgeInVm(demo);
+  return demo.render(123.456).then(() => {
+    assert.equal(demo.renderCalls, 1);
+    assert.equal(demo.autoClearDuringRender, false);
+    assert.equal(demo.autoClearAfterAwait, false);
+    assert.equal(demo.renderTime, 123.456);
+    assert.equal(demo.renderer.autoClear, true);
+  });
+});
+
+test('host bridge maps panel corner radius px to depth HUD pixel-space uniforms', () => {
+  const depthPreviewMaterial = { needsUpdate: false };
+  const depthRawMaterial = { needsUpdate: false };
+  const demo = {
+    reflectors: [],
+    depthInset: { width: 64, previewScale: 4 },
+    depthProcessedInset: { width: 87, height: 58, scale: 4 },
+    depthPreviewMaterial,
+    depthRawMaterial,
+    render() {}
+  };
+  const messageHandler = runBridgeInVm(demo);
+
+  messageHandler({
+    data: {
+      source: 'parkour-host-control',
+      type: 'apply',
+      depthPreviewCornerRadiusPx: 18
+    }
+  });
+
+  assert.equal(demo._depthPreviewCornerRadiusPx, 18);
+  const previewUniforms = depthPreviewMaterial.__depthHudRoundUniforms;
+  const rawUniforms = depthRawMaterial.__depthHudRoundUniforms;
+  assert.equal(previewUniforms.cornerRadiusPx.value, 18);
+  assert.equal(previewUniforms.size.value.x, 87 * 4);
+  assert.equal(previewUniforms.size.value.y, 58 * 4);
+  assert.equal(rawUniforms.cornerRadiusPx.value, 18);
+  assert.equal(rawUniforms.size.value.x, 64 * 4);
+  assert.equal(rawUniforms.size.value.y, 64 * 4);
 });

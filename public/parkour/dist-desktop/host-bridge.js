@@ -35,54 +35,130 @@
 
   const DEFAULT_DEPTH_PREVIEW_SCALE = 4;
   const DEFAULT_DEPTH_PREVIEW_MARGIN = 16;
-  /** Normalized corner radius for depth HUD quads (display only; inference is unchanged). */
-  const DEPTH_HUD_CORNER_RADIUS = 0.11;
+  /** Fallback when host has not sent panel corner radius yet (matches Vuetify v-card default). */
+  const DEFAULT_DEPTH_PREVIEW_CORNER_RADIUS_PX = 4;
+
+  function depthHudClampCornerRadiusPx(radiusPx, widthPx, heightPx) {
+    const width = Math.max(1, Number(widthPx) || 1);
+    const height = Math.max(1, Number(heightPx) || 1);
+    const radius = Math.max(0, Number(radiusPx) || 0);
+    return Math.min(radius, width * 0.5, height * 0.5);
+  }
+
+  function setDepthHudRoundUniforms(uniforms, radiusPx, widthPx, heightPx) {
+    if (!uniforms?.cornerRadiusPx || !uniforms?.size?.value) {
+      return;
+    }
+    const width = Math.max(1, Number(widthPx) || 1);
+    const height = Math.max(1, Number(heightPx) || 1);
+    uniforms.cornerRadiusPx.value = depthHudClampCornerRadiusPx(radiusPx, width, height);
+    uniforms.size.value.x = width;
+    uniforms.size.value.y = height;
+  }
 
   function patchDepthHudRoundedCorners(material) {
     if (!material || material.__depthHudRoundedPatched) {
       return;
     }
     material.__depthHudRoundedPatched = true;
-    material.transparent = true;
+    material.depthWrite = false;
+    material.depthTest = false;
+    if (!material.__depthHudRoundUniforms) {
+      material.__depthHudRoundUniforms = {
+        cornerRadiusPx: { value: 0 },
+        size: { value: { x: 1, y: 1 } }
+      };
+    }
     const previousOnBeforeCompile = material.onBeforeCompile;
     material.onBeforeCompile = (shader) => {
       if (typeof previousOnBeforeCompile === 'function') {
         previousOnBeforeCompile(shader);
       }
-      if (!shader.uniforms.uDepthHudCornerRadius) {
-        shader.uniforms.uDepthHudCornerRadius = { value: DEPTH_HUD_CORNER_RADIUS };
-      }
-      if (shader.fragmentShader.includes('uDepthHudCornerRadius')) {
+      shader.uniforms.uDepthHudCornerRadiusPx = material.__depthHudRoundUniforms.cornerRadiusPx;
+      shader.uniforms.uDepthHudSize = material.__depthHudRoundUniforms.size;
+      if (shader.fragmentShader.includes('uDepthHudCornerRadiusPx')) {
         return;
       }
       shader.fragmentShader = shader.fragmentShader.replace(
         'void main() {',
-        'uniform float uDepthHudCornerRadius;\nvoid main() {'
+        'uniform float uDepthHudCornerRadiusPx;\nuniform vec2 uDepthHudSize;\nvoid main() {'
       );
-      const roundDiscard = [
-        'vec2 depthHudUv = vMapUv - 0.5;',
-        'vec2 depthHudBox = abs(depthHudUv) - (vec2(0.5) - vec2(uDepthHudCornerRadius));',
-        'if (length(max(depthHudBox, 0.0)) - uDepthHudCornerRadius > 0.0) discard;'
+      const roundMask = [
+        'vec2 depthHudP = (vMapUv - 0.5) * uDepthHudSize;',
+        'vec2 depthHudHalf = uDepthHudSize * 0.5;',
+        'vec2 depthHudQ = abs(depthHudP) - depthHudHalf + uDepthHudCornerRadiusPx;',
+        'float depthHudDist = length(max(depthHudQ, 0.0)) + min(max(depthHudQ.x, depthHudQ.y), 0.0) - uDepthHudCornerRadiusPx;',
+        'if (depthHudDist > 0.0) discard;'
       ].join('\n');
       if (shader.fragmentShader.includes('#include <colorspace_fragment>')) {
         shader.fragmentShader = shader.fragmentShader.replace(
           '#include <colorspace_fragment>',
-          `${roundDiscard}\n#include <colorspace_fragment>`
+          `${roundMask}\n#include <colorspace_fragment>`
         );
       } else {
         shader.fragmentShader = shader.fragmentShader.replace(
           /\n\}/,
-          `\n${roundDiscard}\n}`
+          `\n${roundMask}\n}`
         );
       }
     };
-    material.customProgramCacheKey = () => 'depth-hud-rounded-v1';
+    material.customProgramCacheKey = () => 'depth-hud-rounded-v5';
     material.needsUpdate = true;
   }
 
   function applyDepthHudRoundedCorners(demo) {
     patchDepthHudRoundedCorners(demo?.depthRawMaterial);
     patchDepthHudRoundedCorners(demo?.depthPreviewMaterial);
+  }
+
+  function patchDepthHudRender(demo) {
+    if (!demo?.render || demo.__depthHudRenderPatched) {
+      return;
+    }
+    demo.__depthHudRenderPatched = true;
+    const originalRender = demo.render.bind(demo);
+    demo.render = async function depthHudRenderWrapper(...args) {
+      const renderer = this.renderer;
+      if (!renderer) {
+        return originalRender(...args);
+      }
+      const previousAutoClear = renderer.autoClear;
+      renderer.autoClear = false;
+      try {
+        return await originalRender(...args);
+      } finally {
+        renderer.autoClear = previousAutoClear;
+      }
+    };
+  }
+
+  function applyDepthPreviewCornerRadius(demo, radiusPx) {
+    if (!demo) {
+      return;
+    }
+    applyDepthHudRoundedCorners(demo);
+    const scale = demo.depthInset?.previewScale ?? DEFAULT_DEPTH_PREVIEW_SCALE;
+    const processed = demo.depthProcessedInset;
+    const procScale = processed?.scale ?? scale;
+    const procWidth = (processed?.width ?? 87) * procScale;
+    const procHeight = (processed?.height ?? 58) * procScale;
+    const rawWidth = (demo.depthInset?.width ?? 64) * scale;
+    const rawHeight = (demo.depthInset?.height ?? 64) * scale;
+    const cornerRadiusPx = Number.isFinite(Number(radiusPx))
+      ? Number(radiusPx)
+      : DEFAULT_DEPTH_PREVIEW_CORNER_RADIUS_PX;
+    setDepthHudRoundUniforms(
+      demo.depthPreviewMaterial?.__depthHudRoundUniforms,
+      cornerRadiusPx,
+      procWidth,
+      procHeight
+    );
+    setDepthHudRoundUniforms(
+      demo.depthRawMaterial?.__depthHudRoundUniforms,
+      cornerRadiusPx,
+      rawWidth,
+      rawHeight
+    );
   }
 
   function patchPolicyVirtualInput(demo) {
@@ -159,16 +235,25 @@
       const bottom = Math.max(4, Math.min(640, Math.round(Number(state.depthPreviewBottomOffset) || DEFAULT_DEPTH_PREVIEW_MARGIN)));
       demo.depthInset.bottomOffset = bottom;
     }
+    if (state.depthPreviewCornerRadiusPx !== undefined) {
+      demo._depthPreviewCornerRadiusPx = Number(state.depthPreviewCornerRadiusPx);
+    }
+    applyDepthPreviewCornerRadius(
+      demo,
+      demo._depthPreviewCornerRadiusPx ?? DEFAULT_DEPTH_PREVIEW_CORNER_RADIUS_PX
+    );
   }
 
   function attachHostApi(demo) {
     if (!demo || demo.__hostBridgeAttached) {
       patchPolicyVirtualInput(demo);
       applyDepthHudRoundedCorners(demo);
+      patchDepthHudRender(demo);
       return !!demo;
     }
     demo.__hostBridgeAttached = true;
     applyDepthHudRoundedCorners(demo);
+    patchDepthHudRender(demo);
 
     if (demo.followEnabled === undefined) {
       demo.followEnabled = true;
@@ -234,6 +319,7 @@
         || state.depthPreviewMargin !== undefined
         || state.depthPreviewLeftOffset !== undefined
         || state.depthPreviewBottomOffset !== undefined
+        || state.depthPreviewCornerRadiusPx !== undefined
       ) {
         applyDepthPreviewLayout(this, state);
       }
