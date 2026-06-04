@@ -12,7 +12,9 @@
     "preview": "vite preview",
     "test": "node --test tests/*.test.mjs",
     "verify:e2e-knockdown": "node scripts/verify-knockdown-button.mjs",
-    "verify:e2e-parkour-cross": "node scripts/verify-parkour-cross-obstacle.mjs"
+    "verify:e2e-parkour-cross": "node scripts/verify-parkour-cross-obstacle.mjs",
+    "verify:e2e-parkour-depth": "node scripts/verify-parkour-depth.mjs",
+    "verify:record-parkour-ios": "node scripts/record-parkour-ios-verify.mjs"
   },
   "dependencies": {
     "@fontsource/roboto": "5.2.5",
