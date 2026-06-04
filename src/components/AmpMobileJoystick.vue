@@ -27,9 +27,13 @@
         <button
           type="button"
           class="amp-mobile-controls__action-btn amp-mobile-controls__knockdown-btn amp-mobile-controls__orbit-btn amp-mobile-controls__orbit-btn--knockdown"
+          :class="{ 'amp-mobile-controls__knockdown-btn--pressed': knockdownPressed }"
           :aria-label="labels.knockdown"
           :disabled="disabled"
           data-test="knockdown-test-mobile"
+          @pointerdown.prevent="onKnockdownPointerDown"
+          @pointerup.prevent="onKnockdownPointerUp"
+          @pointercancel.prevent="onKnockdownPointerUp"
           @click.stop="onKnockdownClick"
         >
           <v-icon icon="mdi-arrow-down-bold" size="22" />
@@ -71,6 +75,9 @@ import {
   stickVisualFromAmpCommand
 } from '@/utils/ampJoystickCommand.js';
 
+/** Brief pressed highlight when knockdown is triggered from keyboard. */
+const KNOCKDOWN_PULSE_MS = 180;
+
 export default {
   name: 'AmpMobileJoystick',
   props: {
@@ -106,6 +113,7 @@ export default {
     moveNormY: 0,
     yawDirection: 0,
     movePointerId: null,
+    knockdownPressed: false,
     yawPointerActive: false,
     knobOffsetX: 0,
     knobOffsetY: 0,
@@ -131,6 +139,7 @@ export default {
   },
   beforeUnmount() {
     window.removeEventListener('resize', this._onResize);
+    this.clearKnockdownPulse();
     this.releaseMovePointer();
   },
   methods: {
@@ -174,6 +183,33 @@ export default {
     },
     emitZero() {
       this.$emit('command', { cmdX: 0, cmdY: 0, cmdYaw: 0 });
+    },
+    onKnockdownPointerDown() {
+      if (this.disabled) {
+        return;
+      }
+      this.knockdownPressed = true;
+    },
+    onKnockdownPointerUp() {
+      this.knockdownPressed = false;
+    },
+    clearKnockdownPulse() {
+      if (this._knockdownPulseTimer != null) {
+        clearTimeout(this._knockdownPulseTimer);
+        this._knockdownPulseTimer = null;
+      }
+    },
+    /** Visual feedback when knockdown is triggered via PC keyboard (Enter). */
+    pulseKnockdown() {
+      if (this.disabled) {
+        return;
+      }
+      this.knockdownPressed = true;
+      this.clearKnockdownPulse();
+      this._knockdownPulseTimer = window.setTimeout(() => {
+        this.knockdownPressed = false;
+        this._knockdownPulseTimer = null;
+      }, KNOCKDOWN_PULSE_MS);
     },
     onKnockdownClick() {
       if (this.disabled) {
@@ -393,7 +429,7 @@ export default {
   -webkit-backdrop-filter: blur(8px);
 }
 
-.amp-mobile-controls__action-btn:active:not(:disabled),
+.amp-mobile-controls__action-btn:not(.amp-mobile-controls__knockdown-btn):active:not(:disabled),
 .amp-mobile-controls__action-btn--active {
   background: var(--amp-mobile-glass-active);
   border-color: rgba(var(--v-theme-primary), 0.4);
@@ -405,7 +441,7 @@ export default {
   color: rgb(var(--v-theme-secondary));
 }
 
-.amp-mobile-controls__knockdown-btn:active:not(:disabled) {
+.amp-mobile-controls__knockdown-btn--pressed:not(:disabled) {
   background: rgba(var(--v-theme-secondary), 0.38);
   border-color: rgba(var(--v-theme-secondary), 0.55);
 }

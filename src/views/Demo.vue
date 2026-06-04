@@ -1,6 +1,7 @@
 <template>
   <AmpMobileJoystick
     v-if="showAmpJoystick"
+    ref="ampJoystick"
     :disabled="state !== 1"
     :dock-above-mobile-panel="isSmallScreen"
     :labels="ampJoystickLabels"
@@ -522,6 +523,7 @@ import {
 import {
   AMP_KEYBOARD_CONTROL_ROWS,
   computeAmpCommandFromKeys,
+  isAmpKnockdownKey,
   isAmpMovementKey
 } from '@/utils/ampKeyboardCommand.js';
 
@@ -583,6 +585,7 @@ const translations = {
     ampKeyRotateLeft: 'Turn in place left',
     ampKeyRotateRight: 'Turn in place right',
     ampKeySprint: 'Hold for maximum speed',
+    ampKeyKnockdown: 'Knockdown test',
     ampKeyboardFocusHint: 'Click the demo view first, then use the keys. Sliders update while keys are held.',
     ampJoystickGroup: 'AMP movement controls',
     ampJoystickMove: 'Move',
@@ -666,6 +669,7 @@ const translations = {
     ampKeyRotateLeft: '原地向左旋转',
     ampKeyRotateRight: '原地向右旋转',
     ampKeySprint: '按住时以最大速度',
+    ampKeyKnockdown: '击倒测试',
     ampKeyboardFocusHint: '请先点击演示画面，再使用键盘。按住按键时滑块会同步显示当前速度。',
     ampJoystickGroup: 'AMP 移动控制',
     ampJoystickMove: '移动',
@@ -1319,6 +1323,15 @@ export default {
       if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
         this.ampShiftHeld = event.getModifierState('Shift');
         this.applyAmpKeyboardCommand();
+        return;
+      }
+      if (isAmpKnockdownKey(event.code)) {
+        if (event.repeat) {
+          return;
+        }
+        event.preventDefault();
+        this.onKnockdownTest();
+        this.$refs.ampJoystick?.pulseKnockdown?.();
         return;
       }
       if (!isAmpMovementKey(event.code)) {

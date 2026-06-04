@@ -30,8 +30,14 @@ const AMP_MOVEMENT_KEY_CODES = new Set([
   'KeyE'
 ]);
 
+const AMP_KNOCKDOWN_KEY_CODES = new Set(['Enter', 'NumpadEnter']);
+
 export function isAmpMovementKey(code) {
   return AMP_MOVEMENT_KEY_CODES.has(code);
+}
+
+export function isAmpKnockdownKey(code) {
+  return AMP_KNOCKDOWN_KEY_CODES.has(code);
 }
 
 function clamp(value, min, max) {
@@ -82,5 +88,6 @@ export const AMP_KEYBOARD_CONTROL_ROWS = [
   { key: 'D', labelKey: 'ampKeyRight' },
   { key: 'Q', labelKey: 'ampKeyRotateLeft' },
   { key: 'E', labelKey: 'ampKeyRotateRight' },
-  { key: 'SHIFT', labelKey: 'ampKeySprint' }
+  { key: 'SHIFT', labelKey: 'ampKeySprint' },
+  { key: 'ENTER', labelKey: 'ampKeyKnockdown' }
 ];
