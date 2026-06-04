@@ -41,6 +41,10 @@ reflection quality, and reads simulation step rate from the embedded demo via
 `postMessage`. The bridge attaches `setFollowEnabled`, `setRenderScale`,
 `setReflectionQuality`, and `getSimStepHz` to `window.__parkourDemo`.
 
+The depth HUD (raw + processed previews) gets rounded corners via a display-only
+`onBeforeCompile` discard on `depthRawMaterial` / `depthPreviewMaterial`. The
+`depthInferenceMaterial` render target and `setDepthImage` path are untouched.
+
 ### Speed mode (Shift)
 
 Policy keyboard control defaults to **low** speed. Hold **Shift** for fast
