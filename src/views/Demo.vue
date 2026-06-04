@@ -172,16 +172,18 @@
           >
             {{ t.parkourHoldW }}
           </v-alert>
-          <span class="status-name">{{ t.parkourHowToPlay }}</span>
-          <div class="parkour-keys mt-2">
-            <template v-for="row in parkourControls" :key="row.key">
-              <kbd class="parkour-key">{{ row.key }}</kbd>
-              <span class="text-caption">{{ row.label }}</span>
-            </template>
-          </div>
+          <template v-if="!isSmallScreen">
+            <span class="status-name">{{ t.parkourHowToPlay }}</span>
+            <div class="parkour-keys mt-2">
+              <template v-for="row in parkourControls" :key="row.key">
+                <kbd class="parkour-key">{{ row.key }}</kbd>
+                <span class="text-caption">{{ row.label }}</span>
+              </template>
+            </div>
+            <div class="text-caption mt-2 text-medium-emphasis">{{ t.parkourKeyboardFocusHint }}</div>
+          </template>
           <div class="text-caption mt-2">{{ t.parkourClimbNote }}</div>
-          <div class="text-caption mt-2 text-medium-emphasis">{{ t.parkourFocusHint }}</div>
-          <div class="text-caption mt-2 text-medium-emphasis">{{ t.parkourSource }}</div>
+          <div v-if="!isSmallScreen" class="text-caption mt-2 text-medium-emphasis">{{ t.parkourSource }}</div>
         </div>
 
         <div v-if="isAmpPolicy" class="mt-4">
@@ -542,6 +544,12 @@ import {
   computeParkourMobileDepthLayout,
   computeParkourMobileDepthLayoutFromMetrics
 } from '@/utils/parkourDepthPreviewLayout.js';
+import {
+  isParkourMovementKey,
+  isParkourPauseKey,
+  isParkourResetKey,
+  parkourVirtualKeysFromKeyboard
+} from '@/utils/parkourKeyboardCommand.js';
 
 const translations = {
   en: {
@@ -626,6 +634,7 @@ const translations = {
     parkourResetRun: 'Reset run',
     parkourClimbNote: 'Climbing engages automatically while you hold W.',
     parkourFocusHint: 'Click the demo view first, then use the keys.',
+    parkourKeyboardFocusHint: 'Use WASD and Shift on the keyboard; the joystick knob follows while keys are held.',
     parkourSource: 'Embedded build from php-parkour, self-hosted in this site.',
     parkourReset: 'Restart run',
     resizeControlWidth: 'Resize control panel width (left edge)',
@@ -714,6 +723,7 @@ const translations = {
     parkourResetRun: '重置当前回合',
     parkourClimbNote: '按住 W 时会自动触发攀爬。',
     parkourFocusHint: '请先点击演示画面，再使用键盘按键。',
+    parkourKeyboardFocusHint: '可用 WASD 与 Shift 键盘控制；按住按键时摇杆会同步显示方向。',
     parkourSource: '内嵌自 php-parkour 的构建，已自托管在本站。',
     parkourReset: '重新开始',
     resizeControlWidth: '拖拽左边框调整控制面板宽度',
@@ -818,7 +828,9 @@ export default {
     parkourLoadProgress: 0,
     parkourReceivedProgress: false,
     parkourReloadKey: 0,
-    parkourVirtualKeys: { w: false, a: false, d: false }
+    parkourVirtualKeys: { w: false, a: false, d: false },
+    parkourKeysHeld: new Set(),
+    parkourShiftHeld: false
   }),
   computed: {
     desktopControlsPanelStyle() {
@@ -1355,6 +1367,10 @@ export default {
       if (!this.isParkourPolicy || this.state !== 1 || this.parkourLoading) {
         return;
       }
+      if (this.parkourKeysHeld.size > 0) {
+        this.applyParkourKeyboardCommand();
+        return;
+      }
       this.parkourVirtualKeys = { w: Boolean(w), a: Boolean(a), d: Boolean(d) };
       this.postParkourHostControl({
         virtualInput: {
@@ -1376,8 +1392,79 @@ export default {
       if (!this.isParkourPolicy || this.state !== 1 || this.parkourLoading) {
         return;
       }
+      this.clearParkourKeyboardState();
       this.clearParkourVirtualInput();
       this.postParkourHostControl({ parkourResetRun: true });
+    },
+    clearParkourKeyboardState() {
+      this.parkourKeysHeld.clear();
+      this.parkourShiftHeld = false;
+    },
+    applyParkourKeyboardCommand() {
+      if (!this.isParkourPolicy || this.state !== 1 || this.isSmallScreen) {
+        return;
+      }
+      const input = parkourVirtualKeysFromKeyboard(this.parkourKeysHeld, this.parkourShiftHeld);
+      this.parkourVirtualKeys = { w: input.w, a: input.a, d: input.d };
+      this.postParkourHostControl({ virtualInput: input });
+    },
+    handleParkourKeyDown(event) {
+      if (!this.isParkourPolicy || this.state !== 1 || this.isSmallScreen || this.shouldIgnoreAmpKeyboard(event)) {
+        return;
+      }
+      if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
+        this.parkourShiftHeld = event.getModifierState('Shift');
+        this.applyParkourKeyboardCommand();
+        return;
+      }
+      if (isParkourResetKey(event.code)) {
+        if (event.repeat) {
+          return;
+        }
+        event.preventDefault();
+        this.onParkourResetRun();
+        return;
+      }
+      if (isParkourPauseKey(event.code)) {
+        if (event.repeat) {
+          return;
+        }
+        event.preventDefault();
+        this.onParkourPause();
+        return;
+      }
+      if (!isParkourMovementKey(event.code)) {
+        return;
+      }
+      if (event.repeat && this.parkourKeysHeld.has(event.code)) {
+        return;
+      }
+      event.preventDefault();
+      this.parkourKeysHeld.add(event.code);
+      this.applyParkourKeyboardCommand();
+    },
+    handleParkourKeyUp(event) {
+      if (!this.isParkourPolicy || this.isSmallScreen) {
+        return;
+      }
+      if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
+        this.parkourShiftHeld = event.getModifierState('Shift');
+        this.applyParkourKeyboardCommand();
+        return;
+      }
+      if (!isParkourMovementKey(event.code)) {
+        return;
+      }
+      event.preventDefault();
+      this.parkourKeysHeld.delete(event.code);
+      this.applyParkourKeyboardCommand();
+    },
+    onParkourKeyboardBlur() {
+      if (!this.isParkourPolicy) {
+        return;
+      }
+      this.clearParkourKeyboardState();
+      this.applyParkourKeyboardCommand();
     },
     toggleCompliance() {
       const nextEnabled = !this.complianceEnabled;
@@ -1563,6 +1650,9 @@ export default {
       }
       if (!value?.startsWith('g1-amp')) {
         this.clearAmpKeyboardState();
+      }
+      if (!selected?.isExternalDemo) {
+        this.clearParkourKeyboardState();
       }
       if (selected.isExternalDemo) {
         // Entering the embedded Parkour demo: pause physics and stop the MuJoCo
@@ -1927,16 +2017,19 @@ export default {
     }
     this.init();
     this.keydown_listener = (event) => {
+      this.handleParkourKeyDown(event);
       this.handleAmpKeyDown(event);
       if (event.code === 'Backspace' && !this.isParkourPolicy) {
         this.reset();
       }
     };
     this.keyup_listener = (event) => {
+      this.handleParkourKeyUp(event);
       this.handleAmpKeyUp(event);
     };
     this.amp_blur_listener = () => {
       this.onAmpKeyboardBlur();
+      this.onParkourKeyboardBlur();
     };
     document.addEventListener('keydown', this.keydown_listener);
     document.addEventListener('keyup', this.keyup_listener);
