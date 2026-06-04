@@ -42,6 +42,10 @@ const replacements = [
   [
     'async _initOrt(){wQ.wasm.wasmPaths={mjs:new URL("./ort-wasm-simd-threaded.jsep.mjs",import.meta.url).href,wasm:new URL("./ort-wasm-simd-threaded.jsep-6MnTkKum.wasm",import.meta.url).href},wQ.wasm.numThreads=Math.min(4,navigator.hardwareConcurrency||1)}',
     'async _initOrt(){wQ.wasm.wasmPaths={mjs:new URL("./ort-wasm-simd-threaded.jsep.mjs",import.meta.url).href,wasm:new URL("./ort-wasm-simd-threaded.jsep-6MnTkKum.wasm",import.meta.url).href};const _iosDepthFix=/iPad|iPhone|iPod/.test(navigator.userAgent)||navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1;wQ.wasm.numThreads=_iosDepthFix?1:Math.min(4,navigator.hardwareConcurrency||1),_iosDepthFix&&(wQ.wasm.proxy=!1)}'
+  ],
+  [
+    'this.depthPixels=new Float32Array(this.depthCameraConfig.width*this.depthCameraConfig.height*4),this.depthFrame=new Float32Array(this.depthCameraConfig.width*this.depthCameraConfig.height)}async render(A){if(!this.model||!this.data)return;if(this.updateSpeedModeIndicator(),this.controls.update(),this.policyController&&this.params.policyEnabled&&this.params.scene===hE){const Y=this.data.qpos[0],s=[5,10,15,20,25,30,35,40,45,50,55,60].some(R=>Y>=R-1.5&&Y<=R+1);this.policyController.autoForward=s,this.policyController._updateCommandState()}if(this.params.paused){',
+    'this.depthPixels=new Uint8Array(this.depthCameraConfig.width*this.depthCameraConfig.height*4),this.depthFrame=new Float32Array(this.depthCameraConfig.width*this.depthCameraConfig.height)}async render(A){if(!this.model||!this.data)return;if(this.updateSpeedModeIndicator(),this.controls.update(),this.policyController&&this.params.policyEnabled&&this.params.scene===hE){const Y=this.data.qpos[0],s=[5,10,15,20,25,30,35,40,45,50,55,60].some(R=>Y>=R-1.5&&Y<=R+1);this.policyController.autoForward=s,this.policyController._updateCommandState()}if(this.params.paused){'
   ]
 ];
 

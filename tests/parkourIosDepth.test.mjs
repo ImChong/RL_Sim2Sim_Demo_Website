@@ -43,4 +43,14 @@ test('parkour bundle uses Uint8 depth readback for iOS Safari compatibility', ()
     /_iosDepthFix=\/iPad\|iPhone\|iPod\//,
     'ORT init should detect iOS and tune wasm threading'
   );
+  assert.doesNotMatch(
+    bundle,
+    /depthPixels=new Float32Array/,
+    'onWindowResize must not revert depth readback to Float32Array'
+  );
+  assert.match(
+    bundle,
+    /onWindowResize\(\)[^}]*depthPixels=new Uint8Array/,
+    'onWindowResize should keep Uint8Array depth readback buffer'
+  );
 });

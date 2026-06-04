@@ -91,6 +91,9 @@ perceptive locomotion. Re-apply this patch after re-pulling the upstream bundle:
   each capture (no longer waits for the first backbone inference).
 - On iPhone/iPad, ORT is forced to **single-threaded** mode with the worker
   proxy disabled.
+- `onWindowResize` must keep **`Uint8Array`** for `depthPixels` (Safari fires
+  resize on load when the URL bar shows/hides; reverting to `Float32Array`
+  blackens the depth inset immediately).
 
 **If you ever re-pull the upstream build, re-apply all bundle patches.**
 
