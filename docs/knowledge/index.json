@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "updated": "2026-06-04",
+  "entries": [
+    {
+      "id": "splitadapter-2606.03297",
+      "title": "SplitAdapter: Load-Aware Humanoid Loco-Manipulation via Factorized Adaptation",
+      "authors": [
+        "Jeonguk Kang",
+        "Hanbyel Cho",
+        "Sanghyun Kang",
+        "Donghan Koo"
+      ],
+      "affiliation": "Future Robot AI Group, Samsung Electronics",
+      "year": 2026,
+      "arxiv": "2606.03297",
+      "primaryClass": "cs.RO",
+      "projectPage": "https://splitadapter.github.io/",
+      "arxivAbs": "https://arxiv.org/abs/2606.03297",
+      "arxivHtml": "https://arxiv.org/html/2606.03297",
+      "codeUrl": null,
+      "tags": [
+        "humanoid",
+        "loco-manipulation",
+        "sim-to-real",
+        "adaptation",
+        "world-model",
+        "FiLM",
+        "Unitree G1",
+        "PhysHSI"
+      ],
+      "sourceDir": "sources/splitadapter-2606.03297",
+      "digestPath": "digests/splitadapter-2606.03297.md",
+      "ingestedAt": "2026-06-04"
+    }
+  ]
+}

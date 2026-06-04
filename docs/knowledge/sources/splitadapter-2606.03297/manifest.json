@@ -1,0 +1,37 @@
+{
+  "entryId": "splitadapter-2606.03297",
+  "ingestedAt": "2026-06-04",
+  "sources": [
+    {
+      "id": "project-homepage",
+      "type": "website",
+      "url": "https://splitadapter.github.io/",
+      "file": "website-homepage.md",
+      "note": "项目页摘要、方法图说明、演示视频路径、BibTeX"
+    },
+    {
+      "id": "arxiv-html",
+      "type": "arxiv-html",
+      "url": "https://arxiv.org/html/2606.03297",
+      "file": "arxiv-excerpt.md",
+      "note": "arXiv HTML 版全文结构摘录（摘要、方法、实验表、局限）"
+    },
+    {
+      "id": "bibtex",
+      "type": "bibtex",
+      "url": "https://splitadapter.github.io/",
+      "file": "citation.bib"
+    },
+    {
+      "id": "related-materials",
+      "type": "curated-links",
+      "file": "related-materials.md",
+      "note": "论文引用与对比基线、部署平台等外部资料链接"
+    }
+  ],
+  "assetsNotStored": [
+    "https://arxiv.org/pdf/2606.03297.pdf",
+    "https://splitadapter.github.io/assets/videos/*.mp4",
+    "https://splitadapter.github.io/assets/images/fig1_ocean_overview_final3.jpg"
+  ]
+}

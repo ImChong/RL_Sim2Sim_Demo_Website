@@ -24,6 +24,7 @@ npm run dev
 ```
 
 ## 项目结构
+- `docs/knowledge/`：论文与方法的原始资料、消化笔记（见 [docs/knowledge/README.md](./docs/knowledge/README.md)）
 - `src/views/Demo.vue`：演示页面的主要 UI 控件
 - `src/simulation/main.js`：MuJoCo、Three.js 渲染与 policy loop 的启动入口
 - `src/simulation/mujocoUtils.js`：场景 / policy 加载工具与 MuJoCo 文件预加载逻辑
