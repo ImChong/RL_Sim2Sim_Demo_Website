@@ -1,6 +1,7 @@
 <template>
   <AmpMobileJoystick
     v-if="showAmpJoystick"
+    ref="ampJoystick"
     :disabled="state !== 1"
     :dock-above-mobile-panel="isSmallScreen"
     :labels="ampJoystickLabels"
@@ -1329,8 +1330,8 @@ export default {
           return;
         }
         event.preventDefault();
-        event.stopPropagation();
         this.onKnockdownTest();
+        this.$refs.ampJoystick?.pulseKnockdown?.();
         return;
       }
       if (!isAmpMovementKey(event.code)) {
@@ -1815,7 +1816,7 @@ export default {
     this.amp_blur_listener = () => {
       this.onAmpKeyboardBlur();
     };
-    document.addEventListener('keydown', this.keydown_listener, true);
+    document.addEventListener('keydown', this.keydown_listener);
     document.addEventListener('keyup', this.keyup_listener);
     window.addEventListener('blur', this.amp_blur_listener);
     this.mobileControlsResizeObserver = new ResizeObserver(() => {
@@ -1838,7 +1839,7 @@ export default {
     }
     this.mobileControlsResizeObserver?.disconnect();
     document.documentElement.style.removeProperty('--mobile-controls-panel-height');
-    document.removeEventListener('keydown', this.keydown_listener, true);
+    document.removeEventListener('keydown', this.keydown_listener);
     if (this.keyup_listener) {
       document.removeEventListener('keyup', this.keyup_listener);
     }

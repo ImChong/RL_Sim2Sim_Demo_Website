@@ -26,7 +26,6 @@
       <div class="amp-mobile-controls__orbit-anchor" aria-hidden="true">
         <button
           type="button"
-          tabindex="-1"
           class="amp-mobile-controls__action-btn amp-mobile-controls__knockdown-btn amp-mobile-controls__orbit-btn amp-mobile-controls__orbit-btn--knockdown"
           :class="{ 'amp-mobile-controls__knockdown-btn--pressed': knockdownPressed }"
           :aria-label="labels.knockdown"
@@ -35,8 +34,6 @@
           @pointerdown.prevent="onKnockdownPointerDown"
           @pointerup.prevent="onKnockdownPointerUp"
           @pointercancel.prevent="onKnockdownPointerUp"
-          @keydown.enter.prevent
-          @keydown.space.prevent
           @click.stop="onKnockdownClick"
         >
           <v-icon icon="mdi-arrow-down-bold" size="22" />
@@ -77,6 +74,9 @@ import {
   computeAmpCommandFromJoystick,
   stickVisualFromAmpCommand
 } from '@/utils/ampJoystickCommand.js';
+
+/** Brief pressed highlight when knockdown is triggered from keyboard. */
+const KNOCKDOWN_PULSE_MS = 180;
 
 export default {
   name: 'AmpMobileJoystick',
@@ -139,6 +139,7 @@ export default {
   },
   beforeUnmount() {
     window.removeEventListener('resize', this._onResize);
+    this.clearKnockdownPulse();
     this.releaseMovePointer();
   },
   methods: {
@@ -191,6 +192,24 @@ export default {
     },
     onKnockdownPointerUp() {
       this.knockdownPressed = false;
+    },
+    clearKnockdownPulse() {
+      if (this._knockdownPulseTimer != null) {
+        clearTimeout(this._knockdownPulseTimer);
+        this._knockdownPulseTimer = null;
+      }
+    },
+    /** Visual feedback when knockdown is triggered via PC keyboard (Enter). */
+    pulseKnockdown() {
+      if (this.disabled) {
+        return;
+      }
+      this.knockdownPressed = true;
+      this.clearKnockdownPulse();
+      this._knockdownPulseTimer = window.setTimeout(() => {
+        this.knockdownPressed = false;
+        this._knockdownPulseTimer = null;
+      }, KNOCKDOWN_PULSE_MS);
     },
     onKnockdownClick() {
       if (this.disabled) {
