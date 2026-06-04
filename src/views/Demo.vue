@@ -536,6 +536,10 @@ import {
   isAmpKnockdownKey,
   isAmpMovementKey
 } from '@/utils/ampKeyboardCommand.js';
+import {
+  computeParkourMobileDepthLayout,
+  computeParkourMobileDepthLayoutFromMetrics
+} from '@/utils/parkourDepthPreviewLayout.js';
 
 const translations = {
   en: {
@@ -1296,30 +1300,42 @@ export default {
       });
     },
     getParkourDepthPreviewLayout() {
-      const left = this.isSmallScreen ? 12 : 16;
       const scale = this.isSmallScreen ? 2 : 4;
       if (!this.isSmallScreen) {
+        const inset = 16;
         return {
           depthPreviewScale: scale,
-          depthPreviewMargin: left,
-          depthPreviewLeftOffset: left,
-          depthPreviewBottomOffset: 16
+          depthPreviewMargin: inset,
+          depthPreviewLeftOffset: inset,
+          depthPreviewBottomOffset: inset
         };
       }
+
+      const panel = this.$refs.mobileControlsPanel;
+      const stickBase = this.$refs.parkourJoystick?.$refs?.moveBase;
+      if (panel && stickBase) {
+        const viewportHeight = window.innerHeight;
+        const panelTopFromBottom = viewportHeight - panel.getBoundingClientRect().top;
+        const stickRect = stickBase.getBoundingClientRect();
+        const joystickCenterFromBottom = viewportHeight - (stickRect.top + stickRect.height / 2);
+        return computeParkourMobileDepthLayout({
+          panelTopFromBottom,
+          joystickCenterFromBottom,
+          previewScale: scale
+        });
+      }
+
       const panelHeight = parseFloat(
         getComputedStyle(document.documentElement).getPropertyValue('--mobile-controls-panel-height')
       ) || 56;
       const bottomInset = parseFloat(
         getComputedStyle(document.documentElement).getPropertyValue('--vvp-offset-bottom')
       ) || 0;
-      // Match .controls-mobile bottom gap (12px) plus a small gap above the panel.
-      const bottomOffset = Math.ceil(panelHeight + 12 + bottomInset + 8);
-      return {
-        depthPreviewScale: scale,
-        depthPreviewMargin: left,
-        depthPreviewLeftOffset: left,
-        depthPreviewBottomOffset: bottomOffset
-      };
+      return computeParkourMobileDepthLayoutFromMetrics({
+        panelHeight,
+        bottomInset,
+        previewScale: scale
+      });
     },
     clearParkourVirtualInput() {
       this.parkourVirtualKeys = { w: false, a: false, d: false };
