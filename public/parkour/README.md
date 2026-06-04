@@ -89,6 +89,22 @@ patched to use `100×100` and the MJCF repeat values as-is.
 multisample tracking (`let I` / `let w` and assign `I=ea,w=sa` after resizing);
 otherwise the host panel slider stops changing reflection after the first move.
 
+### Visual theme / lighting (`scripts/patch-parkour-visual-theme.mjs`)
+
+The upstream bundle used a bright default background (`0.15 0.25 0.35`), strong
+spot/fill lights, and no `NoToneMapping`, which looked washed out next to the
+main-site AMP and Tracking demos (`src/simulation/theme.js` + `main.js`). Re-apply
+after re-pulling the upstream build:
+
+- Scene background `0.11 0.18 0.28` (dark theme) and Sonic-style hemisphere +
+  fill + rim lights matching the main site.
+- `renderer.toneMapping = 0` (`NoToneMapping`) with exposure `1`.
+- `host-bridge.js` exposes `setVisualTheme` and applies `visualTheme` from the
+  parent control panel via `postMessage`.
+
+`assets/scenes/g1_with_terrain.xml` `<visual>` / skybox are kept aligned with
+`public/examples/scenes/g1_amp/scene_g1.xml`.
+
 ### iOS depth readback (`scripts/patch-parkour-ios-depth.mjs`)
 
 Safari on iPhone/iPad often cannot read **FloatType** render targets via

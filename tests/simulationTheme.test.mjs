@@ -24,14 +24,14 @@ test('getSimulationThemeSettings keeps light mode at default brightness', () => 
   });
 });
 
-test('getSimulationThemeSettings slightly dims dark mode', () => {
+test('getSimulationThemeSettings uses brighter dark mode for parkour parity', () => {
   assert.deepEqual(getSimulationThemeSettings('dark'), {
     themeName: 'dark',
-    lightIntensityScale: 0.85,
-    ambientIntensity: 0.14,
-    backgroundRgb: [0.08, 0.12, 0.18],
-    sonicHemiIntensity: 0.34,
-    sonicFillIntensity: 0.42,
-    sonicRimIntensity: 0.3,
+    lightIntensityScale: 1,
+    ambientIntensity: 0.18,
+    backgroundRgb: [0.11, 0.18, 0.28],
+    sonicHemiIntensity: 0.4,
+    sonicFillIntensity: 0.48,
+    sonicRimIntensity: 0.36,
   });
 });
