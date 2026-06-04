@@ -315,11 +315,97 @@
     demo.setReflectionQuality(demo._pendingReflectionQuality);
   }
 
+  const PARKOUR_MOVEMENT_CODES = new Set(['KeyW', 'KeyA', 'KeyD']);
+  let parkourRelayKeysHeld = null;
+  let parkourRelayShiftHeld = false;
+  let parkourKeyboardRelayInstalled = false;
+
+  function postParkourKeyboardSync(payload) {
+    try {
+      parent.postMessage(
+        { source: 'parkour-keyboard-sync', ...payload },
+        TARGET_ORIGIN
+      );
+    } catch (e) {
+      /* parent gone */
+    }
+  }
+
+  function emitParkourKeyboardSync() {
+    if (!parkourRelayKeysHeld) {
+      return;
+    }
+    postParkourKeyboardSync({
+      keysHeld: [...parkourRelayKeysHeld],
+      shiftHeld: parkourRelayShiftHeld
+    });
+  }
+
+  function clearParkourKeyboardRelay() {
+    if (!parkourRelayKeysHeld || parkourRelayKeysHeld.size === 0) {
+      parkourRelayShiftHeld = false;
+      return;
+    }
+    parkourRelayKeysHeld.clear();
+    parkourRelayShiftHeld = false;
+    postParkourKeyboardSync({ type: 'clear' });
+  }
+
+  function installParkourKeyboardRelay() {
+    if (parkourKeyboardRelayInstalled) {
+      return;
+    }
+    parkourKeyboardRelayInstalled = true;
+    parkourRelayKeysHeld = new Set();
+
+    document.addEventListener(
+      'keydown',
+      (event) => {
+        if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
+          parkourRelayShiftHeld = event.getModifierState('Shift');
+          emitParkourKeyboardSync();
+          return;
+        }
+        if (!PARKOUR_MOVEMENT_CODES.has(event.code)) {
+          return;
+        }
+        if (event.repeat && parkourRelayKeysHeld.has(event.code)) {
+          return;
+        }
+        event.preventDefault();
+        parkourRelayKeysHeld.add(event.code);
+        emitParkourKeyboardSync();
+      },
+      true
+    );
+
+    document.addEventListener(
+      'keyup',
+      (event) => {
+        if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
+          parkourRelayShiftHeld = event.getModifierState('Shift');
+          emitParkourKeyboardSync();
+          return;
+        }
+        if (!PARKOUR_MOVEMENT_CODES.has(event.code)) {
+          return;
+        }
+        event.preventDefault();
+        parkourRelayKeysHeld.delete(event.code);
+        emitParkourKeyboardSync();
+      },
+      true
+    );
+
+    window.addEventListener('blur', clearParkourKeyboardRelay);
+  }
+
   function waitForDemo() {
     const demo = window.__parkourDemo;
     if (attachHostApi(demo)) {
       applyPendingReflectionQuality(demo);
       patchPolicyVirtualInput(demo);
+      installParkourKeyboardRelay();
       startStatsReporter();
       return;
     }

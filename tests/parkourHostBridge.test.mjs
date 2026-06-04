@@ -45,29 +45,13 @@ test('host bridge defers reflection quality until reflectors exist', () => {
   let messageHandler;
   let statsTick;
 
-  const context = {
-    window: {
-      __parkourDemo: demo,
-      location: { origin: 'http://localhost' },
-      addEventListener(type, handler) {
-        if (type === 'message') {
-          messageHandler = handler;
-        }
-      }
-    },
-    parent: { postMessage() {} },
-    requestAnimationFrame(callback) {
-      callback();
-    },
-    setInterval(callback) {
+  const { context, getMessageHandler } = createParkourBridgeContext(demo, {
+    statsTick(callback) {
       statsTick = callback;
-      return 1;
-    },
-    console
-  };
-  context.window.parent = context.parent;
-
+    }
+  });
   vm.runInNewContext(bridgeSource, context);
+  messageHandler = getMessageHandler();
 
   messageHandler({
     data: {
@@ -93,9 +77,12 @@ test('host bridge defers reflection quality until reflectors exist', () => {
   assert.equal(demo.reflectionQuality, 0);
 });
 
-function runBridgeInVm(demo) {
-  const bridgeSource = readFileSync(bridgePath, 'utf8');
+function createParkourBridgeContext(demo, options = {}) {
+  const parentMessages = options.parentMessages ?? null;
+  const docListeners = options.docListeners ?? null;
+  const winListeners = options.winListeners ?? null;
   let messageHandler;
+
   const context = {
     window: {
       __parkourDemo: demo,
@@ -104,20 +91,51 @@ function runBridgeInVm(demo) {
         if (type === 'message') {
           messageHandler = handler;
         }
+        if (type === 'blur' && winListeners) {
+          winListeners.blur = handler;
+        }
       }
     },
-    parent: { postMessage() {} },
+    parent: {
+      postMessage(payload) {
+        if (parentMessages) {
+          parentMessages.push(payload);
+        }
+      }
+    },
+    document: {
+      addEventListener(type, handler, capture) {
+        if (!docListeners) {
+          return;
+        }
+        if (type === 'keydown' && capture) {
+          docListeners.keydown = handler;
+        }
+        if (type === 'keyup' && capture) {
+          docListeners.keyup = handler;
+        }
+      }
+    },
     requestAnimationFrame(callback) {
       callback();
     },
-    setInterval() {
+    setInterval(callback) {
+      if (options.statsTick) {
+        options.statsTick(callback);
+      }
       return 1;
     },
     console
   };
   context.window.parent = context.parent;
+  return { context, getMessageHandler: () => messageHandler };
+}
+
+function runBridgeInVm(demo) {
+  const bridgeSource = readFileSync(bridgePath, 'utf8');
+  const { context, getMessageHandler } = createParkourBridgeContext(demo);
   vm.runInNewContext(bridgeSource, context);
-  return messageHandler;
+  return getMessageHandler();
 }
 
 test('host bridge applies virtual joystick input to policy controller', () => {
@@ -220,6 +238,55 @@ test('parkour bundle supports host depth inset left/bottom offsets', () => {
     /const g=this\.depthInset\.leftOffset\?\?this\.depthInset\.margin,I=this\.depthInset\.bottomOffset\?\?this\.depthInset\.margin/,
     'depth HUD must honor host left/bottom offsets'
   );
+});
+
+test('host bridge relays iframe keyboard to parent for joystick sync', () => {
+  const bridgeSource = readFileSync(bridgePath, 'utf8');
+  const parentMessages = [];
+  const docListeners = { keydown: null, keyup: null };
+  const winListeners = { blur: null };
+  const demo = {
+    reflectors: [],
+    policyController: {
+      pressedKeys: new Set(),
+      highSpeedMode: false,
+      _updateCommandState() {}
+    },
+    render() {}
+  };
+
+  const { context } = createParkourBridgeContext(demo, {
+    parentMessages,
+    docListeners,
+    winListeners
+  });
+  vm.runInNewContext(bridgeSource, context);
+  assert.equal(typeof docListeners.keydown, 'function');
+  assert.equal(typeof docListeners.keyup, 'function');
+
+  docListeners.keydown({
+    code: 'KeyW',
+    repeat: false,
+    preventDefault() {}
+  });
+  assert.equal(parentMessages.length, 1);
+  assert.equal(parentMessages[0].source, 'parkour-keyboard-sync');
+  assert.deepEqual([...parentMessages[0].keysHeld], ['KeyW']);
+
+  docListeners.keyup({
+    code: 'KeyW',
+    preventDefault() {}
+  });
+  assert.equal(parentMessages.length, 2);
+  assert.deepEqual([...(parentMessages[1].keysHeld ?? [])], []);
+
+  docListeners.keydown({
+    code: 'KeyW',
+    repeat: false,
+    preventDefault() {}
+  });
+  winListeners.blur();
+  assert.equal(parentMessages.at(-1).type, 'clear');
 });
 
 test('host bridge rounds depth HUD materials without touching inference', () => {
