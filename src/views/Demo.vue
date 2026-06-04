@@ -11,6 +11,15 @@
     @command="onAmpJoystickCommand"
     @knockdown="onKnockdownTest"
   />
+  <ParkourMobileJoystick
+    v-if="showParkourJoystick"
+    ref="parkourJoystick"
+    :disabled="state !== 1 || parkourLoading"
+    :dock-above-mobile-panel="isSmallScreen"
+    :labels="parkourJoystickLabels"
+    :virtual-keys="parkourVirtualKeys"
+    @input="onParkourJoystickInput"
+  />
   <div id="mujoco-container"></div>
   <div v-if="isParkourPolicy" class="parkour-frame-wrap">
     <iframe
@@ -515,6 +524,7 @@ import { MuJoCoDemo } from '@/simulation/main.js';
 import loadMujoco from 'mujoco-js';
 import ModelIOFlowchart from '@/components/ModelIOFlowchart.vue';
 import AmpMobileJoystick from '@/components/AmpMobileJoystick.vue';
+import ParkourMobileJoystick from '@/components/ParkourMobileJoystick.vue';
 import {
   clampControlPanelSize,
   loadControlPanelSize,
@@ -526,6 +536,10 @@ import {
   isAmpKnockdownKey,
   isAmpMovementKey
 } from '@/utils/ampKeyboardCommand.js';
+import {
+  computeParkourMobileDepthLayout,
+  computeParkourMobileDepthLayoutFromMetrics
+} from '@/utils/parkourDepthPreviewLayout.js';
 
 const translations = {
   en: {
@@ -591,6 +605,8 @@ const translations = {
     ampJoystickMove: 'Move',
     ampJoystickRotateLeft: 'Turn left',
     ampJoystickRotateRight: 'Turn right',
+    parkourJoystickGroup: 'Parkour movement controls',
+    parkourJoystickMove: 'Move (up = forward, left/right = turn in place, no backward)',
     ampPolicyDescription:
       'AMP policy trained for walk, run, and get-up behaviors.',
     parkourPolicyDescription:
@@ -675,6 +691,8 @@ const translations = {
     ampJoystickMove: '移动',
     ampJoystickRotateLeft: '左转',
     ampJoystickRotateRight: '右转',
+    parkourJoystickGroup: '跑酷移动控制',
+    parkourJoystickMove: '移动（上=前进，左/右=原地转向，无后退）',
     ampPolicyDescription:
       '用于行走、跑步和起身行为的 AMP 策略。',
     parkourPolicyDescription:
@@ -702,7 +720,8 @@ export default {
   name: 'DemoPage',
   components: {
     ModelIOFlowchart,
-    AmpMobileJoystick
+    AmpMobileJoystick,
+    ParkourMobileJoystick
   },
   props: {
     visualTheme: {
@@ -792,7 +811,8 @@ export default {
     parkourLoading: false,
     parkourLoadProgress: 0,
     parkourReceivedProgress: false,
-    parkourReloadKey: 0
+    parkourReloadKey: 0,
+    parkourVirtualKeys: { w: false, a: false, d: false }
   }),
   computed: {
     desktopControlsPanelStyle() {
@@ -909,6 +929,9 @@ export default {
     showAmpJoystick() {
       return this.isAmpPolicy && !this.isParkourPolicy;
     },
+    showParkourJoystick() {
+      return this.isParkourPolicy;
+    },
     ampJoystickLabels() {
       return {
         group: this.t.ampJoystickGroup,
@@ -916,6 +939,12 @@ export default {
         rotateLeft: this.t.ampJoystickRotateLeft,
         rotateRight: this.t.ampJoystickRotateRight,
         knockdown: this.t.knockdownTest
+      };
+    },
+    parkourJoystickLabels() {
+      return {
+        group: this.t.parkourJoystickGroup,
+        move: this.t.parkourJoystickMove
       };
     },
     isParkourPolicy() {
@@ -998,6 +1027,7 @@ export default {
       }
       if (isSmall !== this.isSmallScreen) {
         this.isMobileControlsCollapsed = isSmall;
+        this.syncParkourHostControls();
       }
       this.isSmallScreen = isSmall;
       this.$nextTick(() => this.syncMobileControlsHeightObserver());
@@ -1021,6 +1051,9 @@ export default {
       }
       const height = Math.ceil(panel.getBoundingClientRect().height);
       document.documentElement.style.setProperty('--mobile-controls-panel-height', `${height}px`);
+      if (this.isParkourPolicy) {
+        this.syncParkourHostControls();
+      }
     },
     syncMobileControlsHeightObserver() {
       if (!this.mobileControlsResizeObserver) {
@@ -1042,7 +1075,12 @@ export default {
         return;
       }
       this.isMobileControlsCollapsed = !this.isMobileControlsCollapsed;
-      this.$nextTick(() => this.updateMobileControlsHeight());
+      this.$nextTick(() => {
+        this.updateMobileControlsHeight();
+        if (this.isParkourPolicy) {
+          this.syncParkourHostControls();
+        }
+      });
     },
     formatMessage(template, values = {}) {
       return Object.entries(values).reduce(
@@ -1257,7 +1295,67 @@ export default {
       this.postParkourHostControl({
         cameraFollow: this.cameraFollowEnabled,
         renderScale: this.renderScale,
-        reflectionQuality: this.reflectionQuality
+        reflectionQuality: this.reflectionQuality,
+        ...this.getParkourDepthPreviewLayout()
+      });
+    },
+    getParkourDepthPreviewLayout() {
+      const scale = this.isSmallScreen ? 2 : 4;
+      if (!this.isSmallScreen) {
+        const inset = 16;
+        return {
+          depthPreviewScale: scale,
+          depthPreviewMargin: inset,
+          depthPreviewLeftOffset: inset,
+          depthPreviewBottomOffset: inset
+        };
+      }
+
+      const panel = this.$refs.mobileControlsPanel;
+      const stickBase = this.$refs.parkourJoystick?.$refs?.moveBase;
+      if (panel && stickBase) {
+        const viewportHeight = window.innerHeight;
+        const panelTopFromBottom = viewportHeight - panel.getBoundingClientRect().top;
+        const stickRect = stickBase.getBoundingClientRect();
+        const joystickCenterFromBottom = viewportHeight - (stickRect.top + stickRect.height / 2);
+        return computeParkourMobileDepthLayout({
+          panelTopFromBottom,
+          joystickCenterFromBottom,
+          previewScale: scale
+        });
+      }
+
+      const panelHeight = parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue('--mobile-controls-panel-height')
+      ) || 56;
+      const bottomInset = parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue('--vvp-offset-bottom')
+      ) || 0;
+      return computeParkourMobileDepthLayoutFromMetrics({
+        panelHeight,
+        bottomInset,
+        previewScale: scale
+      });
+    },
+    clearParkourVirtualInput() {
+      this.parkourVirtualKeys = { w: false, a: false, d: false };
+      this.postParkourHostControl({
+        virtualInput: { active: false, w: false, a: false, d: false, highSpeed: false }
+      });
+    },
+    onParkourJoystickInput({ active, w, a, d, highSpeed }) {
+      if (!this.isParkourPolicy || this.state !== 1 || this.parkourLoading) {
+        return;
+      }
+      this.parkourVirtualKeys = { w: Boolean(w), a: Boolean(a), d: Boolean(d) };
+      this.postParkourHostControl({
+        virtualInput: {
+          active: Boolean(active),
+          w: Boolean(w),
+          a: Boolean(a),
+          d: Boolean(d),
+          highSpeed: Boolean(highSpeed)
+        }
       });
     },
     toggleCompliance() {
@@ -1460,6 +1558,7 @@ export default {
       // Leaving the Parkour demo for a MuJoCo policy: resume the render loop.
       // (The iframe is unmounted by v-if, freeing its WebGL/WASM context.)
       if (this.parkourSuspended && this.demo) {
+        this.clearParkourVirtualInput();
         this.demo.resumeRendering();
         this.parkourSuspended = false;
       }
@@ -1507,6 +1606,7 @@ export default {
     },
     reset() {
       if (this.isParkourPolicy) {
+        this.clearParkourVirtualInput();
         // Reload the embedded demo for a clean restart (remounts via :key).
         this.startParkourLoad();
         this.parkourReloadKey += 1;
@@ -1554,6 +1654,7 @@ export default {
       this.parkourLoadProgress = 100;
       this.parkourLoading = false;
       this.$nextTick(() => {
+        this.updateMobileControlsHeight();
         this.syncParkourHostControls();
         this.focusParkourFrame();
       });

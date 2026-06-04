@@ -92,3 +92,101 @@ test('host bridge defers reflection quality until reflectors exist', () => {
   assert.equal(demo._pendingReflectionQuality, undefined);
   assert.equal(demo.reflectionQuality, 0);
 });
+
+function runBridgeInVm(demo) {
+  const bridgeSource = readFileSync(bridgePath, 'utf8');
+  let messageHandler;
+  const context = {
+    window: {
+      __parkourDemo: demo,
+      location: { origin: 'http://localhost' },
+      addEventListener(type, handler) {
+        if (type === 'message') {
+          messageHandler = handler;
+        }
+      }
+    },
+    parent: { postMessage() {} },
+    requestAnimationFrame(callback) {
+      callback();
+    },
+    setInterval() {
+      return 1;
+    },
+    console
+  };
+  context.window.parent = context.parent;
+  vm.runInNewContext(bridgeSource, context);
+  return messageHandler;
+}
+
+test('host bridge applies virtual joystick input to policy controller', () => {
+  const joystickStates = [];
+  const policyController = {
+    pressedKeys: new Set(),
+    highSpeedMode: false,
+    _updateCommandState() {
+      joystickStates.push({
+        keys: [...this.pressedKeys],
+        highSpeedMode: this.highSpeedMode
+      });
+    }
+  };
+  const demo = {
+    reflectors: [],
+    policyController,
+    depthInset: { margin: 16, previewScale: 4 },
+    depthProcessedInset: { scale: 4 },
+    render() {}
+  };
+
+  const messageHandler = runBridgeInVm(demo);
+  messageHandler({
+    data: {
+      source: 'parkour-host-control',
+      type: 'apply',
+      virtualInput: { active: true, w: true, a: true, d: false, highSpeed: true }
+    }
+  });
+
+  assert.equal(joystickStates.length, 1);
+  assert.deepEqual(joystickStates[0].keys.sort(), ['a', 'w']);
+  assert.equal(joystickStates[0].highSpeedMode, true);
+  assert.deepEqual([...policyController.pressedKeys], []);
+});
+
+test('host bridge shrinks depth preview layout for mobile host controls', () => {
+  const demo = {
+    reflectors: [],
+    depthInset: { margin: 16, previewScale: 4 },
+    depthProcessedInset: { scale: 4, width: 87, height: 58, gap: 8 },
+    render() {}
+  };
+  const messageHandler = runBridgeInVm(demo);
+
+  messageHandler({
+    data: {
+      source: 'parkour-host-control',
+      type: 'apply',
+      depthPreviewScale: 2,
+      depthPreviewMargin: 8,
+      depthPreviewLeftOffset: 12,
+      depthPreviewBottomOffset: 96
+    }
+  });
+
+  assert.equal(demo.depthInset.previewScale, 2);
+  assert.equal(demo.depthInset.margin, 8);
+  assert.equal(demo.depthInset.leftOffset, 12);
+  assert.equal(demo.depthInset.bottomOffset, 96);
+  assert.equal(demo.depthProcessedInset.scale, 2);
+});
+
+test('parkour bundle supports host depth inset left/bottom offsets', () => {
+  const bundle = readFileSync(bundlePath, 'utf8');
+  assert.match(
+    bundle,
+    /const g=this\.depthInset\.leftOffset\?\?this\.depthInset\.margin,I=this\.depthInset\.bottomOffset\?\?this\.depthInset\.margin/,
+    'depth HUD must honor host left/bottom offsets'
+  );
+});
