@@ -110,29 +110,62 @@ async function main() {
   await page.keyboard.down('KeyW');
   await sleep(400);
 
-  const pressedKnob = await page.evaluate(() => {
-    const style = document.querySelector('.parkour-mobile-controls__stick-knob')?.getAttribute('style') ?? '';
-    return { style };
+  const normalKnob = await page.evaluate(() => {
+    const knob = document.querySelector('.parkour-mobile-controls__stick-knob');
+    const style = knob?.getAttribute('style') ?? '';
+    return {
+      style,
+      offsetY: 0,
+      highSpeed: knob?.classList.contains('parkour-mobile-controls__stick-knob--high-speed') ?? false
+    };
   });
-  pressedKnob.offsetY = knobOffsetY(pressedKnob.style);
+  normalKnob.offsetY = knobOffsetY(normalKnob.style);
+
+  await page.keyboard.down('ShiftLeft');
+  await sleep(300);
+
+  const sprintKnob = await page.evaluate(() => {
+    const knob = document.querySelector('.parkour-mobile-controls__stick-knob');
+    const style = knob?.getAttribute('style') ?? '';
+    return {
+      style,
+      offsetY: 0,
+      highSpeed: knob?.classList.contains('parkour-mobile-controls__stick-knob--high-speed') ?? false
+    };
+  });
+  sprintKnob.offsetY = knobOffsetY(sprintKnob.style);
 
   await page.screenshot({
     path: path.join(OUT_DIR, 'parkour-keyboard-joystick-sync.png'),
     fullPage: false
   });
 
+  await page.keyboard.up('ShiftLeft');
   await page.keyboard.up('KeyW');
   await browser.close();
 
-  const knobMovedUp = pressedKnob.offsetY < idleKnob.offsetY - 8;
+  const knobMovedUp = normalKnob.offsetY < idleKnob.offsetY - 8;
+  const sprintFartherThanNormal = sprintKnob.offsetY < normalKnob.offsetY - 6;
   if (!knobMovedUp) {
     throw new Error(
-      `Joystick knob did not move up on KeyW (idle=${idleKnob.offsetY}px, pressed=${pressedKnob.offsetY}px)`
+      `Joystick knob did not move up on KeyW (idle=${idleKnob.offsetY}px, normal=${normalKnob.offsetY}px)`
     );
+  }
+  if (!sprintFartherThanNormal) {
+    throw new Error(
+      `Shift+W did not push knob farther than W alone (normal=${normalKnob.offsetY}px, sprint=${sprintKnob.offsetY}px)`
+    );
+  }
+  if (!sprintKnob.highSpeed) {
+    throw new Error('Shift+W should mark the knob as high-speed');
+  }
+  if (normalKnob.highSpeed) {
+    throw new Error('W alone should not mark the knob as high-speed');
   }
   console.log('OK: parkour keyboard-joystick sync verified', {
     idleOffsetY: idleKnob.offsetY,
-    pressedOffsetY: pressedKnob.offsetY
+    normalOffsetY: normalKnob.offsetY,
+    sprintOffsetY: sprintKnob.offsetY
   });
 }
 
