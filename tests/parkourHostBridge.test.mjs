@@ -226,6 +226,7 @@ test('host bridge rounds depth HUD materials without touching inference', () => 
   const bridgeSource = readFileSync(bridgePath, 'utf8');
   assert.match(bridgeSource, /applyDepthHudRoundedCorners/);
   assert.match(bridgeSource, /depthHudBox/);
+  assert.match(bridgeSource, /patchDepthHudRender/);
   assert.doesNotMatch(bridgeSource, /depthInferenceMaterial/);
 
   const depthPreviewMaterial = { needsUpdate: false };
@@ -243,13 +244,30 @@ test('host bridge rounds depth HUD materials without touching inference', () => 
   assert.equal(typeof depthPreviewMaterial.onBeforeCompile, 'function');
   assert.equal(depthPreviewMaterial.depthWrite, false);
   assert.equal(depthPreviewMaterial.depthTest, false);
-  assert.notEqual(depthPreviewMaterial.transparent, true);
+  assert.equal(depthPreviewMaterial.transparent, true);
 
   const shader = { uniforms: {}, fragmentShader: 'void main() {\n#include <colorspace_fragment>\n}' };
   depthPreviewMaterial.onBeforeCompile(shader);
   assert.match(shader.fragmentShader, /uDepthHudCornerRadius/);
-  assert.match(shader.fragmentShader, /discard/);
-  assert.equal(shader.uniforms.uDepthHudCornerRadius.value, 0);
+  assert.match(shader.fragmentShader, /gl_FragColor\.a \*= depthHudAlpha/);
+  assert.equal(shader.uniforms.uDepthHudCornerRadius.value.x, 0);
+  assert.equal(shader.uniforms.uDepthHudCornerRadius.value.y, 0);
+});
+
+test('host bridge disables renderer autoClear during demo render', () => {
+  const demo = {
+    reflectors: [],
+    renderer: { autoClear: true },
+    render() {
+      this.renderCalls = (this.renderCalls ?? 0) + 1;
+      this.autoClearDuringRender = this.renderer.autoClear;
+    }
+  };
+  runBridgeInVm(demo);
+  demo.render();
+  assert.equal(demo.renderCalls, 1);
+  assert.equal(demo.autoClearDuringRender, false);
+  assert.equal(demo.renderer.autoClear, true);
 });
 
 test('host bridge maps panel corner radius px to depth HUD normalized radius', () => {
@@ -274,6 +292,8 @@ test('host bridge maps panel corner radius px to depth HUD normalized radius', (
   });
 
   assert.equal(demo._depthPreviewCornerRadiusPx, 18);
-  assert.ok(Math.abs(depthPreviewMaterial.__depthHudCornerRadiusUniform.value - 18 / (87 * 4)) < 1e-6);
-  assert.ok(Math.abs(depthRawMaterial.__depthHudCornerRadiusUniform.value - 18 / (64 * 4)) < 1e-6);
+  assert.ok(Math.abs(depthPreviewMaterial.__depthHudCornerRadiusUniform.value.x - 18 / (87 * 4)) < 1e-6);
+  assert.ok(Math.abs(depthPreviewMaterial.__depthHudCornerRadiusUniform.value.y - 18 / (58 * 4)) < 1e-6);
+  assert.ok(Math.abs(depthRawMaterial.__depthHudCornerRadiusUniform.value.x - 18 / (64 * 4)) < 1e-6);
+  assert.ok(Math.abs(depthRawMaterial.__depthHudCornerRadiusUniform.value.y - 18 / (64 * 4)) < 1e-6);
 });

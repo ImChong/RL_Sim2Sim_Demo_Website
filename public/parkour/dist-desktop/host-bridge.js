@@ -38,10 +38,23 @@
   /** Fallback when host has not sent panel corner radius yet (matches Vuetify v-card default). */
   const DEFAULT_DEPTH_PREVIEW_CORNER_RADIUS_PX = 4;
 
-  function depthHudCornerRadiusNormalized(radiusPx, widthPx) {
+  function depthHudCornerRadiusNormalized(radiusPx, widthPx, heightPx) {
     const width = Math.max(1, Number(widthPx) || 1);
+    const height = Math.max(1, Number(heightPx) || 1);
     const radius = Math.max(0, Number(radiusPx) || 0);
-    return Math.min(0.49, radius / width);
+    return {
+      x: Math.min(0.49, radius / width),
+      y: Math.min(0.49, radius / height)
+    };
+  }
+
+  function setDepthHudCornerRadiusUniform(uniform, radiusPx, widthPx, heightPx) {
+    if (!uniform?.value) {
+      return;
+    }
+    const next = depthHudCornerRadiusNormalized(radiusPx, widthPx, heightPx);
+    uniform.value.x = next.x;
+    uniform.value.y = next.y;
   }
 
   function patchDepthHudRoundedCorners(material) {
@@ -49,10 +62,11 @@
       return;
     }
     material.__depthHudRoundedPatched = true;
+    material.transparent = true;
     material.depthWrite = false;
     material.depthTest = false;
     if (!material.__depthHudCornerRadiusUniform) {
-      material.__depthHudCornerRadiusUniform = { value: 0 };
+      material.__depthHudCornerRadiusUniform = { value: { x: 0, y: 0 } };
     }
     const previousOnBeforeCompile = material.onBeforeCompile;
     material.onBeforeCompile = (shader) => {
@@ -65,32 +79,57 @@
       }
       shader.fragmentShader = shader.fragmentShader.replace(
         'void main() {',
-        'uniform float uDepthHudCornerRadius;\nvoid main() {'
+        'uniform vec2 uDepthHudCornerRadius;\nvoid main() {'
       );
-      const roundDiscard = [
+      const roundMask = [
         'vec2 depthHudUv = vMapUv - 0.5;',
-        'vec2 depthHudBox = abs(depthHudUv) - (vec2(0.5) - vec2(uDepthHudCornerRadius));',
-        'if (length(max(depthHudBox, 0.0)) - uDepthHudCornerRadius > 0.0) discard;'
+        'vec2 depthHudR = uDepthHudCornerRadius;',
+        'vec2 depthHudBox = abs(depthHudUv) - (vec2(0.5) - depthHudR);',
+        'float depthHudDist = length(max(depthHudBox, 0.0)) - min(depthHudR.x, depthHudR.y);',
+        'float depthHudAlpha = 1.0 - smoothstep(0.0, 0.003, depthHudDist);',
+        'gl_FragColor.a *= depthHudAlpha;'
       ].join('\n');
       if (shader.fragmentShader.includes('#include <colorspace_fragment>')) {
         shader.fragmentShader = shader.fragmentShader.replace(
           '#include <colorspace_fragment>',
-          `${roundDiscard}\n#include <colorspace_fragment>`
+          `${roundMask}\n#include <colorspace_fragment>`
         );
       } else {
         shader.fragmentShader = shader.fragmentShader.replace(
           /\n\}/,
-          `\n${roundDiscard}\n}`
+          `\n${roundMask}\n}`
         );
       }
     };
-    material.customProgramCacheKey = () => 'depth-hud-rounded-v2';
+    material.customProgramCacheKey = () => 'depth-hud-rounded-v3';
     material.needsUpdate = true;
   }
 
   function applyDepthHudRoundedCorners(demo) {
     patchDepthHudRoundedCorners(demo?.depthRawMaterial);
     patchDepthHudRoundedCorners(demo?.depthPreviewMaterial);
+  }
+
+  function patchDepthHudRender(demo) {
+    if (!demo?.render || demo.__depthHudRenderPatched) {
+      return;
+    }
+    demo.__depthHudRenderPatched = true;
+    const originalRender = demo.render.bind(demo);
+    demo.render = function depthHudRenderWrapper() {
+      const renderer = this.renderer;
+      if (!renderer) {
+        originalRender();
+        return;
+      }
+      const previousAutoClear = renderer.autoClear;
+      renderer.autoClear = false;
+      try {
+        originalRender();
+      } finally {
+        renderer.autoClear = previousAutoClear;
+      }
+    };
   }
 
   function applyDepthPreviewCornerRadius(demo, radiusPx) {
@@ -102,22 +141,24 @@
     const processed = demo.depthProcessedInset;
     const procScale = processed?.scale ?? scale;
     const procWidth = (processed?.width ?? 87) * procScale;
+    const procHeight = (processed?.height ?? 58) * procScale;
     const rawWidth = (demo.depthInset?.width ?? 64) * scale;
+    const rawHeight = (demo.depthInset?.height ?? 64) * scale;
     const cornerRadiusPx = Number.isFinite(Number(radiusPx))
       ? Number(radiusPx)
       : DEFAULT_DEPTH_PREVIEW_CORNER_RADIUS_PX;
-    if (demo.depthPreviewMaterial?.__depthHudCornerRadiusUniform) {
-      demo.depthPreviewMaterial.__depthHudCornerRadiusUniform.value = depthHudCornerRadiusNormalized(
-        cornerRadiusPx,
-        procWidth
-      );
-    }
-    if (demo.depthRawMaterial?.__depthHudCornerRadiusUniform) {
-      demo.depthRawMaterial.__depthHudCornerRadiusUniform.value = depthHudCornerRadiusNormalized(
-        cornerRadiusPx,
-        rawWidth
-      );
-    }
+    setDepthHudCornerRadiusUniform(
+      demo.depthPreviewMaterial?.__depthHudCornerRadiusUniform,
+      cornerRadiusPx,
+      procWidth,
+      procHeight
+    );
+    setDepthHudCornerRadiusUniform(
+      demo.depthRawMaterial?.__depthHudCornerRadiusUniform,
+      cornerRadiusPx,
+      rawWidth,
+      rawHeight
+    );
   }
 
   function patchPolicyVirtualInput(demo) {
@@ -207,10 +248,12 @@
     if (!demo || demo.__hostBridgeAttached) {
       patchPolicyVirtualInput(demo);
       applyDepthHudRoundedCorners(demo);
+      patchDepthHudRender(demo);
       return !!demo;
     }
     demo.__hostBridgeAttached = true;
     applyDepthHudRoundedCorners(demo);
+    patchDepthHudRender(demo);
 
     if (demo.followEnabled === undefined) {
       demo.followEnabled = true;

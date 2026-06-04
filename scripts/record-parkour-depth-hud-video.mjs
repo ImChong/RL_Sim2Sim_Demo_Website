@@ -105,6 +105,7 @@ async function waitForParkourReady(page) {
         && Boolean(frame)
         && Boolean(demo?.policyController?.isReady)
         && Boolean(demo?.depthPreviewMaterial?.__depthHudRoundedPatched)
+        && Boolean(demo?.__depthHudRenderPatched)
       );
     },
     { timeout: 240000, polling: 500 }
@@ -202,20 +203,33 @@ async function validateDepthHud(page) {
     const left = inset.leftOffset ?? inset.margin ?? 16;
     const bottom = inset.bottomOffset ?? inset.margin ?? 16;
     const uniform = demo.depthPreviewMaterial?.__depthHudCornerRadiusUniform?.value ?? null;
-    const expectedUniform = cardRadius / procW;
+    const expectedUniformX = cardRadius / procW;
+    const expectedUniformY = cardRadius / procH;
 
     const rect = frame.getBoundingClientRect();
     const canvas = frame.contentDocument?.querySelector('canvas');
     if (!canvas) {
       return { ok: false, reason: 'missing canvas' };
     }
+    const sx = canvas.width / canvas.clientWidth;
+    const sy = canvas.height / canvas.clientHeight;
 
     const sampleHostPixel = (hostX, hostY) => {
       const tmp = document.createElement('canvas');
       tmp.width = 1;
       tmp.height = 1;
       const ctx = tmp.getContext('2d');
-      ctx.drawImage(canvas, hostX - rect.left, hostY - rect.top, 1, 1, 0, 0, 1, 1);
+      ctx.drawImage(
+        canvas,
+        (hostX - rect.left) * sx,
+        (hostY - rect.top) * sy,
+        1,
+        1,
+        0,
+        0,
+        1,
+        1
+      );
       const data = ctx.getImageData(0, 0, 1, 1).data;
       return [data[0], data[1], data[2]];
     };
@@ -229,17 +243,24 @@ async function validateDepthHud(page) {
     const cornerRound = sampleHostPixel(hudRight - 14, hudTop + 14);
     const interior = sampleHostPixel(hudLeft + procW / 2, hudTop + procH / 2);
 
-    const isNearBlack = ([r, g, b]) => r < 8 && g < 8 && b < 8;
-    const radiusDelta = Math.abs((uniform ?? 0) - expectedUniform);
+    const isNearBlack = ([r, g, b]) => r < 12 && g < 12 && b < 12;
+    const radiusDeltaX = Math.abs((uniform?.x ?? 0) - expectedUniformX);
+    const radiusDeltaY = Math.abs((uniform?.y ?? 0) - expectedUniformY);
 
     return {
-      ok: !isNearBlack(cornerSquare) && !isNearBlack(cornerRound) && radiusDelta < 0.02,
+      ok: !isNearBlack(cornerSquare)
+        && !isNearBlack(cornerRound)
+        && radiusDeltaX < 0.02
+        && radiusDeltaY < 0.02,
       cardRadius,
       uniform,
-      expectedUniform,
-      radiusDelta,
+      expectedUniformX,
+      expectedUniformY,
+      radiusDeltaX,
+      radiusDeltaY,
       depthWrite: demo.depthPreviewMaterial?.depthWrite,
       transparent: demo.depthPreviewMaterial?.transparent,
+      renderPatched: demo.__depthHudRenderPatched,
       cornerSquare,
       cornerRound,
       interior,
