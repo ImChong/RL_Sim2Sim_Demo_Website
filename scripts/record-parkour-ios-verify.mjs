@@ -66,12 +66,12 @@ async function main() {
 
   const page = await browser.newPage();
   await page.emulate({
-    name: 'iPhone 13 Pro',
+    name: 'iPhone 15',
     userAgent:
       'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
     viewport: {
-      width: 390,
-      height: 844,
+      width: 393,
+      height: 852,
       deviceScaleFactor: 3,
       isMobile: true,
       hasTouch: true
@@ -196,7 +196,7 @@ async function main() {
     crossedFirstObstacle: crossed,
     frameCount: frameIndex,
     durationSec: Math.round((Date.now() - recordStart) / 1000),
-    userAgent: 'iPhone Safari (emulated)',
+    userAgent: 'iPhone 15 Safari (emulated)',
     url: BASE_URL
   };
   writeFileSync(join(OUT_DIR, 'parkour-ios-depth-verify.json'), JSON.stringify(summary, null, 2));
