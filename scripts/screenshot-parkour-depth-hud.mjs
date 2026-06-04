@@ -42,26 +42,50 @@ async function waitForParkourReady(page) {
   await sleep(4000);
 }
 
+async function waitForMainSimulationReady(page) {
+  await page.waitForFunction(
+    () => !/Loading Simulation|正在加载仿真环境/.test(document.querySelector('.v-dialog')?.textContent ?? ''),
+    { timeout: 240000, polling: 500 }
+  );
+  await sleep(1000);
+}
+
 async function selectParkourPolicy(page) {
   const onParkour = await page.evaluate(() => Boolean(document.querySelector('.parkour-frame')));
   if (onParkour) {
+    await waitForParkourReady(page);
     return;
   }
-  const field = await page.$('.controls-card .v-select .v-field');
-  if (!field) {
+  await waitForMainSimulationReady(page);
+  await page.evaluate(() => {
+    document.querySelector('.controls-mobile-collapsed .controls-title .v-btn')?.click();
+  });
+  await sleep(400);
+  const opened = await page.evaluate(() => {
+    const field = document.querySelector('.controls-card .v-select .v-field');
+    if (!field) {
+      return false;
+    }
+    field.scrollIntoView({ block: 'center' });
+    field.click();
+    return true;
+  });
+  if (!opened) {
     throw new Error('Policy select not found');
   }
-  await field.evaluate((el) => el.scrollIntoView({ block: 'center' }));
-  await field.click();
   await sleep(500);
   await page.waitForSelector('.v-overlay-container .v-list-item', { timeout: 15000 });
-  const items = await page.$$('.v-overlay-container .v-list-item');
-  for (const el of items) {
-    const text = await el.evaluate((n) => n.textContent?.trim() ?? '');
-    if (/parkour|跑酷|Perceptive/i.test(text)) {
-      await el.click();
-      break;
+  const picked = await page.evaluate(() => {
+    const items = [...document.querySelectorAll('.v-overlay-container .v-list-item')];
+    const target = items.find((n) => /parkour|跑酷|Perceptive/i.test(n.textContent ?? ''));
+    if (!target) {
+      return false;
     }
+    target.click();
+    return true;
+  });
+  if (!picked) {
+    throw new Error('Parkour policy option not found');
   }
   await waitForParkourReady(page);
 }
@@ -124,27 +148,31 @@ async function main() {
   });
 
   try {
-    const page = await browser.newPage();
-    await page.setBypassCSP(true);
-    await page.setViewport({ width: 1400, height: 900 });
-    await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 120000 });
-    await selectParkourPolicy(page);
-    await page.screenshot({ path: DESKTOP_OUT });
-    await captureDepthHudCrop(page, path.join(OUT_DIR, 'parkour-depth-hud-desktop-crop.png'));
+    const desktopPage = await browser.newPage();
+    await desktopPage.setBypassCSP(true);
+    await desktopPage.setViewport({ width: 1400, height: 900 });
+    await desktopPage.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 120000 });
+    await selectParkourPolicy(desktopPage);
+    await desktopPage.screenshot({ path: DESKTOP_OUT });
+    await captureDepthHudCrop(desktopPage, path.join(OUT_DIR, 'parkour-depth-hud-desktop-crop.png'));
     console.log('Wrote', DESKTOP_OUT);
+    await desktopPage.close();
 
-    await page.setViewport({
+    const mobilePage = await browser.newPage();
+    await mobilePage.setBypassCSP(true);
+    await mobilePage.setViewport({
       width: 390,
       height: 844,
       isMobile: true,
       hasTouch: true,
       deviceScaleFactor: 3
     });
-    await page.reload({ waitUntil: 'domcontentloaded' });
-    await selectParkourPolicy(page);
-    await page.screenshot({ path: MOBILE_OUT, fullPage: true });
-    await captureDepthHudCrop(page, path.join(OUT_DIR, 'parkour-depth-hud-mobile-crop.png'));
+    await mobilePage.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 120000 });
+    await selectParkourPolicy(mobilePage);
+    await mobilePage.screenshot({ path: MOBILE_OUT, fullPage: true });
+    await captureDepthHudCrop(mobilePage, path.join(OUT_DIR, 'parkour-depth-hud-mobile-crop.png'));
     console.log('Wrote', MOBILE_OUT);
+    await mobilePage.close();
   } finally {
     await browser.close();
   }
