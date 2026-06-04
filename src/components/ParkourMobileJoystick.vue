@@ -8,19 +8,43 @@
     role="group"
     :aria-label="labels.group"
   >
-    <div
-      ref="moveBase"
-      class="parkour-mobile-controls__stick-base"
-      :aria-label="labels.move"
-      @pointerdown.prevent="onMoveDown"
-      @pointermove.prevent="onMoveMove"
-      @pointerup.prevent="onMoveUp"
-      @pointercancel.prevent="onMoveUp"
-    >
+    <div class="parkour-mobile-controls__pad">
       <div
-        class="parkour-mobile-controls__stick-knob"
-        :style="knobStyle"
-      ></div>
+        ref="moveBase"
+        class="parkour-mobile-controls__stick-base"
+        :aria-label="labels.move"
+        @pointerdown.prevent="onMoveDown"
+        @pointermove.prevent="onMoveMove"
+        @pointerup.prevent="onMoveUp"
+        @pointercancel.prevent="onMoveUp"
+      >
+        <div
+          class="parkour-mobile-controls__stick-knob"
+          :style="knobStyle"
+        ></div>
+      </div>
+      <div class="parkour-mobile-controls__orbit-anchor" aria-hidden="true">
+        <button
+          type="button"
+          class="parkour-mobile-controls__action-btn parkour-mobile-controls__orbit-btn parkour-mobile-controls__orbit-btn--pause"
+          :aria-label="labels.pause"
+          :disabled="disabled"
+          data-test="parkour-pause-mobile"
+          @click.stop="onPauseClick"
+        >
+          <v-icon icon="mdi-pause" size="22" />
+        </button>
+        <button
+          type="button"
+          class="parkour-mobile-controls__action-btn parkour-mobile-controls__orbit-btn parkour-mobile-controls__orbit-btn--reset"
+          :aria-label="labels.resetRun"
+          :disabled="disabled"
+          data-test="parkour-reset-run-mobile"
+          @click.stop="onResetRunClick"
+        >
+          <v-icon icon="mdi-replay" size="22" />
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -51,7 +75,7 @@ export default {
       default: () => ({ w: false, a: false, d: false })
     }
   },
-  emits: ['input'],
+  emits: ['input', 'pause', 'reset-run'],
   data: () => ({
     moveNormX: 0,
     moveNormY: 0,
@@ -117,6 +141,18 @@ export default {
         d: active ? keys.d : false,
         highSpeed: active ? keys.highSpeed : false
       });
+    },
+    onPauseClick() {
+      if (this.disabled) {
+        return;
+      }
+      this.$emit('pause');
+    },
+    onResetRunClick() {
+      if (this.disabled) {
+        return;
+      }
+      this.$emit('reset-run');
     },
     updateMoveFromClient(clientX, clientY) {
       const base = this.$refs.moveBase;
@@ -188,7 +224,10 @@ export default {
 .parkour-mobile-controls {
   --parkour-mobile-glass: rgba(var(--v-theme-on-surface), 0.12);
   --parkour-mobile-glass-border: rgba(var(--v-theme-on-surface), 0.16);
+  --parkour-mobile-glass-active: rgba(var(--v-theme-primary), 0.22);
   --parkour-stick-size: 128px;
+  --parkour-btn-size: 48px;
+  --parkour-orbit-radius: calc(var(--parkour-stick-size) / 2 + var(--parkour-btn-size) / 2 + 14px);
 
   position: fixed;
   right: 20px;
@@ -206,6 +245,9 @@ export default {
 }
 
 .parkour-mobile-controls--dock-panel {
+  --parkour-stick-size: 108px;
+  --parkour-btn-size: 40px;
+  --parkour-orbit-radius: calc(var(--parkour-stick-size) / 2 + var(--parkour-btn-size) / 2 + 12px);
   right: 12px;
   bottom: calc(
     12px + constant(safe-area-inset-bottom) + var(--vvp-offset-bottom, 0px) +
@@ -217,7 +259,25 @@ export default {
   );
 }
 
+.parkour-mobile-controls__pad {
+  position: relative;
+  width: calc(var(--parkour-stick-size) + var(--parkour-orbit-radius) + var(--parkour-btn-size) / 2);
+  height: calc(var(--parkour-stick-size) + var(--parkour-orbit-radius) * 0.52);
+}
+
+.parkour-mobile-controls--dock-panel .parkour-mobile-controls__stick-knob {
+  width: 44px;
+  height: 44px;
+}
+
+.parkour-mobile-controls--dock-panel .parkour-mobile-controls__action-btn :deep(.v-icon) {
+  font-size: 20px !important;
+}
+
 .parkour-mobile-controls__stick-base {
+  position: absolute;
+  right: 0;
+  bottom: 0;
   width: var(--parkour-stick-size);
   height: var(--parkour-stick-size);
   border-radius: 50%;
@@ -226,7 +286,16 @@ export default {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   touch-action: none;
-  position: relative;
+  z-index: 1;
+}
+
+.parkour-mobile-controls__orbit-anchor {
+  position: absolute;
+  right: calc(var(--parkour-stick-size) / 2);
+  bottom: calc(var(--parkour-stick-size) / 2);
+  width: 0;
+  height: 0;
+  z-index: 2;
 }
 
 .parkour-mobile-controls__stick-base::before {
@@ -250,5 +319,43 @@ export default {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
   pointer-events: none;
   will-change: transform;
+}
+
+/* 0deg = 12 o'clock; CCW: 9:30 -75deg, 8:30 -105deg */
+.parkour-mobile-controls__orbit-btn {
+  --orbit-deg: 0deg;
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%) rotate(var(--orbit-deg))
+    translateY(calc(-1 * var(--parkour-orbit-radius))) rotate(calc(-1 * var(--orbit-deg)));
+}
+
+.parkour-mobile-controls__orbit-btn--reset {
+  --orbit-deg: -75deg;
+}
+
+.parkour-mobile-controls__orbit-btn--pause {
+  --orbit-deg: -105deg;
+}
+
+.parkour-mobile-controls__action-btn {
+  width: var(--parkour-btn-size);
+  height: var(--parkour-btn-size);
+  border-radius: 50%;
+  border: 1px solid var(--parkour-mobile-glass-border);
+  background: var(--parkour-mobile-glass);
+  color: rgb(var(--v-theme-on-surface));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.parkour-mobile-controls__action-btn:active:not(:disabled) {
+  background: var(--parkour-mobile-glass-active);
+  border-color: rgba(var(--v-theme-primary), 0.4);
 }
 </style>
