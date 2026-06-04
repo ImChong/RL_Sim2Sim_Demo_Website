@@ -71,7 +71,12 @@ async function selectParkourPolicy(page) {
 
 async function waitForParkourReady(page) {
   await page.waitForFunction(
-    () => !document.querySelector('.parkour-loading') && !!document.querySelector('.parkour-mobile-controls'),
+    () => {
+      const loading = /Loading Simulation|正在加载仿真环境/.test(
+        document.querySelector('.loading-simulation-dialog')?.textContent ?? ''
+      );
+      return !loading && !!document.querySelector('.parkour-mobile-controls');
+    },
     { timeout: 240000, polling: 500 }
   );
   await sleep(10000);
