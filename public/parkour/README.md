@@ -96,7 +96,7 @@ spot/fill lights, and no `NoToneMapping`, which looked washed out next to the
 main-site AMP and Tracking demos (`src/simulation/theme.js` + `main.js`). Re-apply
 after re-pulling the upstream build:
 
-- Scene background `0.08 0.12 0.18` (dark theme) and Sonic-style hemisphere +
+- Scene background `0.11 0.18 0.28` (dark theme) and Sonic-style hemisphere +
   fill + rim lights matching the main site.
 - `renderer.toneMapping = 0` (`NoToneMapping`) with exposure `1`.
 - `host-bridge.js` exposes `setVisualTheme` and applies `visualTheme` from the

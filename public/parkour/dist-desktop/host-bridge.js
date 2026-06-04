@@ -18,15 +18,15 @@
   /** Mirrors src/simulation/theme.js (main-site AMP / Tracking). */
   const SIMULATION_THEME_SETTINGS = {
     dark: {
-      lightIntensityScale: 0.85,
-      ambientIntensity: 0.14,
-      backgroundRgb: [0.08, 0.12, 0.18],
+      lightIntensityScale: 1,
+      ambientIntensity: 0.18,
+      backgroundRgb: [0.11, 0.18, 0.28],
       sonicHemiSky: 0x6a8aaa,
       sonicHemiGround: 0x2a3a28,
-      sonicHemiIntensity: 0.34,
+      sonicHemiIntensity: 0.4,
       sonicFillColor: 0x80c0ff,
-      sonicFillIntensity: 0.42,
-      sonicRimIntensity: 0.3
+      sonicFillIntensity: 0.48,
+      sonicRimIntensity: 0.36
     },
     light: {
       lightIntensityScale: 1,

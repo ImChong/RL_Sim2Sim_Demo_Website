@@ -14,8 +14,8 @@ const bridgePath = join(__dirname, '../public/parkour/dist-desktop/host-bridge.j
 
 test('parkour bundle uses AMP-style sonic lighting instead of legacy fill lights', () => {
   const bundle = readFileSync(bundlePath, 'utf8');
-  assert.match(bundle, /this\.sonicHemi=new RR\(6979754,2769450,\.34\)/);
-  assert.match(bundle, /this\.scene\.background=new hB\(\.08,\.12,\.18\)/);
+  assert.match(bundle, /this\.sonicHemi=new RR\(6979754,2769450,\.4\)/);
+  assert.match(bundle, /this\.scene\.background=new hB\(\.11,\.18,\.28\)/);
   assert.match(bundle, /this\.renderer\.toneMapping=0,this\.renderer\.toneMappingExposure=1/);
   assert.doesNotMatch(bundle, /this\.fillLightLeft=new uw/);
   assert.doesNotMatch(bundle, /this\.spotlight=new bR/);
@@ -60,10 +60,10 @@ test('host bridge applyParkourVisualTheme matches theme.js dark background', () 
   vm.runInNewContext(bridgeSource, context);
 
   demo.setVisualTheme('dark');
-  assert.deepEqual(demo.scene.background.rgb, [0.08, 0.12, 0.18]);
+  assert.deepEqual(demo.scene.background.rgb, [0.11, 0.18, 0.28]);
   assert.equal(demo.scene.fog, null);
-  assert.equal(demo.ambientLight.intensity, 0.14);
-  assert.equal(demo.sonicHemi.intensity, 0.34);
+  assert.equal(demo.ambientLight.intensity, 0.18);
+  assert.equal(demo.sonicHemi.intensity, 0.4);
   assert.equal(demo.renderer.toneMapping, 0);
   assert.equal(demo.renderer.toneMappingExposure, 1);
 });
