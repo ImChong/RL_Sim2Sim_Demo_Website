@@ -73,3 +73,41 @@ export function computeAmpCommandFromJoystick(
     cmdYaw
   };
 }
+
+/** Approximate stick pose from velocity command (for keyboard / slider → joystick sync). */
+export function stickVisualFromAmpCommand(cmdX, cmdY, cmdYaw) {
+  const absX = Math.abs(cmdX);
+  const absY = Math.abs(cmdY);
+  const useSprint =
+    absX >= AMP_CMD_SPRINT.vx * AMP_JOYSTICK_SPRINT_THRESHOLD
+    || absY >= AMP_CMD_SPRINT.vy * AMP_JOYSTICK_SPRINT_THRESHOLD
+    || (cmdX < 0 && absX >= AMP_CMD_SPRINT.vxBack * AMP_JOYSTICK_SPRINT_THRESHOLD);
+  const speed = useSprint ? AMP_CMD_SPRINT : AMP_CMD_WALK;
+
+  let normY = 0;
+  if (cmdX > 1e-4) {
+    normY = cmdX / speed.vx;
+  } else if (cmdX < -1e-4) {
+    normY = cmdX / speed.vxBack;
+  }
+
+  let normX = 0;
+  if (absY > 1e-4) {
+    normX = -cmdY / speed.vy;
+  }
+
+  const mag = Math.hypot(normX, normY);
+  if (mag > 1) {
+    normX /= mag;
+    normY /= mag;
+  }
+
+  let yawDirection = 0;
+  if (cmdYaw > 1e-4) {
+    yawDirection = 1;
+  } else if (cmdYaw < -1e-4) {
+    yawDirection = -1;
+  }
+
+  return { normX, normY, yawDirection };
+}

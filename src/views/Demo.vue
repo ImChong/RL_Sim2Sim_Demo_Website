@@ -1,8 +1,12 @@
 <template>
   <AmpMobileJoystick
-    v-if="showAmpMobileJoystick"
+    v-if="showAmpJoystick"
     :disabled="state !== 1"
+    :dock-above-mobile-panel="isSmallScreen"
     :labels="ampJoystickLabels"
+    :cmd-x="cmdX"
+    :cmd-y="cmdY"
+    :cmd-yaw="cmdYaw"
     @command="onAmpJoystickCommand"
     @knockdown="onKnockdownTest"
   />
@@ -898,8 +902,8 @@ export default {
     isAmpPolicy() {
       return this.currentPolicy?.startsWith('g1-amp');
     },
-    showAmpMobileJoystick() {
-      return this.isAmpPolicy && this.isSmallScreen && !this.isParkourPolicy;
+    showAmpJoystick() {
+      return this.isAmpPolicy && !this.isParkourPolicy;
     },
     ampJoystickLabels() {
       return {
@@ -1280,6 +1284,9 @@ export default {
       this.cmdY = cmdY;
       this.cmdYaw = cmdYaw;
       this.onCmdChange();
+      if (this.ampKeysHeld.size > 0) {
+        this.applyAmpKeyboardCommand();
+      }
     },
     shouldIgnoreAmpKeyboard(event) {
       const tag = event.target?.tagName;

@@ -5,7 +5,8 @@ import {
   applyJoystickDeadzone,
   computeAmpCommandFromJoystick,
   computeAmpCommandFromMoveStick,
-  computeAmpYawFromStick
+  computeAmpYawFromStick,
+  stickVisualFromAmpCommand
 } from '../src/utils/ampJoystickCommand.js';
 
 describe('ampJoystickCommand', () => {
@@ -56,5 +57,17 @@ describe('ampJoystickCommand', () => {
     assert.ok(cmd.cmdX > 0);
     assert.ok(cmd.cmdX < AMP_CMD_SPRINT.vx);
     assert.equal(cmd.cmdYaw, AMP_CMD_SPRINT.yaw);
+  });
+
+  test('stickVisualFromAmpCommand mirrors forward walk command', () => {
+    const visual = stickVisualFromAmpCommand(AMP_CMD_WALK.vx, 0, 0);
+    assert.ok(visual.normY > 0.5);
+    assert.equal(visual.normX, 0);
+    assert.equal(visual.yawDirection, 0);
+  });
+
+  test('stickVisualFromAmpCommand mirrors yaw left', () => {
+    const visual = stickVisualFromAmpCommand(0, 0, AMP_CMD_SPRINT.yaw);
+    assert.equal(visual.yawDirection, 1);
   });
 });

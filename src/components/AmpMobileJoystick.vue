@@ -1,7 +1,10 @@
 <template>
   <div
     class="amp-mobile-controls"
-    :class="{ 'amp-mobile-controls--disabled': disabled }"
+    :class="{
+      'amp-mobile-controls--disabled': disabled,
+      'amp-mobile-controls--dock-panel': dockAboveMobilePanel
+    }"
     role="group"
     :aria-label="labels.group"
   >
@@ -34,6 +37,7 @@
         <button
           type="button"
           class="amp-mobile-controls__action-btn amp-mobile-controls__orbit-btn amp-mobile-controls__orbit-btn--yaw-left"
+          :class="{ 'amp-mobile-controls__action-btn--active': yawDirection === 1 }"
           :aria-label="labels.rotateLeft"
           :disabled="disabled"
           @pointerdown.prevent="onYawDown(1, $event)"
@@ -46,6 +50,7 @@
         <button
           type="button"
           class="amp-mobile-controls__action-btn amp-mobile-controls__orbit-btn amp-mobile-controls__orbit-btn--yaw-right"
+          :class="{ 'amp-mobile-controls__action-btn--active': yawDirection === -1 }"
           :aria-label="labels.rotateRight"
           :disabled="disabled"
           @pointerdown.prevent="onYawDown(-1, $event)"
@@ -61,7 +66,10 @@
 </template>
 
 <script>
-import { computeAmpCommandFromJoystick } from '@/utils/ampJoystickCommand.js';
+import {
+  computeAmpCommandFromJoystick,
+  stickVisualFromAmpCommand
+} from '@/utils/ampJoystickCommand.js';
 
 export default {
   name: 'AmpMobileJoystick',
@@ -70,9 +78,26 @@ export default {
       type: Boolean,
       default: false
     },
+    /** When true, sit above the docked mobile control panel. */
+    dockAboveMobilePanel: {
+      type: Boolean,
+      default: false
+    },
     labels: {
       type: Object,
       required: true
+    },
+    cmdX: {
+      type: Number,
+      default: 0
+    },
+    cmdY: {
+      type: Number,
+      default: 0
+    },
+    cmdYaw: {
+      type: Number,
+      default: 0
     }
   },
   emits: ['command', 'knockdown'],
@@ -81,6 +106,7 @@ export default {
     moveNormY: 0,
     yawDirection: 0,
     movePointerId: null,
+    yawPointerActive: false,
     knobOffsetX: 0,
     knobOffsetY: 0,
     maxRadius: 1
@@ -92,8 +118,14 @@ export default {
       };
     }
   },
+  watch: {
+    cmdX: 'syncVisualFromCommand',
+    cmdY: 'syncVisualFromCommand',
+    cmdYaw: 'syncVisualFromCommand'
+  },
   mounted() {
     this.measureBase();
+    this.syncVisualFromCommand();
     this._onResize = () => this.measureBase();
     window.addEventListener('resize', this._onResize);
   },
@@ -109,6 +141,23 @@ export default {
       }
       const rect = base.getBoundingClientRect();
       this.maxRadius = Math.max(24, (Math.min(rect.width, rect.height) - 44) / 2);
+      this.syncVisualFromCommand();
+    },
+    syncVisualFromCommand() {
+      const { normX, normY, yawDirection } = stickVisualFromAmpCommand(
+        this.cmdX,
+        this.cmdY,
+        this.cmdYaw
+      );
+      if (this.movePointerId === null) {
+        this.moveNormX = normX;
+        this.moveNormY = normY;
+        this.knobOffsetX = normX * this.maxRadius;
+        this.knobOffsetY = -normY * this.maxRadius;
+      }
+      if (!this.yawPointerActive) {
+        this.yawDirection = yawDirection;
+      }
     },
     emitCommand() {
       if (this.disabled) {
@@ -198,6 +247,7 @@ export default {
       if (this.disabled) {
         return;
       }
+      this.yawPointerActive = true;
       event.currentTarget.setPointerCapture(event.pointerId);
       this.yawDirection = direction;
       this.emitCommand();
@@ -208,6 +258,7 @@ export default {
       } catch {
         // ignore
       }
+      this.yawPointerActive = false;
       this.yawDirection = 0;
       this.emitCommand();
     }
@@ -226,16 +277,10 @@ export default {
   --amp-orbit-radius: calc(var(--amp-stick-size) / 2 + var(--amp-btn-size) / 2 + 14px);
 
   position: fixed;
-  right: 12px;
+  right: 20px;
   z-index: 1050;
-  bottom: calc(
-    12px + constant(safe-area-inset-bottom) + var(--vvp-offset-bottom, 0px) +
-      var(--mobile-controls-panel-height, 140px) + 12px
-  );
-  bottom: calc(
-    12px + env(safe-area-inset-bottom, 0px) + var(--vvp-offset-bottom, 0px) +
-      var(--mobile-controls-panel-height, 140px) + 12px
-  );
+  bottom: calc(20px + constant(safe-area-inset-bottom) + var(--vvp-offset-bottom, 0px));
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px) + var(--vvp-offset-bottom, 0px));
   touch-action: none;
   user-select: none;
   pointer-events: auto;
@@ -244,6 +289,18 @@ export default {
 .amp-mobile-controls--disabled {
   opacity: 0.45;
   pointer-events: none;
+}
+
+.amp-mobile-controls--dock-panel {
+  right: 12px;
+  bottom: calc(
+    12px + constant(safe-area-inset-bottom) + var(--vvp-offset-bottom, 0px) +
+      var(--mobile-controls-panel-height, 140px) + 12px
+  );
+  bottom: calc(
+    12px + env(safe-area-inset-bottom, 0px) + var(--vvp-offset-bottom, 0px) +
+      var(--mobile-controls-panel-height, 140px) + 12px
+  );
 }
 
 .amp-mobile-controls__pad {
@@ -336,7 +393,8 @@ export default {
   -webkit-backdrop-filter: blur(8px);
 }
 
-.amp-mobile-controls__action-btn:active:not(:disabled) {
+.amp-mobile-controls__action-btn:active:not(:disabled),
+.amp-mobile-controls__action-btn--active {
   background: var(--amp-mobile-glass-active);
   border-color: rgba(var(--v-theme-primary), 0.4);
 }
