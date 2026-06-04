@@ -241,11 +241,39 @@ test('host bridge rounds depth HUD materials without touching inference', () => 
   assert.equal(depthPreviewMaterial.__depthHudRoundedPatched, true);
   assert.equal(depthRawMaterial.__depthHudRoundedPatched, true);
   assert.equal(typeof depthPreviewMaterial.onBeforeCompile, 'function');
-  assert.equal(depthPreviewMaterial.transparent, true);
+  assert.equal(depthPreviewMaterial.depthWrite, false);
+  assert.equal(depthPreviewMaterial.depthTest, false);
+  assert.notEqual(depthPreviewMaterial.transparent, true);
 
   const shader = { uniforms: {}, fragmentShader: 'void main() {\n#include <colorspace_fragment>\n}' };
   depthPreviewMaterial.onBeforeCompile(shader);
   assert.match(shader.fragmentShader, /uDepthHudCornerRadius/);
   assert.match(shader.fragmentShader, /discard/);
-  assert.equal(shader.uniforms.uDepthHudCornerRadius.value, 0.11);
+  assert.equal(shader.uniforms.uDepthHudCornerRadius.value, 0);
+});
+
+test('host bridge maps panel corner radius px to depth HUD normalized radius', () => {
+  const depthPreviewMaterial = { needsUpdate: false };
+  const depthRawMaterial = { needsUpdate: false };
+  const demo = {
+    reflectors: [],
+    depthInset: { width: 64, previewScale: 4 },
+    depthProcessedInset: { width: 87, height: 58, scale: 4 },
+    depthPreviewMaterial,
+    depthRawMaterial,
+    render() {}
+  };
+  const messageHandler = runBridgeInVm(demo);
+
+  messageHandler({
+    data: {
+      source: 'parkour-host-control',
+      type: 'apply',
+      depthPreviewCornerRadiusPx: 18
+    }
+  });
+
+  assert.equal(demo._depthPreviewCornerRadiusPx, 18);
+  assert.ok(Math.abs(depthPreviewMaterial.__depthHudCornerRadiusUniform.value - 18 / (87 * 4)) < 1e-6);
+  assert.ok(Math.abs(depthRawMaterial.__depthHudCornerRadiusUniform.value - 18 / (64 * 4)) < 1e-6);
 });

@@ -43,7 +43,10 @@ reflection quality, and reads simulation step rate from the embedded demo via
 
 The depth HUD (raw + processed previews) gets rounded corners via a display-only
 `onBeforeCompile` discard on `depthRawMaterial` / `depthPreviewMaterial`. The
-`depthInferenceMaterial` render target and `setDepthImage` path are untouched.
+host page sends `depthPreviewCornerRadiusPx` (read from the control panel's
+computed `border-radius`) so the preview matches the panel; materials stay
+opaque with `depthWrite`/`depthTest` disabled to avoid black corner artifacts.
+The `depthInferenceMaterial` render target and `setDepthImage` path are untouched.
 
 ### Speed mode (Shift)
 

@@ -1309,13 +1309,15 @@ export default {
     },
     getParkourDepthPreviewLayout() {
       const scale = this.isSmallScreen ? 2 : 4;
+      const cornerRadiusPx = this.getControlsPanelCornerRadiusPx();
       if (!this.isSmallScreen) {
         const inset = 16;
         return {
           depthPreviewScale: scale,
           depthPreviewMargin: inset,
           depthPreviewLeftOffset: inset,
-          depthPreviewBottomOffset: inset
+          depthPreviewBottomOffset: inset,
+          depthPreviewCornerRadiusPx: cornerRadiusPx
         };
       }
 
@@ -1328,12 +1330,15 @@ export default {
         const stickRect = stickBase.getBoundingClientRect();
         const joystickCenterFromBottom = viewportHeight - (stickRect.top + stickRect.height / 2);
         const joystickPadLeft = padEl.getBoundingClientRect().left;
-        return computeParkourMobileDepthLayoutWithClearance({
-          panelTopFromBottom,
-          joystickCenterFromBottom,
-          joystickPadLeft,
-          preferredScale: scale
-        });
+        return {
+          ...computeParkourMobileDepthLayoutWithClearance({
+            panelTopFromBottom,
+            joystickCenterFromBottom,
+            joystickPadLeft,
+            preferredScale: scale
+          }),
+          depthPreviewCornerRadiusPx: cornerRadiusPx
+        };
       }
 
       const panelHeight = parseFloat(
@@ -1342,12 +1347,26 @@ export default {
       const bottomInset = parseFloat(
         getComputedStyle(document.documentElement).getPropertyValue('--vvp-offset-bottom')
       ) || 0;
-      return computeParkourMobileDepthLayoutFromMetrics({
-        panelHeight,
-        bottomInset,
-        previewScale: scale,
-        viewportWidth: window.innerWidth
-      });
+      return {
+        ...computeParkourMobileDepthLayoutFromMetrics({
+          panelHeight,
+          bottomInset,
+          previewScale: scale,
+          viewportWidth: window.innerWidth
+        }),
+        depthPreviewCornerRadiusPx: cornerRadiusPx
+      };
+    },
+    getControlsPanelCornerRadiusPx() {
+      const card = this.$refs.mobileControlsPanel?.querySelector('.controls-card');
+      if (!card) {
+        return this.isSmallScreen ? 18 : 4;
+      }
+      const radius = parseFloat(getComputedStyle(card).borderTopLeftRadius);
+      if (Number.isFinite(radius) && radius > 0) {
+        return radius;
+      }
+      return this.isSmallScreen ? 18 : 4;
     },
     clearParkourVirtualInput() {
       this.parkourVirtualKeys = { w: false, a: false, d: false };
