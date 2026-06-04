@@ -258,15 +258,17 @@ test('host bridge disables renderer autoClear during demo render', () => {
   const demo = {
     reflectors: [],
     renderer: { autoClear: true },
-    render() {
+    render(time) {
       this.renderCalls = (this.renderCalls ?? 0) + 1;
       this.autoClearDuringRender = this.renderer.autoClear;
+      this.renderTime = time;
     }
   };
   runBridgeInVm(demo);
-  demo.render();
+  demo.render(123.456);
   assert.equal(demo.renderCalls, 1);
   assert.equal(demo.autoClearDuringRender, false);
+  assert.equal(demo.renderTime, 123.456);
   assert.equal(demo.renderer.autoClear, true);
 });
 

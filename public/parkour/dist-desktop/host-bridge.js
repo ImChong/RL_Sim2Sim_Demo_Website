@@ -116,16 +116,15 @@
     }
     demo.__depthHudRenderPatched = true;
     const originalRender = demo.render.bind(demo);
-    demo.render = function depthHudRenderWrapper() {
+    demo.render = function depthHudRenderWrapper(...args) {
       const renderer = this.renderer;
       if (!renderer) {
-        originalRender();
-        return;
+        return originalRender(...args);
       }
       const previousAutoClear = renderer.autoClear;
       renderer.autoClear = false;
       try {
-        originalRender();
+        return originalRender(...args);
       } finally {
         renderer.autoClear = previousAutoClear;
       }
