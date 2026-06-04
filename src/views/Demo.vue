@@ -1458,6 +1458,20 @@ export default {
       this.clearParkourKeyboardState();
       this.applyParkourKeyboardCommand();
     },
+    onParkourKeyboardSync(data) {
+      if (!this.isParkourPolicy || this.state !== 1 || this.isSmallScreen) {
+        return;
+      }
+      if (data.type === 'clear') {
+        this.clearParkourKeyboardState();
+        this.applyParkourKeyboardCommand();
+        return;
+      }
+      const codes = Array.isArray(data.keysHeld) ? data.keysHeld : [];
+      this.parkourKeysHeld = new Set(codes.filter((code) => isParkourMovementKey(code)));
+      this.parkourShiftHeld = Boolean(data.shiftHeld);
+      this.applyParkourKeyboardCommand();
+    },
     toggleCompliance() {
       const nextEnabled = !this.complianceEnabled;
       if (nextEnabled) {
@@ -1744,10 +1758,14 @@ export default {
       }
     },
     focusParkourFrame() {
-      // Same-origin iframe: focus it so keyboard input (W/A/D/Shift/SPACE) reaches
-      // the demo right away.
+      // Desktop: keep focus on the host page so document key listeners drive
+      // virtualInput and the joystick knob stays in sync. Mobile uses touch only.
       try {
-        this.$refs.parkourFrame?.contentWindow?.focus();
+        if (this.isSmallScreen) {
+          this.$refs.parkourFrame?.contentWindow?.focus();
+        } else {
+          window.focus();
+        }
       } catch (error) {
         /* focusing can throw in some browsers; safe to ignore */
       }
@@ -1781,6 +1799,10 @@ export default {
             this.simStepHz = hz;
           }
         }
+        return;
+      }
+      if (data.source === 'parkour-keyboard-sync') {
+        this.onParkourKeyboardSync(data);
         return;
       }
       if (data.source !== 'parkour-loader') {
