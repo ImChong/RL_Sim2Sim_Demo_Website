@@ -4,6 +4,9 @@
     :disabled="state !== 1"
     :dock-above-mobile-panel="isSmallScreen"
     :labels="ampJoystickLabels"
+    :cmd-x="cmdX"
+    :cmd-y="cmdY"
+    :cmd-yaw="cmdYaw"
     @command="onAmpJoystickCommand"
     @knockdown="onKnockdownTest"
   />
@@ -1281,6 +1284,9 @@ export default {
       this.cmdY = cmdY;
       this.cmdYaw = cmdYaw;
       this.onCmdChange();
+      if (this.ampKeysHeld.size > 0) {
+        this.applyAmpKeyboardCommand();
+      }
     },
     shouldIgnoreAmpKeyboard(event) {
       const tag = event.target?.tagName;
