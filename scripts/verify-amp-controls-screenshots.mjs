@@ -113,13 +113,25 @@ async function main() {
   const desktopChecks = await page.evaluate(() => ({
     keyboard: !!document.querySelector('.amp-keyboard-controls'),
     joystick: !!document.querySelector('.amp-mobile-controls'),
-    knockdown: !!document.querySelector('[data-test="knockdown-test"]')
+    knockdownPanel: !!document.querySelector('[data-test="knockdown-test"]'),
+    knockdownJoystick: !!document.querySelector('[data-test="knockdown-test-mobile"]'),
+    dockPanel: document.querySelector('.amp-mobile-controls')?.classList.contains(
+      'amp-mobile-controls--dock-panel'
+    )
   }));
-  if (!desktopChecks.keyboard || desktopChecks.joystick) {
+  if (
+    !desktopChecks.keyboard
+    || !desktopChecks.joystick
+    || !desktopChecks.knockdownJoystick
+    || desktopChecks.dockPanel
+  ) {
     throw new Error(`Desktop checks failed: ${JSON.stringify(desktopChecks)}`);
   }
   await scrollAmpControlsIntoView(page);
   await page.screenshot({ path: DESKTOP_OUT, fullPage: false });
+  const DESKTOP_JOYSTICK_OUT = path.join(OUT_DIR, 'amp-desktop-joystick.png');
+  await page.screenshot({ path: DESKTOP_JOYSTICK_OUT, fullPage: false });
+  console.log('Desktop joystick OK:', DESKTOP_JOYSTICK_OUT);
   console.log('Desktop OK:', DESKTOP_OUT);
 
   // —— Mobile: virtual joystick above control panel ——

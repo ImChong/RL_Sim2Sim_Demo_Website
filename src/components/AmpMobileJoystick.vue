@@ -1,7 +1,10 @@
 <template>
   <div
     class="amp-mobile-controls"
-    :class="{ 'amp-mobile-controls--disabled': disabled }"
+    :class="{
+      'amp-mobile-controls--disabled': disabled,
+      'amp-mobile-controls--dock-panel': dockAboveMobilePanel
+    }"
     role="group"
     :aria-label="labels.group"
   >
@@ -67,6 +70,11 @@ export default {
   name: 'AmpMobileJoystick',
   props: {
     disabled: {
+      type: Boolean,
+      default: false
+    },
+    /** When true, sit above the docked mobile control panel. */
+    dockAboveMobilePanel: {
       type: Boolean,
       default: false
     },
@@ -226,16 +234,10 @@ export default {
   --amp-orbit-radius: calc(var(--amp-stick-size) / 2 + var(--amp-btn-size) / 2 + 14px);
 
   position: fixed;
-  right: 12px;
+  right: 20px;
   z-index: 1050;
-  bottom: calc(
-    12px + constant(safe-area-inset-bottom) + var(--vvp-offset-bottom, 0px) +
-      var(--mobile-controls-panel-height, 140px) + 12px
-  );
-  bottom: calc(
-    12px + env(safe-area-inset-bottom, 0px) + var(--vvp-offset-bottom, 0px) +
-      var(--mobile-controls-panel-height, 140px) + 12px
-  );
+  bottom: calc(20px + constant(safe-area-inset-bottom) + var(--vvp-offset-bottom, 0px));
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px) + var(--vvp-offset-bottom, 0px));
   touch-action: none;
   user-select: none;
   pointer-events: auto;
@@ -244,6 +246,18 @@ export default {
 .amp-mobile-controls--disabled {
   opacity: 0.45;
   pointer-events: none;
+}
+
+.amp-mobile-controls--dock-panel {
+  right: 12px;
+  bottom: calc(
+    12px + constant(safe-area-inset-bottom) + var(--vvp-offset-bottom, 0px) +
+      var(--mobile-controls-panel-height, 140px) + 12px
+  );
+  bottom: calc(
+    12px + env(safe-area-inset-bottom, 0px) + var(--vvp-offset-bottom, 0px) +
+      var(--mobile-controls-panel-height, 140px) + 12px
+  );
 }
 
 .amp-mobile-controls__pad {
