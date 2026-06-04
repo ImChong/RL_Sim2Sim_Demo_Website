@@ -26,10 +26,17 @@
       <div class="amp-mobile-controls__orbit-anchor" aria-hidden="true">
         <button
           type="button"
+          tabindex="-1"
           class="amp-mobile-controls__action-btn amp-mobile-controls__knockdown-btn amp-mobile-controls__orbit-btn amp-mobile-controls__orbit-btn--knockdown"
+          :class="{ 'amp-mobile-controls__knockdown-btn--pressed': knockdownPressed }"
           :aria-label="labels.knockdown"
           :disabled="disabled"
           data-test="knockdown-test-mobile"
+          @pointerdown.prevent="onKnockdownPointerDown"
+          @pointerup.prevent="onKnockdownPointerUp"
+          @pointercancel.prevent="onKnockdownPointerUp"
+          @keydown.enter.prevent
+          @keydown.space.prevent
           @click.stop="onKnockdownClick"
         >
           <v-icon icon="mdi-arrow-down-bold" size="22" />
@@ -106,6 +113,7 @@ export default {
     moveNormY: 0,
     yawDirection: 0,
     movePointerId: null,
+    knockdownPressed: false,
     yawPointerActive: false,
     knobOffsetX: 0,
     knobOffsetY: 0,
@@ -174,6 +182,15 @@ export default {
     },
     emitZero() {
       this.$emit('command', { cmdX: 0, cmdY: 0, cmdYaw: 0 });
+    },
+    onKnockdownPointerDown() {
+      if (this.disabled) {
+        return;
+      }
+      this.knockdownPressed = true;
+    },
+    onKnockdownPointerUp() {
+      this.knockdownPressed = false;
     },
     onKnockdownClick() {
       if (this.disabled) {
@@ -393,7 +410,7 @@ export default {
   -webkit-backdrop-filter: blur(8px);
 }
 
-.amp-mobile-controls__action-btn:active:not(:disabled),
+.amp-mobile-controls__action-btn:not(.amp-mobile-controls__knockdown-btn):active:not(:disabled),
 .amp-mobile-controls__action-btn--active {
   background: var(--amp-mobile-glass-active);
   border-color: rgba(var(--v-theme-primary), 0.4);
@@ -405,7 +422,7 @@ export default {
   color: rgb(var(--v-theme-secondary));
 }
 
-.amp-mobile-controls__knockdown-btn:active:not(:disabled) {
+.amp-mobile-controls__knockdown-btn--pressed:not(:disabled) {
   background: rgba(var(--v-theme-secondary), 0.38);
   border-color: rgba(var(--v-theme-secondary), 0.55);
 }

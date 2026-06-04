@@ -1329,6 +1329,7 @@ export default {
           return;
         }
         event.preventDefault();
+        event.stopPropagation();
         this.onKnockdownTest();
         return;
       }
@@ -1814,7 +1815,7 @@ export default {
     this.amp_blur_listener = () => {
       this.onAmpKeyboardBlur();
     };
-    document.addEventListener('keydown', this.keydown_listener);
+    document.addEventListener('keydown', this.keydown_listener, true);
     document.addEventListener('keyup', this.keyup_listener);
     window.addEventListener('blur', this.amp_blur_listener);
     this.mobileControlsResizeObserver = new ResizeObserver(() => {
@@ -1837,7 +1838,7 @@ export default {
     }
     this.mobileControlsResizeObserver?.disconnect();
     document.documentElement.style.removeProperty('--mobile-controls-panel-height');
-    document.removeEventListener('keydown', this.keydown_listener);
+    document.removeEventListener('keydown', this.keydown_listener, true);
     if (this.keyup_listener) {
       document.removeEventListener('keyup', this.keyup_listener);
     }
