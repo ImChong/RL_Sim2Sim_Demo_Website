@@ -810,7 +810,7 @@ export default {
     parkourLoadProgress: 0,
     parkourReceivedProgress: false,
     parkourReloadKey: 0,
-    parkourVirtualKeys: { w: false, a: false, d: false },
+    parkourVirtualKeys: { w: false, a: false, d: false, highSpeed: false },
     parkourKeysHeld: new Set(),
     parkourShiftHeld: false
   }),
@@ -1369,7 +1369,7 @@ export default {
       return this.isSmallScreen ? 18 : 4;
     },
     clearParkourVirtualInput() {
-      this.parkourVirtualKeys = { w: false, a: false, d: false };
+      this.parkourVirtualKeys = { w: false, a: false, d: false, highSpeed: false };
       this.postParkourHostControl({
         virtualInput: { active: false, w: false, a: false, d: false, highSpeed: false }
       });
@@ -1382,7 +1382,12 @@ export default {
         this.applyParkourKeyboardCommand();
         return;
       }
-      this.parkourVirtualKeys = { w: Boolean(w), a: Boolean(a), d: Boolean(d) };
+      this.parkourVirtualKeys = {
+        w: Boolean(w),
+        a: Boolean(a),
+        d: Boolean(d),
+        highSpeed: Boolean(highSpeed)
+      };
       this.postParkourHostControl({
         virtualInput: {
           active: Boolean(active),
@@ -1416,7 +1421,12 @@ export default {
         return;
       }
       const input = parkourVirtualKeysFromKeyboard(this.parkourKeysHeld, this.parkourShiftHeld);
-      this.parkourVirtualKeys = { w: input.w, a: input.a, d: input.d };
+      this.parkourVirtualKeys = {
+        w: input.w,
+        a: input.a,
+        d: input.d,
+        highSpeed: input.highSpeed
+      };
       this.postParkourHostControl({ virtualInput: input });
     },
     handleParkourKeyDown(event) {

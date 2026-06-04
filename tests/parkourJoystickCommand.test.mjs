@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   computeParkourKeysFromStick,
+  PARKOUR_JOYSTICK_HIGH_SPEED_VISUAL_SCALE,
+  PARKOUR_JOYSTICK_NORMAL_VISUAL_SCALE,
   stickVisualFromParkourKeys
 } from '../src/utils/parkourJoystickCommand.js';
 
@@ -44,4 +46,20 @@ test('stickVisualFromParkourKeys mirrors active keys', () => {
   const visual = stickVisualFromParkourKeys({ w: true, a: true, d: false });
   assert.ok(visual.normY > 0);
   assert.ok(visual.normX < 0);
+  assert.equal(visual.highSpeed, false);
+});
+
+test('stickVisualFromParkourKeys scales normal speed below sprint', () => {
+  const normal = stickVisualFromParkourKeys({ w: true, a: false, d: false, highSpeed: false });
+  const sprint = stickVisualFromParkourKeys({ w: true, a: false, d: false, highSpeed: true });
+
+  assert.equal(normal.normY, PARKOUR_JOYSTICK_NORMAL_VISUAL_SCALE);
+  assert.equal(normal.normX, 0);
+  assert.equal(normal.highSpeed, false);
+
+  assert.equal(sprint.normY, PARKOUR_JOYSTICK_HIGH_SPEED_VISUAL_SCALE);
+  assert.equal(sprint.normX, 0);
+  assert.equal(sprint.highSpeed, true);
+
+  assert.ok(Math.abs(normal.normY) < Math.abs(sprint.normY));
 });

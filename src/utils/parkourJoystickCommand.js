@@ -7,6 +7,12 @@ import {
 /** Minimum stick deflection before a parkour key is considered pressed. */
 export const PARKOUR_JOYSTICK_AXIS_THRESHOLD = 0.2;
 
+/** Keyboard / virtual-key sync: partial deflection for normal speed. */
+export const PARKOUR_JOYSTICK_NORMAL_VISUAL_SCALE = 0.5;
+
+/** Keyboard / virtual-key sync: full deflection for Shift / sprint. */
+export const PARKOUR_JOYSTICK_HIGH_SPEED_VISUAL_SCALE = 1;
+
 /**
  * Map a 2D stick (-1..1) to G1 parkour virtual keys.
  * Up = forward (W), left/right = turn in place (A/D), down = no command.
@@ -28,7 +34,7 @@ export function computeParkourKeysFromStick(normX, normY) {
 }
 
 /** Approximate stick pose from virtual key state (for visual sync). */
-export function stickVisualFromParkourKeys({ w, a, d }) {
+export function stickVisualFromParkourKeys({ w, a, d, highSpeed = false }) {
   let normX = 0;
   let normY = 0;
   if (a) {
@@ -40,9 +46,12 @@ export function stickVisualFromParkourKeys({ w, a, d }) {
     normY = 1;
   }
   const mag = Math.hypot(normX, normY);
-  if (mag > 1) {
-    normX /= mag;
-    normY /= mag;
+  if (mag > 0) {
+    const scale = highSpeed
+      ? PARKOUR_JOYSTICK_HIGH_SPEED_VISUAL_SCALE
+      : PARKOUR_JOYSTICK_NORMAL_VISUAL_SCALE;
+    normX = (normX / mag) * scale;
+    normY = (normY / mag) * scale;
   }
-  return { normX, normY };
+  return { normX, normY, highSpeed: Boolean(highSpeed && (w || a || d)) };
 }

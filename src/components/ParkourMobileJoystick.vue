@@ -20,6 +20,7 @@
       >
         <div
           class="parkour-mobile-controls__stick-knob"
+          :class="{ 'parkour-mobile-controls__stick-knob--high-speed': knobHighSpeed }"
           :style="knobStyle"
         ></div>
       </div>
@@ -72,7 +73,7 @@ export default {
     },
     virtualKeys: {
       type: Object,
-      default: () => ({ w: false, a: false, d: false })
+      default: () => ({ w: false, a: false, d: false, highSpeed: false })
     }
   },
   emits: ['input', 'pause', 'reset-run'],
@@ -82,6 +83,7 @@ export default {
     movePointerId: null,
     knobOffsetX: 0,
     knobOffsetY: 0,
+    knobHighSpeed: false,
     maxRadius: 1
   }),
   computed: {
@@ -122,9 +124,10 @@ export default {
       if (this.movePointerId !== null) {
         return;
       }
-      const { normX, normY } = stickVisualFromParkourKeys(this.virtualKeys);
+      const { normX, normY, highSpeed } = stickVisualFromParkourKeys(this.virtualKeys);
       this.moveNormX = normX;
       this.moveNormY = normY;
+      this.knobHighSpeed = highSpeed;
       this.knobOffsetX = normX * this.maxRadius;
       this.knobOffsetY = -normY * this.maxRadius;
     },
@@ -174,6 +177,8 @@ export default {
       this.knobOffsetY = dy;
       this.moveNormX = dx / this.maxRadius;
       this.moveNormY = -dy / this.maxRadius;
+      const keys = computeParkourKeysFromStick(this.moveNormX, this.moveNormY);
+      this.knobHighSpeed = keys.highSpeed;
       this.emitInput();
     },
     onMoveDown(event) {
@@ -201,6 +206,7 @@ export default {
       this.movePointerId = null;
       this.moveNormX = 0;
       this.moveNormY = 0;
+      this.knobHighSpeed = false;
       this.knobOffsetX = 0;
       this.knobOffsetY = 0;
       this.emitInput(false);
@@ -319,6 +325,13 @@ export default {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
   pointer-events: none;
   will-change: transform;
+  transition: border-color 0.12s ease, background-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.parkour-mobile-controls__stick-knob--high-speed {
+  border-color: rgba(var(--v-theme-secondary), 0.65);
+  background: rgba(var(--v-theme-secondary), 0.32);
+  box-shadow: 0 2px 10px rgba(var(--v-theme-secondary), 0.28);
 }
 
 /* 0deg = 12 o'clock; CCW: 9:30 -75deg, 8:30 -105deg */
