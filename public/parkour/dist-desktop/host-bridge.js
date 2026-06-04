@@ -35,6 +35,55 @@
 
   const DEFAULT_DEPTH_PREVIEW_SCALE = 4;
   const DEFAULT_DEPTH_PREVIEW_MARGIN = 16;
+  /** Normalized corner radius for depth HUD quads (display only; inference is unchanged). */
+  const DEPTH_HUD_CORNER_RADIUS = 0.11;
+
+  function patchDepthHudRoundedCorners(material) {
+    if (!material || material.__depthHudRoundedPatched) {
+      return;
+    }
+    material.__depthHudRoundedPatched = true;
+    material.transparent = true;
+    const previousOnBeforeCompile = material.onBeforeCompile;
+    material.onBeforeCompile = (shader) => {
+      if (typeof previousOnBeforeCompile === 'function') {
+        previousOnBeforeCompile(shader);
+      }
+      if (!shader.uniforms.uDepthHudCornerRadius) {
+        shader.uniforms.uDepthHudCornerRadius = { value: DEPTH_HUD_CORNER_RADIUS };
+      }
+      if (shader.fragmentShader.includes('uDepthHudCornerRadius')) {
+        return;
+      }
+      shader.fragmentShader = shader.fragmentShader.replace(
+        'void main() {',
+        'uniform float uDepthHudCornerRadius;\nvoid main() {'
+      );
+      const roundDiscard = [
+        'vec2 depthHudUv = vMapUv - 0.5;',
+        'vec2 depthHudBox = abs(depthHudUv) - (vec2(0.5) - vec2(uDepthHudCornerRadius));',
+        'if (length(max(depthHudBox, 0.0)) - uDepthHudCornerRadius > 0.0) discard;'
+      ].join('\n');
+      if (shader.fragmentShader.includes('#include <colorspace_fragment>')) {
+        shader.fragmentShader = shader.fragmentShader.replace(
+          '#include <colorspace_fragment>',
+          `${roundDiscard}\n#include <colorspace_fragment>`
+        );
+      } else {
+        shader.fragmentShader = shader.fragmentShader.replace(
+          /\n\}/,
+          `\n${roundDiscard}\n}`
+        );
+      }
+    };
+    material.customProgramCacheKey = () => 'depth-hud-rounded-v1';
+    material.needsUpdate = true;
+  }
+
+  function applyDepthHudRoundedCorners(demo) {
+    patchDepthHudRoundedCorners(demo?.depthRawMaterial);
+    patchDepthHudRoundedCorners(demo?.depthPreviewMaterial);
+  }
 
   function patchPolicyVirtualInput(demo) {
     const pc = demo?.policyController;
@@ -115,9 +164,11 @@
   function attachHostApi(demo) {
     if (!demo || demo.__hostBridgeAttached) {
       patchPolicyVirtualInput(demo);
+      applyDepthHudRoundedCorners(demo);
       return !!demo;
     }
     demo.__hostBridgeAttached = true;
+    applyDepthHudRoundedCorners(demo);
 
     if (demo.followEnabled === undefined) {
       demo.followEnabled = true;

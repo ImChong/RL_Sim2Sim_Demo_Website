@@ -221,3 +221,31 @@ test('parkour bundle supports host depth inset left/bottom offsets', () => {
     'depth HUD must honor host left/bottom offsets'
   );
 });
+
+test('host bridge rounds depth HUD materials without touching inference', () => {
+  const bridgeSource = readFileSync(bridgePath, 'utf8');
+  assert.match(bridgeSource, /applyDepthHudRoundedCorners/);
+  assert.match(bridgeSource, /depthHudBox/);
+  assert.doesNotMatch(bridgeSource, /depthInferenceMaterial/);
+
+  const depthPreviewMaterial = { needsUpdate: false };
+  const depthRawMaterial = { needsUpdate: false };
+  const demo = {
+    reflectors: [],
+    depthPreviewMaterial,
+    depthRawMaterial,
+    render() {}
+  };
+  runBridgeInVm(demo);
+
+  assert.equal(depthPreviewMaterial.__depthHudRoundedPatched, true);
+  assert.equal(depthRawMaterial.__depthHudRoundedPatched, true);
+  assert.equal(typeof depthPreviewMaterial.onBeforeCompile, 'function');
+  assert.equal(depthPreviewMaterial.transparent, true);
+
+  const shader = { uniforms: {}, fragmentShader: 'void main() {\n#include <colorspace_fragment>\n}' };
+  depthPreviewMaterial.onBeforeCompile(shader);
+  assert.match(shader.fragmentShader, /uDepthHudCornerRadius/);
+  assert.match(shader.fragmentShader, /discard/);
+  assert.equal(shader.uniforms.uDepthHudCornerRadius.value, 0.11);
+});
