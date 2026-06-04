@@ -189,6 +189,12 @@
       if (state.virtualInput !== undefined) {
         this.applyVirtualInput(state.virtualInput);
       }
+      if (state.parkourPause === 'toggle') {
+        this.togglePause();
+      }
+      if (state.parkourResetRun) {
+        this.resetRun();
+      }
     };
 
     demo.applyVirtualInput = function (input) {
@@ -197,6 +203,21 @@
         return;
       }
       this.policyController.setHostVirtualInput(input);
+    };
+
+    demo.togglePause = function () {
+      if (!this.params) {
+        return;
+      }
+      this.params.paused = !this.params.paused;
+    };
+
+    demo.resetRun = function () {
+      if (typeof this.reloadScene === 'function') {
+        void this.reloadScene();
+        return;
+      }
+      this.applySceneInitialState?.({ resetData: true, rebindCameras: true });
     };
 
     return true;

@@ -19,6 +19,8 @@
     :labels="parkourJoystickLabels"
     :virtual-keys="parkourVirtualKeys"
     @input="onParkourJoystickInput"
+    @pause="onParkourPause"
+    @reset-run="onParkourResetRun"
   />
   <div id="mujoco-container"></div>
   <div v-if="isParkourPolicy" class="parkour-frame-wrap">
@@ -607,6 +609,8 @@ const translations = {
     ampJoystickRotateRight: 'Turn right',
     parkourJoystickGroup: 'Parkour movement controls',
     parkourJoystickMove: 'Move (up = forward, left/right = turn in place, no backward)',
+    parkourJoystickPause: 'Pause',
+    parkourJoystickResetRun: 'Reset run',
     ampPolicyDescription:
       'AMP policy trained for walk, run, and get-up behaviors.',
     parkourPolicyDescription:
@@ -693,6 +697,8 @@ const translations = {
     ampJoystickRotateRight: '右转',
     parkourJoystickGroup: '跑酷移动控制',
     parkourJoystickMove: '移动（上=前进，左/右=原地转向，无后退）',
+    parkourJoystickPause: '暂停',
+    parkourJoystickResetRun: '重置当前回合',
     ampPolicyDescription:
       '用于行走、跑步和起身行为的 AMP 策略。',
     parkourPolicyDescription:
@@ -944,7 +950,9 @@ export default {
     parkourJoystickLabels() {
       return {
         group: this.t.parkourJoystickGroup,
-        move: this.t.parkourJoystickMove
+        move: this.t.parkourJoystickMove,
+        pause: this.t.parkourJoystickPause,
+        resetRun: this.t.parkourJoystickResetRun
       };
     },
     isParkourPolicy() {
@@ -1357,6 +1365,19 @@ export default {
           highSpeed: Boolean(highSpeed)
         }
       });
+    },
+    onParkourPause() {
+      if (!this.isParkourPolicy || this.state !== 1 || this.parkourLoading) {
+        return;
+      }
+      this.postParkourHostControl({ parkourPause: 'toggle' });
+    },
+    onParkourResetRun() {
+      if (!this.isParkourPolicy || this.state !== 1 || this.parkourLoading) {
+        return;
+      }
+      this.clearParkourVirtualInput();
+      this.postParkourHostControl({ parkourResetRun: true });
     },
     toggleCompliance() {
       const nextEnabled = !this.complianceEnabled;

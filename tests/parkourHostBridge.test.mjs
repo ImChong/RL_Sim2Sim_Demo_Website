@@ -182,6 +182,37 @@ test('host bridge shrinks depth preview layout for mobile host controls', () => 
   assert.equal(demo.depthProcessedInset.scale, 2);
 });
 
+test('host bridge toggles pause and resets parkour run', () => {
+  let reloadCalls = 0;
+  const demo = {
+    reflectors: [],
+    params: { paused: false },
+    reloadScene() {
+      reloadCalls += 1;
+    },
+    render() {}
+  };
+  const messageHandler = runBridgeInVm(demo);
+
+  messageHandler({
+    data: {
+      source: 'parkour-host-control',
+      type: 'apply',
+      parkourPause: 'toggle'
+    }
+  });
+  assert.equal(demo.params.paused, true);
+
+  messageHandler({
+    data: {
+      source: 'parkour-host-control',
+      type: 'apply',
+      parkourResetRun: true
+    }
+  });
+  assert.equal(reloadCalls, 1);
+});
+
 test('parkour bundle supports host depth inset left/bottom offsets', () => {
   const bundle = readFileSync(bundlePath, 'utf8');
   assert.match(
