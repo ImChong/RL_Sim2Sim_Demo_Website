@@ -1047,6 +1047,9 @@ export default {
       }
       const height = Math.ceil(panel.getBoundingClientRect().height);
       document.documentElement.style.setProperty('--mobile-controls-panel-height', `${height}px`);
+      if (this.isParkourPolicy) {
+        this.syncParkourHostControls();
+      }
     },
     syncMobileControlsHeightObserver() {
       if (!this.mobileControlsResizeObserver) {
@@ -1068,7 +1071,12 @@ export default {
         return;
       }
       this.isMobileControlsCollapsed = !this.isMobileControlsCollapsed;
-      this.$nextTick(() => this.updateMobileControlsHeight());
+      this.$nextTick(() => {
+        this.updateMobileControlsHeight();
+        if (this.isParkourPolicy) {
+          this.syncParkourHostControls();
+        }
+      });
     },
     formatMessage(template, values = {}) {
       return Object.entries(values).reduce(
@@ -1284,9 +1292,34 @@ export default {
         cameraFollow: this.cameraFollowEnabled,
         renderScale: this.renderScale,
         reflectionQuality: this.reflectionQuality,
-        depthPreviewScale: this.isSmallScreen ? 2 : 4,
-        depthPreviewMargin: this.isSmallScreen ? 8 : 16
+        ...this.getParkourDepthPreviewLayout()
       });
+    },
+    getParkourDepthPreviewLayout() {
+      const left = this.isSmallScreen ? 12 : 16;
+      const scale = this.isSmallScreen ? 2 : 4;
+      if (!this.isSmallScreen) {
+        return {
+          depthPreviewScale: scale,
+          depthPreviewMargin: left,
+          depthPreviewLeftOffset: left,
+          depthPreviewBottomOffset: 16
+        };
+      }
+      const panelHeight = parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue('--mobile-controls-panel-height')
+      ) || 56;
+      const bottomInset = parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue('--vvp-offset-bottom')
+      ) || 0;
+      // Match .controls-mobile bottom gap (12px) plus a small gap above the panel.
+      const bottomOffset = Math.ceil(panelHeight + 12 + bottomInset + 8);
+      return {
+        depthPreviewScale: scale,
+        depthPreviewMargin: left,
+        depthPreviewLeftOffset: left,
+        depthPreviewBottomOffset: bottomOffset
+      };
     },
     clearParkourVirtualInput() {
       this.parkourVirtualKeys = { w: false, a: false, d: false };
@@ -1605,6 +1638,7 @@ export default {
       this.parkourLoadProgress = 100;
       this.parkourLoading = false;
       this.$nextTick(() => {
+        this.updateMobileControlsHeight();
         this.syncParkourHostControls();
         this.focusParkourFrame();
       });

@@ -102,6 +102,14 @@
       const margin = Math.max(4, Math.min(32, Math.round(Number(state.depthPreviewMargin) || DEFAULT_DEPTH_PREVIEW_MARGIN)));
       demo.depthInset.margin = margin;
     }
+    if (state.depthPreviewLeftOffset !== undefined) {
+      const left = Math.max(4, Math.min(48, Math.round(Number(state.depthPreviewLeftOffset) || DEFAULT_DEPTH_PREVIEW_MARGIN)));
+      demo.depthInset.leftOffset = left;
+    }
+    if (state.depthPreviewBottomOffset !== undefined) {
+      const bottom = Math.max(4, Math.min(640, Math.round(Number(state.depthPreviewBottomOffset) || DEFAULT_DEPTH_PREVIEW_MARGIN)));
+      demo.depthInset.bottomOffset = bottom;
+    }
   }
 
   function attachHostApi(demo) {
@@ -170,7 +178,12 @@
       if (state.reflectionQuality !== undefined) {
         this.setReflectionQuality(state.reflectionQuality);
       }
-      if (state.depthPreviewScale !== undefined || state.depthPreviewMargin !== undefined) {
+      if (
+        state.depthPreviewScale !== undefined
+        || state.depthPreviewMargin !== undefined
+        || state.depthPreviewLeftOffset !== undefined
+        || state.depthPreviewBottomOffset !== undefined
+      ) {
         applyDepthPreviewLayout(this, state);
       }
       if (state.virtualInput !== undefined) {

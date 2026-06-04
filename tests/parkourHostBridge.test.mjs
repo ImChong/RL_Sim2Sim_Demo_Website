@@ -169,11 +169,24 @@ test('host bridge shrinks depth preview layout for mobile host controls', () => 
       source: 'parkour-host-control',
       type: 'apply',
       depthPreviewScale: 2,
-      depthPreviewMargin: 8
+      depthPreviewMargin: 8,
+      depthPreviewLeftOffset: 12,
+      depthPreviewBottomOffset: 96
     }
   });
 
   assert.equal(demo.depthInset.previewScale, 2);
   assert.equal(demo.depthInset.margin, 8);
+  assert.equal(demo.depthInset.leftOffset, 12);
+  assert.equal(demo.depthInset.bottomOffset, 96);
   assert.equal(demo.depthProcessedInset.scale, 2);
+});
+
+test('parkour bundle supports host depth inset left/bottom offsets', () => {
+  const bundle = readFileSync(bundlePath, 'utf8');
+  assert.match(
+    bundle,
+    /const g=this\.depthInset\.leftOffset\?\?this\.depthInset\.margin,I=this\.depthInset\.bottomOffset\?\?this\.depthInset\.margin/,
+    'depth HUD must honor host left/bottom offsets'
+  );
 });
