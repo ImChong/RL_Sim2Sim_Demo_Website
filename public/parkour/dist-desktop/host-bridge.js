@@ -33,8 +33,80 @@
     return REFLECTION_QUALITY_PRESETS[index];
   }
 
+  const DEFAULT_DEPTH_PREVIEW_SCALE = 4;
+  const DEFAULT_DEPTH_PREVIEW_MARGIN = 16;
+
+  function patchPolicyVirtualInput(demo) {
+    const pc = demo?.policyController;
+    if (!pc || pc.__hostVirtualPatched) {
+      return !!pc;
+    }
+    pc.__hostVirtualPatched = true;
+    pc._hostVirtual = { active: false, w: false, a: false, d: false, highSpeed: false };
+
+    const originalUpdate = pc._updateCommandState.bind(pc);
+    pc._updateCommandState = function hostVirtualUpdateCommandState() {
+      const hv = this._hostVirtual;
+      if (!hv?.active) {
+        return originalUpdate();
+      }
+      const savedKeys = this.pressedKeys;
+      const savedSpeed = this.highSpeedMode;
+      this.pressedKeys = new Set();
+      if (hv.w) {
+        this.pressedKeys.add('w');
+      }
+      if (hv.a) {
+        this.pressedKeys.add('a');
+      }
+      if (hv.d) {
+        this.pressedKeys.add('d');
+      }
+      this.highSpeedMode = Boolean(hv.highSpeed);
+      originalUpdate();
+      this.pressedKeys = savedKeys;
+      this.highSpeedMode = savedSpeed;
+    };
+
+    pc.setHostVirtualInput = function (input) {
+      const active = Boolean(input?.active);
+      this._hostVirtual.active = active;
+      if (active) {
+        this._hostVirtual.w = Boolean(input.w);
+        this._hostVirtual.a = Boolean(input.a);
+        this._hostVirtual.d = Boolean(input.d);
+        this._hostVirtual.highSpeed = Boolean(input.highSpeed);
+      }
+      this._updateCommandState();
+    };
+
+    if (demo._pendingVirtualInput) {
+      pc.setHostVirtualInput(demo._pendingVirtualInput);
+      demo._pendingVirtualInput = undefined;
+    }
+    return true;
+  }
+
+  function applyDepthPreviewLayout(demo, state) {
+    if (!demo?.depthInset) {
+      return;
+    }
+    if (state.depthPreviewScale !== undefined) {
+      const scale = Math.max(1, Math.min(4, Number(state.depthPreviewScale) || DEFAULT_DEPTH_PREVIEW_SCALE));
+      demo.depthInset.previewScale = scale;
+      if (demo.depthProcessedInset) {
+        demo.depthProcessedInset.scale = scale;
+      }
+    }
+    if (state.depthPreviewMargin !== undefined) {
+      const margin = Math.max(4, Math.min(32, Math.round(Number(state.depthPreviewMargin) || DEFAULT_DEPTH_PREVIEW_MARGIN)));
+      demo.depthInset.margin = margin;
+    }
+  }
+
   function attachHostApi(demo) {
     if (!demo || demo.__hostBridgeAttached) {
+      patchPolicyVirtualInput(demo);
       return !!demo;
     }
     demo.__hostBridgeAttached = true;
@@ -98,6 +170,20 @@
       if (state.reflectionQuality !== undefined) {
         this.setReflectionQuality(state.reflectionQuality);
       }
+      if (state.depthPreviewScale !== undefined || state.depthPreviewMargin !== undefined) {
+        applyDepthPreviewLayout(this, state);
+      }
+      if (state.virtualInput !== undefined) {
+        this.applyVirtualInput(state.virtualInput);
+      }
+    };
+
+    demo.applyVirtualInput = function (input) {
+      if (!patchPolicyVirtualInput(this)) {
+        this._pendingVirtualInput = input;
+        return;
+      }
+      this.policyController.setHostVirtualInput(input);
     };
 
     return true;
@@ -148,6 +234,7 @@
     const demo = window.__parkourDemo;
     if (attachHostApi(demo)) {
       applyPendingReflectionQuality(demo);
+      patchPolicyVirtualInput(demo);
       startStatsReporter();
       return;
     }

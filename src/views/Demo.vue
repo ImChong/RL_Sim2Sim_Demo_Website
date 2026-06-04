@@ -11,6 +11,15 @@
     @command="onAmpJoystickCommand"
     @knockdown="onKnockdownTest"
   />
+  <ParkourMobileJoystick
+    v-if="showParkourJoystick"
+    ref="parkourJoystick"
+    :disabled="state !== 1 || parkourLoading"
+    :dock-above-mobile-panel="isSmallScreen"
+    :labels="parkourJoystickLabels"
+    :virtual-keys="parkourVirtualKeys"
+    @input="onParkourJoystickInput"
+  />
   <div id="mujoco-container"></div>
   <div v-if="isParkourPolicy" class="parkour-frame-wrap">
     <iframe
@@ -515,6 +524,7 @@ import { MuJoCoDemo } from '@/simulation/main.js';
 import loadMujoco from 'mujoco-js';
 import ModelIOFlowchart from '@/components/ModelIOFlowchart.vue';
 import AmpMobileJoystick from '@/components/AmpMobileJoystick.vue';
+import ParkourMobileJoystick from '@/components/ParkourMobileJoystick.vue';
 import {
   clampControlPanelSize,
   loadControlPanelSize,
@@ -591,6 +601,8 @@ const translations = {
     ampJoystickMove: 'Move',
     ampJoystickRotateLeft: 'Turn left',
     ampJoystickRotateRight: 'Turn right',
+    parkourJoystickGroup: 'Parkour movement controls',
+    parkourJoystickMove: 'Move (up = forward, left/right = turn in place, no backward)',
     ampPolicyDescription:
       'AMP policy trained for walk, run, and get-up behaviors.',
     parkourPolicyDescription:
@@ -675,6 +687,8 @@ const translations = {
     ampJoystickMove: '移动',
     ampJoystickRotateLeft: '左转',
     ampJoystickRotateRight: '右转',
+    parkourJoystickGroup: '跑酷移动控制',
+    parkourJoystickMove: '移动（上=前进，左/右=原地转向，无后退）',
     ampPolicyDescription:
       '用于行走、跑步和起身行为的 AMP 策略。',
     parkourPolicyDescription:
@@ -702,7 +716,8 @@ export default {
   name: 'DemoPage',
   components: {
     ModelIOFlowchart,
-    AmpMobileJoystick
+    AmpMobileJoystick,
+    ParkourMobileJoystick
   },
   props: {
     visualTheme: {
@@ -792,7 +807,8 @@ export default {
     parkourLoading: false,
     parkourLoadProgress: 0,
     parkourReceivedProgress: false,
-    parkourReloadKey: 0
+    parkourReloadKey: 0,
+    parkourVirtualKeys: { w: false, a: false, d: false }
   }),
   computed: {
     desktopControlsPanelStyle() {
@@ -909,6 +925,9 @@ export default {
     showAmpJoystick() {
       return this.isAmpPolicy && !this.isParkourPolicy;
     },
+    showParkourJoystick() {
+      return this.isParkourPolicy;
+    },
     ampJoystickLabels() {
       return {
         group: this.t.ampJoystickGroup,
@@ -916,6 +935,12 @@ export default {
         rotateLeft: this.t.ampJoystickRotateLeft,
         rotateRight: this.t.ampJoystickRotateRight,
         knockdown: this.t.knockdownTest
+      };
+    },
+    parkourJoystickLabels() {
+      return {
+        group: this.t.parkourJoystickGroup,
+        move: this.t.parkourJoystickMove
       };
     },
     isParkourPolicy() {
@@ -998,6 +1023,7 @@ export default {
       }
       if (isSmall !== this.isSmallScreen) {
         this.isMobileControlsCollapsed = isSmall;
+        this.syncParkourHostControls();
       }
       this.isSmallScreen = isSmall;
       this.$nextTick(() => this.syncMobileControlsHeightObserver());
@@ -1257,7 +1283,30 @@ export default {
       this.postParkourHostControl({
         cameraFollow: this.cameraFollowEnabled,
         renderScale: this.renderScale,
-        reflectionQuality: this.reflectionQuality
+        reflectionQuality: this.reflectionQuality,
+        depthPreviewScale: this.isSmallScreen ? 2 : 4,
+        depthPreviewMargin: this.isSmallScreen ? 8 : 16
+      });
+    },
+    clearParkourVirtualInput() {
+      this.parkourVirtualKeys = { w: false, a: false, d: false };
+      this.postParkourHostControl({
+        virtualInput: { active: false, w: false, a: false, d: false, highSpeed: false }
+      });
+    },
+    onParkourJoystickInput({ active, w, a, d, highSpeed }) {
+      if (!this.isParkourPolicy || this.state !== 1 || this.parkourLoading) {
+        return;
+      }
+      this.parkourVirtualKeys = { w: Boolean(w), a: Boolean(a), d: Boolean(d) };
+      this.postParkourHostControl({
+        virtualInput: {
+          active: Boolean(active),
+          w: Boolean(w),
+          a: Boolean(a),
+          d: Boolean(d),
+          highSpeed: Boolean(highSpeed)
+        }
       });
     },
     toggleCompliance() {
@@ -1460,6 +1509,7 @@ export default {
       // Leaving the Parkour demo for a MuJoCo policy: resume the render loop.
       // (The iframe is unmounted by v-if, freeing its WebGL/WASM context.)
       if (this.parkourSuspended && this.demo) {
+        this.clearParkourVirtualInput();
         this.demo.resumeRendering();
         this.parkourSuspended = false;
       }
@@ -1507,6 +1557,7 @@ export default {
     },
     reset() {
       if (this.isParkourPolicy) {
+        this.clearParkourVirtualInput();
         // Reload the embedded demo for a clean restart (remounts via :key).
         this.startParkourLoad();
         this.parkourReloadKey += 1;

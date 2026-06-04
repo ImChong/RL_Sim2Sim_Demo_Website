@@ -1,0 +1,254 @@
+<template>
+  <div
+    class="parkour-mobile-controls"
+    :class="{
+      'parkour-mobile-controls--disabled': disabled,
+      'parkour-mobile-controls--dock-panel': dockAboveMobilePanel
+    }"
+    role="group"
+    :aria-label="labels.group"
+  >
+    <div
+      ref="moveBase"
+      class="parkour-mobile-controls__stick-base"
+      :aria-label="labels.move"
+      @pointerdown.prevent="onMoveDown"
+      @pointermove.prevent="onMoveMove"
+      @pointerup.prevent="onMoveUp"
+      @pointercancel.prevent="onMoveUp"
+    >
+      <div
+        class="parkour-mobile-controls__stick-knob"
+        :style="knobStyle"
+      ></div>
+    </div>
+  </div>
+</template>
+
+<script>
+import {
+  computeParkourKeysFromStick,
+  stickVisualFromParkourKeys
+} from '@/utils/parkourJoystickCommand.js';
+
+export default {
+  name: 'ParkourMobileJoystick',
+  props: {
+    disabled: {
+      type: Boolean,
+      default: false
+    },
+    dockAboveMobilePanel: {
+      type: Boolean,
+      default: false
+    },
+    labels: {
+      type: Object,
+      required: true
+    },
+    virtualKeys: {
+      type: Object,
+      default: () => ({ w: false, a: false, d: false })
+    }
+  },
+  emits: ['input'],
+  data: () => ({
+    moveNormX: 0,
+    moveNormY: 0,
+    movePointerId: null,
+    knobOffsetX: 0,
+    knobOffsetY: 0,
+    maxRadius: 1
+  }),
+  computed: {
+    knobStyle() {
+      return {
+        transform: `translate(calc(-50% + ${this.knobOffsetX}px), calc(-50% + ${this.knobOffsetY}px))`
+      };
+    }
+  },
+  watch: {
+    virtualKeys: {
+      deep: true,
+      handler: 'syncVisualFromKeys'
+    }
+  },
+  mounted() {
+    this.measureBase();
+    this.syncVisualFromKeys();
+    this._onResize = () => this.measureBase();
+    window.addEventListener('resize', this._onResize);
+  },
+  beforeUnmount() {
+    window.removeEventListener('resize', this._onResize);
+    this.releaseMovePointer();
+    this.emitInput(false);
+  },
+  methods: {
+    measureBase() {
+      const base = this.$refs.moveBase;
+      if (!base) {
+        return;
+      }
+      const rect = base.getBoundingClientRect();
+      this.maxRadius = Math.max(24, (Math.min(rect.width, rect.height) - 44) / 2);
+      this.syncVisualFromKeys();
+    },
+    syncVisualFromKeys() {
+      if (this.movePointerId !== null) {
+        return;
+      }
+      const { normX, normY } = stickVisualFromParkourKeys(this.virtualKeys);
+      this.moveNormX = normX;
+      this.moveNormY = normY;
+      this.knobOffsetX = normX * this.maxRadius;
+      this.knobOffsetY = -normY * this.maxRadius;
+    },
+    emitInput(activeOverride) {
+      if (this.disabled) {
+        return;
+      }
+      const keys = computeParkourKeysFromStick(this.moveNormX, this.moveNormY);
+      const active = activeOverride ?? keys.active;
+      this.$emit('input', {
+        active,
+        w: active ? keys.w : false,
+        a: active ? keys.a : false,
+        d: active ? keys.d : false,
+        highSpeed: active ? keys.highSpeed : false
+      });
+    },
+    updateMoveFromClient(clientX, clientY) {
+      const base = this.$refs.moveBase;
+      if (!base) {
+        return;
+      }
+      const rect = base.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      let dx = clientX - cx;
+      let dy = clientY - cy;
+      const dist = Math.hypot(dx, dy);
+      if (dist > this.maxRadius) {
+        const scale = this.maxRadius / dist;
+        dx *= scale;
+        dy *= scale;
+      }
+      this.knobOffsetX = dx;
+      this.knobOffsetY = dy;
+      this.moveNormX = dx / this.maxRadius;
+      this.moveNormY = -dy / this.maxRadius;
+      this.emitInput();
+    },
+    onMoveDown(event) {
+      if (this.disabled) {
+        return;
+      }
+      this.measureBase();
+      this.movePointerId = event.pointerId;
+      event.currentTarget.setPointerCapture(event.pointerId);
+      this.updateMoveFromClient(event.clientX, event.clientY);
+    },
+    onMoveMove(event) {
+      if (this.disabled || this.movePointerId !== event.pointerId) {
+        return;
+      }
+      this.updateMoveFromClient(event.clientX, event.clientY);
+    },
+    onMoveUp(event) {
+      if (this.movePointerId !== null && event.pointerId !== this.movePointerId) {
+        return;
+      }
+      this.resetMove();
+    },
+    resetMove() {
+      this.movePointerId = null;
+      this.moveNormX = 0;
+      this.moveNormY = 0;
+      this.knobOffsetX = 0;
+      this.knobOffsetY = 0;
+      this.emitInput(false);
+    },
+    releaseMovePointer() {
+      if (this.movePointerId === null) {
+        return;
+      }
+      try {
+        this.$refs.moveBase?.releasePointerCapture(this.movePointerId);
+      } catch {
+        // ignore if capture was already released
+      }
+      this.resetMove();
+    }
+  }
+};
+</script>
+
+<style scoped>
+.parkour-mobile-controls {
+  --parkour-mobile-glass: rgba(var(--v-theme-on-surface), 0.12);
+  --parkour-mobile-glass-border: rgba(var(--v-theme-on-surface), 0.16);
+  --parkour-stick-size: 128px;
+
+  position: fixed;
+  right: 20px;
+  z-index: 1050;
+  bottom: calc(20px + constant(safe-area-inset-bottom) + var(--vvp-offset-bottom, 0px));
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px) + var(--vvp-offset-bottom, 0px));
+  touch-action: none;
+  user-select: none;
+  pointer-events: auto;
+}
+
+.parkour-mobile-controls--disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.parkour-mobile-controls--dock-panel {
+  right: 12px;
+  bottom: calc(
+    12px + constant(safe-area-inset-bottom) + var(--vvp-offset-bottom, 0px) +
+      var(--mobile-controls-panel-height, 140px) + 12px
+  );
+  bottom: calc(
+    12px + env(safe-area-inset-bottom, 0px) + var(--vvp-offset-bottom, 0px) +
+      var(--mobile-controls-panel-height, 140px) + 12px
+  );
+}
+
+.parkour-mobile-controls__stick-base {
+  width: var(--parkour-stick-size);
+  height: var(--parkour-stick-size);
+  border-radius: 50%;
+  border: 1px solid var(--parkour-mobile-glass-border);
+  background: var(--parkour-mobile-glass);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  touch-action: none;
+  position: relative;
+}
+
+.parkour-mobile-controls__stick-base::before {
+  content: '';
+  position: absolute;
+  inset: 22%;
+  border-radius: 50%;
+  border: 1px dashed rgba(var(--v-theme-on-surface), 0.12);
+  pointer-events: none;
+}
+
+.parkour-mobile-controls__stick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 1px solid rgba(var(--v-theme-primary), 0.45);
+  background: rgba(var(--v-theme-primary), 0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  pointer-events: none;
+  will-change: transform;
+}
+</style>
