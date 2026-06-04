@@ -202,9 +202,10 @@ async function validateDepthHud(page) {
     const procH = processed.height * procScale;
     const left = inset.leftOffset ?? inset.margin ?? 16;
     const bottom = inset.bottomOffset ?? inset.margin ?? 16;
-    const uniform = demo.depthPreviewMaterial?.__depthHudCornerRadiusUniform?.value ?? null;
-    const expectedUniformX = cardRadius / procW;
-    const expectedUniformY = cardRadius / procH;
+    const uniforms = demo.depthPreviewMaterial?.__depthHudRoundUniforms ?? null;
+    const expectedRadiusPx = cardRadius;
+    const expectedSizeX = procW;
+    const expectedSizeY = procH;
 
     const rect = frame.getBoundingClientRect();
     const canvas = frame.contentDocument?.querySelector('canvas');
@@ -244,20 +245,27 @@ async function validateDepthHud(page) {
     const interior = sampleHostPixel(hudLeft + procW / 2, hudTop + procH / 2);
 
     const isNearBlack = ([r, g, b]) => r < 12 && g < 12 && b < 12;
-    const radiusDeltaX = Math.abs((uniform?.x ?? 0) - expectedUniformX);
-    const radiusDeltaY = Math.abs((uniform?.y ?? 0) - expectedUniformY);
+    const radiusDelta = Math.abs((uniforms?.cornerRadiusPx?.value ?? 0) - expectedRadiusPx);
+    const sizeDeltaX = Math.abs((uniforms?.size?.value?.x ?? 0) - expectedSizeX);
+    const sizeDeltaY = Math.abs((uniforms?.size?.value?.y ?? 0) - expectedSizeY);
 
     return {
       ok: !isNearBlack(cornerSquare)
         && !isNearBlack(cornerRound)
-        && radiusDeltaX < 0.02
-        && radiusDeltaY < 0.02,
+        && radiusDelta < 1
+        && sizeDeltaX < 1
+        && sizeDeltaY < 1,
       cardRadius,
-      uniform,
-      expectedUniformX,
-      expectedUniformY,
-      radiusDeltaX,
-      radiusDeltaY,
+      uniforms: {
+        cornerRadiusPx: uniforms?.cornerRadiusPx?.value ?? null,
+        size: uniforms?.size?.value ?? null
+      },
+      expectedRadiusPx,
+      expectedSizeX,
+      expectedSizeY,
+      radiusDelta,
+      sizeDeltaX,
+      sizeDeltaY,
       depthWrite: demo.depthPreviewMaterial?.depthWrite,
       transparent: demo.depthPreviewMaterial?.transparent,
       renderPatched: demo.__depthHudRenderPatched,

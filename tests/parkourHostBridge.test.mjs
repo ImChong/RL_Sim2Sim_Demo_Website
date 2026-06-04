@@ -225,7 +225,7 @@ test('parkour bundle supports host depth inset left/bottom offsets', () => {
 test('host bridge rounds depth HUD materials without touching inference', () => {
   const bridgeSource = readFileSync(bridgePath, 'utf8');
   assert.match(bridgeSource, /applyDepthHudRoundedCorners/);
-  assert.match(bridgeSource, /depthHudBox/);
+  assert.match(bridgeSource, /depthHudQ/);
   assert.match(bridgeSource, /patchDepthHudRender/);
   assert.doesNotMatch(bridgeSource, /depthInferenceMaterial/);
 
@@ -248,10 +248,12 @@ test('host bridge rounds depth HUD materials without touching inference', () => 
 
   const shader = { uniforms: {}, fragmentShader: 'void main() {\n#include <colorspace_fragment>\n}' };
   depthPreviewMaterial.onBeforeCompile(shader);
-  assert.match(shader.fragmentShader, /uDepthHudCornerRadius/);
+  assert.match(shader.fragmentShader, /uDepthHudCornerRadiusPx/);
+  assert.match(shader.fragmentShader, /uDepthHudSize/);
   assert.match(shader.fragmentShader, /discard/);
-  assert.equal(shader.uniforms.uDepthHudCornerRadius.value.x, 0);
-  assert.equal(shader.uniforms.uDepthHudCornerRadius.value.y, 0);
+  assert.equal(shader.uniforms.uDepthHudCornerRadiusPx.value, 0);
+  assert.equal(shader.uniforms.uDepthHudSize.value.x, 1);
+  assert.equal(shader.uniforms.uDepthHudSize.value.y, 1);
 });
 
 test('host bridge disables renderer autoClear during async demo render', () => {
@@ -276,7 +278,7 @@ test('host bridge disables renderer autoClear during async demo render', () => {
   });
 });
 
-test('host bridge maps panel corner radius px to depth HUD normalized radius', () => {
+test('host bridge maps panel corner radius px to depth HUD pixel-space uniforms', () => {
   const depthPreviewMaterial = { needsUpdate: false };
   const depthRawMaterial = { needsUpdate: false };
   const demo = {
@@ -298,8 +300,12 @@ test('host bridge maps panel corner radius px to depth HUD normalized radius', (
   });
 
   assert.equal(demo._depthPreviewCornerRadiusPx, 18);
-  assert.ok(Math.abs(depthPreviewMaterial.__depthHudCornerRadiusUniform.value.x - 18 / (87 * 4)) < 1e-6);
-  assert.ok(Math.abs(depthPreviewMaterial.__depthHudCornerRadiusUniform.value.y - 18 / (58 * 4)) < 1e-6);
-  assert.ok(Math.abs(depthRawMaterial.__depthHudCornerRadiusUniform.value.x - 18 / (64 * 4)) < 1e-6);
-  assert.ok(Math.abs(depthRawMaterial.__depthHudCornerRadiusUniform.value.y - 18 / (64 * 4)) < 1e-6);
+  const previewUniforms = depthPreviewMaterial.__depthHudRoundUniforms;
+  const rawUniforms = depthRawMaterial.__depthHudRoundUniforms;
+  assert.equal(previewUniforms.cornerRadiusPx.value, 18);
+  assert.equal(previewUniforms.size.value.x, 87 * 4);
+  assert.equal(previewUniforms.size.value.y, 58 * 4);
+  assert.equal(rawUniforms.cornerRadiusPx.value, 18);
+  assert.equal(rawUniforms.size.value.x, 64 * 4);
+  assert.equal(rawUniforms.size.value.y, 64 * 4);
 });
