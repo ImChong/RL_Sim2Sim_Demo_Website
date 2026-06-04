@@ -245,6 +245,9 @@ export default {
 }
 
 .parkour-mobile-controls--dock-panel {
+  --parkour-stick-size: 108px;
+  --parkour-btn-size: 40px;
+  --parkour-orbit-radius: calc(var(--parkour-stick-size) / 2 + var(--parkour-btn-size) / 2 + 12px);
   right: 12px;
   bottom: calc(
     12px + constant(safe-area-inset-bottom) + var(--vvp-offset-bottom, 0px) +
@@ -260,6 +263,15 @@ export default {
   position: relative;
   width: calc(var(--parkour-stick-size) + var(--parkour-orbit-radius) + var(--parkour-btn-size) / 2);
   height: calc(var(--parkour-stick-size) + var(--parkour-orbit-radius) * 0.52);
+}
+
+.parkour-mobile-controls--dock-panel .parkour-mobile-controls__stick-knob {
+  width: 44px;
+  height: 44px;
+}
+
+.parkour-mobile-controls--dock-panel .parkour-mobile-controls__action-btn :deep(.v-icon) {
+  font-size: 20px !important;
 }
 
 .parkour-mobile-controls__stick-base {

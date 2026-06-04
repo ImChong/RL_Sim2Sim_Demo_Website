@@ -542,7 +542,8 @@ import {
 } from '@/utils/ampKeyboardCommand.js';
 import {
   computeParkourMobileDepthLayout,
-  computeParkourMobileDepthLayoutFromMetrics
+  computeParkourMobileDepthLayoutFromMetrics,
+  computeParkourMobileDepthLayoutWithClearance
 } from '@/utils/parkourDepthPreviewLayout.js';
 import {
   isParkourMovementKey,
@@ -1332,16 +1333,19 @@ export default {
       }
 
       const panel = this.$refs.mobileControlsPanel;
+      const padEl = this.$refs.parkourJoystick?.$el;
       const stickBase = this.$refs.parkourJoystick?.$refs?.moveBase;
-      if (panel && stickBase) {
+      if (panel && padEl && stickBase) {
         const viewportHeight = window.innerHeight;
         const panelTopFromBottom = viewportHeight - panel.getBoundingClientRect().top;
         const stickRect = stickBase.getBoundingClientRect();
         const joystickCenterFromBottom = viewportHeight - (stickRect.top + stickRect.height / 2);
-        return computeParkourMobileDepthLayout({
+        const joystickPadLeft = padEl.getBoundingClientRect().left;
+        return computeParkourMobileDepthLayoutWithClearance({
           panelTopFromBottom,
           joystickCenterFromBottom,
-          previewScale: scale
+          joystickPadLeft,
+          preferredScale: scale
         });
       }
 
@@ -1354,7 +1358,8 @@ export default {
       return computeParkourMobileDepthLayoutFromMetrics({
         panelHeight,
         bottomInset,
-        previewScale: scale
+        previewScale: scale,
+        viewportWidth: window.innerWidth
       });
     },
     clearParkourVirtualInput() {
