@@ -5,6 +5,7 @@ import {
   AMP_CMD_SPRINT,
   AMP_CMD_WALK,
   computeAmpCommandFromKeys,
+  isAmpKnockdownKey,
   isAmpMovementKey
 } from '../src/utils/ampKeyboardCommand.js';
 
@@ -13,6 +14,12 @@ describe('ampKeyboardCommand', () => {
     assert.equal(isAmpMovementKey('KeyW'), true);
     assert.equal(isAmpMovementKey('KeyQ'), true);
     assert.equal(isAmpMovementKey('Space'), false);
+  });
+
+  test('isAmpKnockdownKey recognizes Enter and NumpadEnter', () => {
+    assert.equal(isAmpKnockdownKey('Enter'), true);
+    assert.equal(isAmpKnockdownKey('NumpadEnter'), true);
+    assert.equal(isAmpKnockdownKey('KeyW'), false);
   });
 
   test('walk forward on W', () => {
