@@ -15,7 +15,111 @@
     { size: 512, multisample: 4 }
   ];
 
+  /** Mirrors src/simulation/theme.js (main-site AMP / Tracking). */
+  const SIMULATION_THEME_SETTINGS = {
+    dark: {
+      lightIntensityScale: 0.85,
+      ambientIntensity: 0.14,
+      backgroundRgb: [0.08, 0.12, 0.18],
+      sonicHemiSky: 0x6a8aaa,
+      sonicHemiGround: 0x2a3a28,
+      sonicHemiIntensity: 0.34,
+      sonicFillColor: 0x80c0ff,
+      sonicFillIntensity: 0.42,
+      sonicRimIntensity: 0.3
+    },
+    light: {
+      lightIntensityScale: 1,
+      ambientIntensity: 0.1,
+      backgroundRgb: [0.15, 0.25, 0.35],
+      sonicHemiSky: 0x6a8aaa,
+      sonicHemiGround: 0x2a3a28,
+      sonicHemiIntensity: 0.12,
+      sonicFillColor: 0x80c0ff,
+      sonicFillIntensity: 0.18,
+      sonicRimIntensity: 0.12
+    }
+  };
+
+  const LEGACY_PARKOUR_LIGHT_KEYS = ['spotlight', 'hemiLight', 'fillLightLeft', 'fillLightRight'];
+
   let statsTimer = null;
+
+  function normalizeVisualThemeName(name) {
+    return name === 'light' ? 'light' : 'dark';
+  }
+
+  function getVisualThemeSettings(name) {
+    return SIMULATION_THEME_SETTINGS[normalizeVisualThemeName(name)];
+  }
+
+  function disposeLegacyParkourLights(demo) {
+    for (const key of LEGACY_PARKOUR_LIGHT_KEYS) {
+      const light = demo[key];
+      if (!light) {
+        continue;
+      }
+      demo.scene?.remove(light);
+      light.dispose?.();
+      demo[key] = null;
+    }
+  }
+
+  function applyParkourVisualTheme(demo, themeName) {
+    const settings = getVisualThemeSettings(themeName);
+    if (!settings || !demo?.scene) {
+      return;
+    }
+
+    demo.visualThemeName = normalizeVisualThemeName(themeName);
+    disposeLegacyParkourLights(demo);
+
+    if (demo.scene.background?.setRGB) {
+      demo.scene.background.setRGB(...settings.backgroundRgb);
+    }
+
+    demo.scene.fog = null;
+
+    if (demo.ambientLight) {
+      demo.ambientLight.intensity = settings.ambientIntensity;
+    }
+
+    if (demo.sonicHemi) {
+      demo.sonicHemi.color?.setHex?.(settings.sonicHemiSky);
+      demo.sonicHemi.groundColor?.setHex?.(settings.sonicHemiGround);
+      demo.sonicHemi.intensity = settings.sonicHemiIntensity;
+    }
+
+    if (demo.sonicFill) {
+      demo.sonicFill.color?.setHex?.(settings.sonicFillColor);
+      demo.sonicFill.intensity = settings.sonicFillIntensity;
+    }
+
+    if (demo.sonicRim) {
+      demo.sonicRim.intensity = settings.sonicRimIntensity;
+    }
+
+    if (!demo.lightBaseIntensities) {
+      demo.lightBaseIntensities = new Map();
+    }
+
+    for (const [index, light] of Object.entries(demo.lights ?? {})) {
+      if (!light) {
+        continue;
+      }
+      const lightIndex = Number(index);
+      const baseIntensity = demo.lightBaseIntensities.get(lightIndex) ?? light.intensity ?? 1;
+      demo.lightBaseIntensities.set(lightIndex, baseIntensity);
+      light.intensity = baseIntensity * settings.lightIntensityScale;
+    }
+
+    if (demo.renderer) {
+      demo.renderer.toneMapping = 0;
+      demo.renderer.toneMappingExposure = 1;
+    }
+
+    demo.render?.();
+  }
 
   function post(type, payload) {
     try {
@@ -249,6 +353,9 @@
       patchPolicyVirtualInput(demo);
       applyDepthHudRoundedCorners(demo);
       patchDepthHudRender(demo);
+      if (demo) {
+        applyParkourVisualTheme(demo, demo.visualThemeName ?? 'dark');
+      }
       return !!demo;
     }
     demo.__hostBridgeAttached = true;
@@ -301,6 +408,10 @@
       return this.simStepHz || 0;
     };
 
+    demo.setVisualTheme = function (name) {
+      applyParkourVisualTheme(this, name);
+    };
+
     demo.applyHostControlState = function (state) {
       if (!state || typeof state !== 'object') {
         return;
@@ -313,6 +424,9 @@
       }
       if (state.reflectionQuality !== undefined) {
         this.setReflectionQuality(state.reflectionQuality);
+      }
+      if (state.visualTheme !== undefined) {
+        this.setVisualTheme(state.visualTheme);
       }
       if (
         state.depthPreviewScale !== undefined
@@ -356,6 +470,8 @@
       }
       this.applySceneInitialState?.({ resetData: true, rebindCameras: true });
     };
+
+    applyParkourVisualTheme(demo, demo.visualThemeName ?? 'dark');
 
     return true;
   }

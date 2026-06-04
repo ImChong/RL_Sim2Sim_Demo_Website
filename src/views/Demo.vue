@@ -1013,6 +1013,9 @@ export default {
       immediate: true,
       handler(value) {
         this.demo?.setVisualTheme?.(value);
+        if (this.isParkourPolicy) {
+          this.postParkourHostControl({ visualTheme: value });
+        }
       }
     }
   },
@@ -1304,6 +1307,7 @@ export default {
         cameraFollow: this.cameraFollowEnabled,
         renderScale: this.renderScale,
         reflectionQuality: this.reflectionQuality,
+        visualTheme: this.visualTheme,
         ...this.getParkourDepthPreviewLayout()
       });
     },
