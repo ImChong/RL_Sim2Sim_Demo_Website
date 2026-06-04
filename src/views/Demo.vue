@@ -33,31 +33,6 @@
       allow="autoplay; fullscreen"
       @load="onParkourLoad"
     ></iframe>
-    <div
-      v-if="parkourLoading"
-      class="parkour-loading"
-      role="status"
-      aria-live="polite"
-    >
-      <v-card :title="t.loadingSimulationTitle" class="parkour-loading-card">
-        <v-card-text>
-          <p class="text-body-2 mb-3">{{ t.loadingSimulationBody }}</p>
-          <v-progress-linear
-            :model-value="parkourLoadProgress"
-            height="10"
-            color="primary"
-            rounded
-            class="loading-simulation-progress"
-            :aria-label="t.loadingSimulationTitle"
-            :aria-valuenow="parkourLoadProgress"
-            aria-valuemin="0"
-            aria-valuemax="100"
-            role="progressbar"
-          ></v-progress-linear>
-          <div class="text-caption text-medium-emphasis mt-2 text-end">{{ parkourLoadProgress }}%</div>
-        </v-card-text>
-      </v-card>
-    </div>
   </div>
   <div class="global-alerts">
     <v-alert
@@ -480,23 +455,29 @@
       </template>
     </v-card>
   </div>
-  <v-dialog :model-value="state === 0" persistent max-width="600px" scrollable>
+  <v-dialog
+    :model-value="showSimulationLoadingDialog"
+    persistent
+    max-width="600px"
+    scrollable
+    class="loading-simulation-dialog"
+  >
     <v-card :title="t.loadingSimulationTitle">
       <v-card-text>
         <p class="text-body-2 mb-3">{{ t.loadingSimulationBody }}</p>
         <v-progress-linear
-          :model-value="simulationLoadProgress"
+          :model-value="simulationLoadingProgress"
           height="10"
           color="primary"
           rounded
           class="loading-simulation-progress"
           :aria-label="t.loadingSimulationTitle"
-          :aria-valuenow="simulationLoadProgress"
+          :aria-valuenow="simulationLoadingProgress"
           aria-valuemin="0"
           aria-valuemax="100"
           role="progressbar"
         ></v-progress-linear>
-        <div class="text-caption text-medium-emphasis mt-2 text-end">{{ simulationLoadProgress }}%</div>
+        <div class="text-caption text-medium-emphasis mt-2 text-end">{{ simulationLoadingProgress }}%</div>
       </v-card-text>
     </v-card>
   </v-dialog>
@@ -1019,6 +1000,12 @@ export default {
     },
     t() {
       return translations[this.language] ?? translations.en;
+    },
+    showSimulationLoadingDialog() {
+      return this.state === 0 || this.parkourLoading;
+    },
+    simulationLoadingProgress() {
+      return this.parkourLoading ? this.parkourLoadProgress : this.simulationLoadProgress;
     }
   },
   watch: {
@@ -2094,27 +2081,6 @@ export default {
   height: 100%;
   border: 0;
 }
-
-.parkour-loading {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  /* Opaque backdrop (app theme background) hides the iframe while it
-     initialises. The card below reuses the same themed Vuetify v-card as the
-     AMP / Tracking "Loading Simulation Environment" dialog so the colour scheme
-     matches across all policies and both light/dark themes. */
-  background: rgb(var(--v-theme-background));
-  pointer-events: none;
-}
-
-.parkour-loading-card {
-  width: 100%;
-  max-width: 600px;
-}
-
 .parkour-controls {
   display: flex;
   flex-direction: column;

@@ -25,7 +25,9 @@ async function waitForParkourReady(page) {
   await page.waitForFunction(
     () => {
       const frame = document.querySelector('.parkour-frame');
-      const loading = document.querySelector('.parkour-loading');
+      const loading = /Loading Simulation|正在加载仿真环境/.test(
+        document.querySelector('.loading-simulation-dialog')?.textContent ?? ''
+      );
       return frame && !loading;
     },
     { timeout: 240000, polling: 500 }
