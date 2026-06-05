@@ -41,28 +41,28 @@
         <button
           type="button"
           class="amp-mobile-controls__action-btn amp-mobile-controls__orbit-btn amp-mobile-controls__orbit-btn--yaw-left"
-          :class="{ 'amp-mobile-controls__action-btn--active': yawDirection === 1 }"
-          :aria-label="labels.rotateLeft"
+          :class="{ 'amp-mobile-controls__action-btn--active': strafeDirection === 1 }"
+          :aria-label="labels.strafeLeft"
           :disabled="disabled"
-          @pointerdown.prevent="onYawDown(1, $event)"
-          @pointerup.prevent="onYawUp($event)"
-          @pointercancel.prevent="onYawUp($event)"
-          @pointerleave.prevent="onYawUp($event)"
+          @pointerdown.prevent="onStrafeDown(1, $event)"
+          @pointerup.prevent="onStrafeUp($event)"
+          @pointercancel.prevent="onStrafeUp($event)"
+          @pointerleave.prevent="onStrafeUp($event)"
         >
-          <v-icon icon="mdi-rotate-left" size="22" />
+          <v-icon icon="mdi-arrow-left-bold" size="22" />
         </button>
         <button
           type="button"
           class="amp-mobile-controls__action-btn amp-mobile-controls__orbit-btn amp-mobile-controls__orbit-btn--yaw-right"
-          :class="{ 'amp-mobile-controls__action-btn--active': yawDirection === -1 }"
-          :aria-label="labels.rotateRight"
+          :class="{ 'amp-mobile-controls__action-btn--active': strafeDirection === -1 }"
+          :aria-label="labels.strafeRight"
           :disabled="disabled"
-          @pointerdown.prevent="onYawDown(-1, $event)"
-          @pointerup.prevent="onYawUp($event)"
-          @pointercancel.prevent="onYawUp($event)"
-          @pointerleave.prevent="onYawUp($event)"
+          @pointerdown.prevent="onStrafeDown(-1, $event)"
+          @pointerup.prevent="onStrafeUp($event)"
+          @pointercancel.prevent="onStrafeUp($event)"
+          @pointerleave.prevent="onStrafeUp($event)"
         >
-          <v-icon icon="mdi-rotate-right" size="22" />
+          <v-icon icon="mdi-arrow-right-bold" size="22" />
         </button>
       </div>
     </div>
@@ -111,10 +111,10 @@ export default {
   data: () => ({
     moveNormX: 0,
     moveNormY: 0,
-    yawDirection: 0,
+    strafeDirection: 0,
     movePointerId: null,
     knockdownPressed: false,
-    yawPointerActive: false,
+    strafePointerActive: false,
     knobOffsetX: 0,
     knobOffsetY: 0,
     maxRadius: 1
@@ -153,7 +153,7 @@ export default {
       this.syncVisualFromCommand();
     },
     syncVisualFromCommand() {
-      const { normX, normY, yawDirection } = stickVisualFromAmpCommand(
+      const { normX, normY, yawDirection: strafeDirection } = stickVisualFromAmpCommand(
         this.cmdX,
         this.cmdY,
         this.cmdYaw
@@ -164,8 +164,8 @@ export default {
         this.knobOffsetX = normX * this.maxRadius;
         this.knobOffsetY = -normY * this.maxRadius;
       }
-      if (!this.yawPointerActive) {
-        this.yawDirection = yawDirection;
+      if (!this.strafePointerActive) {
+        this.strafeDirection = strafeDirection;
       }
     },
     emitCommand() {
@@ -175,7 +175,7 @@ export default {
       const { cmdX, cmdY, cmdYaw } = computeAmpCommandFromJoystick(
         this.moveNormX,
         this.moveNormY,
-        this.yawDirection,
+        this.strafeDirection,
         false,
         true
       );
@@ -279,23 +279,23 @@ export default {
       }
       this.resetMove();
     },
-    onYawDown(direction, event) {
+    onStrafeDown(direction, event) {
       if (this.disabled) {
         return;
       }
-      this.yawPointerActive = true;
+      this.strafePointerActive = true;
       event.currentTarget.setPointerCapture(event.pointerId);
-      this.yawDirection = direction;
+      this.strafeDirection = direction;
       this.emitCommand();
     },
-    onYawUp(event) {
+    onStrafeUp(event) {
       try {
         event.currentTarget.releasePointerCapture(event.pointerId);
       } catch {
         // ignore
       }
-      this.yawPointerActive = false;
-      this.yawDirection = 0;
+      this.strafePointerActive = false;
+      this.strafeDirection = 0;
       this.emitCommand();
     }
   }

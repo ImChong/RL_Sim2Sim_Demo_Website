@@ -60,16 +60,16 @@ export function computeAmpCommandFromKeys(keys, shiftKey = false) {
   }
 
   let cmdY = 0;
-  if (held.has('KeyA') && !held.has('KeyD')) {
+  if (held.has('KeyQ') && !held.has('KeyD')) {
     cmdY = speed.vy;
-  } else if (held.has('KeyD') && !held.has('KeyA')) {
+  } else if (held.has('KeyD') && !held.has('KeyQ')) {
     cmdY = -speed.vy;
   }
 
   let cmdYaw = 0;
-  if (held.has('KeyQ') && !held.has('KeyE')) {
+  if (held.has('KeyA') && !held.has('KeyE')) {
     cmdYaw = speed.yaw;
-  } else if (held.has('KeyE') && !held.has('KeyQ')) {
+  } else if (held.has('KeyE') && !held.has('KeyA')) {
     cmdYaw = -speed.yaw;
   }
 
@@ -84,10 +84,10 @@ export function computeAmpCommandFromKeys(keys, shiftKey = false) {
 export const AMP_KEYBOARD_CONTROL_ROWS = [
   { key: 'W', labelKey: 'ampKeyForward' },
   { key: 'S', labelKey: 'ampKeyBackward' },
-  { key: 'A', labelKey: 'ampKeyLeft' },
-  { key: 'D', labelKey: 'ampKeyRight' },
-  { key: 'Q', labelKey: 'ampKeyRotateLeft' },
-  { key: 'E', labelKey: 'ampKeyRotateRight' },
+  { key: 'A', labelKey: 'ampKeyRotateLeft' },
+  { key: 'D', labelKey: 'ampKeyRotateRight' },
+  { key: 'Q', labelKey: 'ampKeyLeft' },
+  { key: 'E', labelKey: 'ampKeyRight' },
   { key: 'SHIFT', labelKey: 'ampKeySprint' },
   { key: 'ENTER', labelKey: 'ampKeyKnockdown' }
 ];
