@@ -19,7 +19,7 @@ export function applyJoystickDeadzone(value, zone = AMP_JOYSTICK_DEADZONE) {
 
 /**
  * Map a 2D stick (-1..1) to planar velocity.
- * Stick up (+normY) = forward (+cmdX); stick right (+normX) = strafe right (-cmdY).
+ * Stick up (+normY) = forward (+cmdX); stick right (+normX) = turn right (-cmdYaw).
  */
 export function computeAmpCommandFromMoveStick(normX, normY, sprint = false) {
   const x = applyJoystickDeadzone(normX);
@@ -35,52 +35,54 @@ export function computeAmpCommandFromMoveStick(normX, normY, sprint = false) {
     cmdX = y * speed.vxBack;
   }
 
-  const cmdY = -x * speed.vy;
+  const cmdYaw = -x * speed.yaw;
 
   return {
     cmdX: clamp(cmdX, AMP_CMD_LIMITS.cmdX.min, AMP_CMD_LIMITS.cmdX.max),
-    cmdY: clamp(cmdY, AMP_CMD_LIMITS.cmdY.min, AMP_CMD_LIMITS.cmdY.max),
+    cmdYaw: clamp(cmdYaw, AMP_CMD_LIMITS.cmdYaw.min, AMP_CMD_LIMITS.cmdYaw.max),
     sprint: useSprint
   };
 }
 
-/** direction: +1 left (CCW), -1 right (CW), 0 release. */
-export function computeAmpYawFromStick(direction, sprint = false, yawAlwaysMax = false) {
+/** direction: +1 left, -1 right, 0 release. */
+export function computeAmpStrafeFromStick(direction, sprint = false, strafeAlwaysMax = false) {
   if (!direction) {
     return 0;
   }
-  const speed = sprint || yawAlwaysMax ? AMP_CMD_SPRINT : AMP_CMD_WALK;
-  const cmdYaw = direction * speed.yaw;
-  return clamp(cmdYaw, AMP_CMD_LIMITS.cmdYaw.min, AMP_CMD_LIMITS.cmdYaw.max);
+  const speed = sprint || strafeAlwaysMax ? AMP_CMD_SPRINT : AMP_CMD_WALK;
+  const cmdY = direction * speed.vy;
+  return clamp(cmdY, AMP_CMD_LIMITS.cmdY.min, AMP_CMD_LIMITS.cmdY.max);
 }
 
 export function computeAmpCommandFromJoystick(
   moveNormX,
   moveNormY,
-  yawDirection,
+  strafeDirection,
   sprint = false,
-  yawAlwaysMax = false
+  strafeAlwaysMax = false
 ) {
   const move = computeAmpCommandFromMoveStick(moveNormX, moveNormY, sprint);
-  const cmdYaw = computeAmpYawFromStick(
-    yawDirection,
+  const cmdY = computeAmpStrafeFromStick(
+    strafeDirection,
     move.sprint || sprint,
-    yawAlwaysMax
+    strafeAlwaysMax
   );
   return {
     cmdX: move.cmdX,
-    cmdY: move.cmdY,
-    cmdYaw
+    cmdY,
+    cmdYaw: move.cmdYaw
   };
 }
 
 /** Approximate stick pose from velocity command (for keyboard / slider → joystick sync). */
 export function stickVisualFromAmpCommand(cmdX, cmdY, cmdYaw) {
   const absX = Math.abs(cmdX);
-  const absY = Math.abs(cmdY);
+  const absStrafe = Math.abs(cmdY);
+  const absYaw = Math.abs(cmdYaw);
   const useSprint =
     absX >= AMP_CMD_SPRINT.vx * AMP_JOYSTICK_SPRINT_THRESHOLD
-    || absY >= AMP_CMD_SPRINT.vy * AMP_JOYSTICK_SPRINT_THRESHOLD
+    || absStrafe >= AMP_CMD_SPRINT.vy * AMP_JOYSTICK_SPRINT_THRESHOLD
+    || absYaw >= AMP_CMD_SPRINT.yaw * AMP_JOYSTICK_SPRINT_THRESHOLD
     || (cmdX < 0 && absX >= AMP_CMD_SPRINT.vxBack * AMP_JOYSTICK_SPRINT_THRESHOLD);
   const speed = useSprint ? AMP_CMD_SPRINT : AMP_CMD_WALK;
 
@@ -92,8 +94,8 @@ export function stickVisualFromAmpCommand(cmdX, cmdY, cmdYaw) {
   }
 
   let normX = 0;
-  if (absY > 1e-4) {
-    normX = -cmdY / speed.vy;
+  if (absYaw > 1e-4) {
+    normX = -cmdYaw / speed.yaw;
   }
 
   const mag = Math.hypot(normX, normY);
@@ -102,12 +104,12 @@ export function stickVisualFromAmpCommand(cmdX, cmdY, cmdYaw) {
     normY /= mag;
   }
 
-  let yawDirection = 0;
-  if (cmdYaw > 1e-4) {
-    yawDirection = 1;
-  } else if (cmdYaw < -1e-4) {
-    yawDirection = -1;
+  let strafeDirection = 0;
+  if (cmdY > 1e-4) {
+    strafeDirection = 1;
+  } else if (cmdY < -1e-4) {
+    strafeDirection = -1;
   }
 
-  return { normX, normY, yawDirection };
+  return { normX, normY, yawDirection: strafeDirection };
 }

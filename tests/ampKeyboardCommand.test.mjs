@@ -39,9 +39,9 @@ describe('ampKeyboardCommand', () => {
   });
 
   test('strafe and yaw signs match body frame (+Y left, +yaw left)', () => {
-    assert.equal(computeAmpCommandFromKeys(new Set(['KeyA']), false).cmdY, AMP_CMD_WALK.vy);
+    assert.equal(computeAmpCommandFromKeys(new Set(['KeyQ']), false).cmdY, AMP_CMD_WALK.vy);
     assert.equal(computeAmpCommandFromKeys(new Set(['KeyD']), false).cmdY, -AMP_CMD_WALK.vy);
-    assert.equal(computeAmpCommandFromKeys(new Set(['KeyQ']), false).cmdYaw, AMP_CMD_WALK.yaw);
+    assert.equal(computeAmpCommandFromKeys(new Set(['KeyA']), false).cmdYaw, AMP_CMD_WALK.yaw);
     assert.equal(computeAmpCommandFromKeys(new Set(['KeyE']), false).cmdYaw, -AMP_CMD_WALK.yaw);
   });
 
@@ -51,7 +51,7 @@ describe('ampKeyboardCommand', () => {
       cmdY: 0,
       cmdYaw: 0
     });
-    assert.deepEqual(computeAmpCommandFromKeys(new Set(['KeyA', 'KeyD']), true), {
+    assert.deepEqual(computeAmpCommandFromKeys(new Set(['KeyQ', 'KeyD']), true), {
       cmdX: 0,
       cmdY: 0,
       cmdYaw: 0
@@ -59,7 +59,7 @@ describe('ampKeyboardCommand', () => {
   });
 
   test('commands clamp to slider limits', () => {
-    const cmd = computeAmpCommandFromKeys(new Set(['KeyW', 'KeyA', 'KeyQ']), true);
+    const cmd = computeAmpCommandFromKeys(new Set(['KeyW', 'KeyQ', 'KeyA']), true);
     assert.equal(cmd.cmdX, AMP_CMD_LIMITS.cmdX.max);
     assert.equal(cmd.cmdY, AMP_CMD_LIMITS.cmdY.max);
     assert.equal(cmd.cmdYaw, AMP_CMD_LIMITS.cmdYaw.max);
