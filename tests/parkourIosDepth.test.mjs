@@ -104,3 +104,23 @@ test('parkour ORT init uses single-threaded wasm only on Apple hardware', () => 
     'ORT worker proxy should be disabled only on Apple'
   );
 });
+
+test('parkour ORT init uses non-JSEP wasm on Apple hardware', () => {
+  const bundle = readFileSync(bundlePath, 'utf8');
+
+  assert.match(
+    bundle,
+    /wQ\.wasm\.wasmPaths=_appleOrt\?\{mjs:new URL\("\.\/ort-wasm-simd-threaded\.mjs"/,
+    'Apple should load non-JSEP ORT wasm (WebKit 26 JSEP is unstable)'
+  );
+  assert.match(
+    bundle,
+    /this\._policyInitError=String\(C\?\.message\|\|C\)/,
+    'policy init should record error message for diagnostics'
+  );
+  assert.match(
+    bundle,
+    /else if\(this\.depthPreviewPixels&&this\.depthPreviewSize&&s\)/,
+    'depth preview should fall back to readback when policy is unavailable'
+  );
+});

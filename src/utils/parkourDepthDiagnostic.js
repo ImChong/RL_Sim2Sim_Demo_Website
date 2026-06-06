@@ -57,7 +57,10 @@ export function sampleDepthFrameMeters(depthFrame, { maxSamples = 1000 } = {}) {
 
 const HINT_LABELS = {
   demo_missing: 'Parkour iframe demo object is missing',
-  policy_not_ready: 'ONNX policy is not ready (depth stays black until loaded)',
+  policy_not_ready: 'ONNX policy is not ready (robot goes limp; preview needs policy backbone)',
+  policy_init_failed: 'Policy init failed — check policyInitError (common on iOS WebKit 26 + JSEP ORT)',
+  readback_ok_policy_failed:
+    'GPU depth readback works but policy failed — not an iOS depth-texture bug',
   apple_path_inactive: 'iOS Uint8 depth path is not active on Apple hardware',
   preview_dark: 'Processed depth preview looks black',
   readback_zero: 'GPU depth readback buffer is all zeros',
@@ -79,6 +82,12 @@ export function buildParkourDepthDiagnosticHints({
   }
   if (!demo?.policyController?.isReady) {
     hints.push('policy_not_ready');
+    if (demo?._policyInitError) {
+      hints.push('policy_init_failed');
+    }
+    if ((depthReadback?.avg ?? 0) > 5) {
+      hints.push('readback_ok_policy_failed');
+    }
   }
   if (
     /iPad|iPhone|iPod/.test(hostUserAgent) &&
@@ -140,7 +149,9 @@ export function buildParkourDepthDiagnosticReport({
     },
     parkour: {
       appleDepthReadback: Boolean(demo?._appleDepthReadback),
+      policyControllerExists: Boolean(demo?.policyController),
       policyReady: Boolean(demo?.policyController?.isReady),
+      policyInitError: demo?._policyInitError ?? null,
       policyEnabled: demo?.params?.policyEnabled ?? null,
       robotX: demo?.data?.qpos?.[0] ?? null,
       simStepHz: demo?.simStepHz ?? null,
