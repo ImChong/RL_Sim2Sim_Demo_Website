@@ -57,3 +57,23 @@ export function clearHostDemoContainer(container) {
   }
   container.replaceChildren();
 }
+
+/** Idempotent MEMFS mount for cold starts after iOS policy reload. */
+export function prepareMujocoWorkingDirectory(mujoco) {
+  if (!mujoco?.FS) {
+    throw new Error('MuJoCo FS is unavailable');
+  }
+  const fs = mujoco.FS;
+  const workingPath = '/working';
+  if (!fs.analyzePath(workingPath).exists) {
+    fs.mkdir(workingPath);
+  }
+  try {
+    fs.mount(mujoco.MEMFS, { root: '.' }, workingPath);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/already mounted|exists/i.test(message)) {
+      throw error;
+    }
+  }
+}
