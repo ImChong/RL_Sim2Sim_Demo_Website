@@ -60,16 +60,16 @@ export function computeAmpCommandFromKeys(keys, shiftKey = false) {
   }
 
   let cmdY = 0;
-  if (held.has('KeyQ') && !held.has('KeyD')) {
+  if (held.has('KeyQ') && !held.has('KeyE')) {
     cmdY = speed.vy;
-  } else if (held.has('KeyD') && !held.has('KeyQ')) {
+  } else if (held.has('KeyE') && !held.has('KeyQ')) {
     cmdY = -speed.vy;
   }
 
   let cmdYaw = 0;
-  if (held.has('KeyA') && !held.has('KeyE')) {
+  if (held.has('KeyA') && !held.has('KeyD')) {
     cmdYaw = speed.yaw;
-  } else if (held.has('KeyE') && !held.has('KeyA')) {
+  } else if (held.has('KeyD') && !held.has('KeyA')) {
     cmdYaw = -speed.yaw;
   }
 
