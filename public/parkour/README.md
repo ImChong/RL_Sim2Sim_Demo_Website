@@ -85,6 +85,12 @@ The upstream renderer multiplies floor `mat_texrepeat` by 30 on a 300×300
 AMP demo (`100×100` plane, `texrepeat="44 44"` in `scene_g1.xml`). The bundle was
 patched to use `100×100` and the MJCF repeat values as-is.
 
+The course in `g1_with_terrain.xml` runs to the finish marker at **x = 66**; a
+`100×100` floor reflector only covers **x ∈ [-50, 50]**, so depth/perception
+breaks once the robot passes mid-course. Re-apply
+`scripts/patch-parkour-ground-plane.mjs` after re-pulling the upstream build:
+`150×100` along the course axis (checker repeat scaled ×1.5 on that axis).
+
 `Reflector.setReflectionQuality` in the bundle must update its internal size /
 multisample tracking (`let I` / `let w` and assign `I=ea,w=sa` after resizing);
 otherwise the host panel slider stops changing reflection after the first move.
