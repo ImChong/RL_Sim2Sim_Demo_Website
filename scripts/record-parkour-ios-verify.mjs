@@ -162,7 +162,6 @@ async function readParkourSnapshot(page) {
       robotX: demo?.data?.qpos?.[0] ?? 0,
       depthAvg: avg,
       appleDepthReadback: Boolean(demo?._appleDepthReadback),
-      appleDepthOverride: Boolean(demo?._appleDepthOverrideMaterial),
       policyReady: Boolean(demo?.policyController?.isReady),
       userAgent: navigator.userAgent,
       platform: navigator.platform,
@@ -351,7 +350,7 @@ async function main() {
 
   const overlayLine1 = escapeDrawtext('iPhone 15 Safari | 393x852 | touch');
   const overlayLine2 = escapeDrawtext(
-    `Apple depth=${start.appleDepthReadback ? 'ON' : 'OFF'} override=${start.appleDepthOverride ? 'ON' : 'OFF'}`
+    `Apple Uint8 depth=${start.appleDepthReadback ? 'ON' : 'OFF'} policy=${start.policyReady ? 'ready' : 'off'}`
   );
   const overlayLine3 = escapeDrawtext(`depth avg=${start.depthAvg.toFixed(1)} host=${USE_HOST_APP ? 'iframe' : 'direct'}`);
 
@@ -391,7 +390,6 @@ async function main() {
     viewport: '393x852 @3x',
     hostAppIframe: USE_HOST_APP,
     appleDepthReadback: start.appleDepthReadback,
-    appleDepthOverride: start.appleDepthOverride,
     navigatorPlatform: start.platform,
     maxTouchPoints: start.maxTouchPoints,
     url: BASE_URL
@@ -401,14 +399,14 @@ async function main() {
   console.log('Video saved:', OUT_VIDEO);
   console.log(JSON.stringify(summary, null, 2));
 
-  if (!start.appleDepthReadback || !start.appleDepthOverride) {
-    throw new Error('iOS native depth path was not active during recording');
+  if (!start.appleDepthReadback || !start.policyReady) {
+    throw new Error('iOS Uint8 depth path was not active during recording');
   }
   if (start.depthAvg < 2) {
     throw new Error(`Depth preview too dark at start (avg=${start.depthAvg.toFixed(2)})`);
   }
   if (!crossed) {
-    console.warn('WARN: Robot did not cross first obstacle; video still saved for depth HUD review');
+    throw new Error('Robot did not cross first obstacle during recording');
   }
 }
 

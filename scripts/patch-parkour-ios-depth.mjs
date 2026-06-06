@@ -4,9 +4,10 @@
  * Only Apple mobile hardware (iPhone/iPad/iPod) uses Uint8 readback; other
  * platforms keep the original Float32 depth pipeline.
  *
- * On iOS Safari, sampling WEBGL_depth_texture in a fragment shader often returns
- * zero. Apple devices therefore render depth with MeshDepthMaterial override
- * directly into a Uint8 color target (no depth-texture sampling).
+ * Safari cannot read FloatType render targets reliably. Apple devices keep the
+ * original depth-texture inference pass but pack linear depth into Uint8 before
+ * CPU readback. Do NOT replace this with MeshDepthMaterial override: that makes
+ * the HUD visible but distorts depth statistics and causes falls at obstacles.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -20,6 +21,12 @@ const bundlePath = join(
 
 const APPLE_DETECT =
   '/iPad|iPhone|iPod/.test(navigator.userAgent)||navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1';
+
+const APPLE_RENDER_TAIL =
+  'this.renderer.setRenderTarget(this.depthTarget),this.renderer.clear(),this.renderer.render(this.scene,this.depthCameraView),this.renderer.setRenderTarget(null),this.depthInferenceMaterial.uniforms.cameraNear.value=this.depthCameraView.near,this.depthInferenceMaterial.uniforms.cameraFar.value=this.depthCameraView.far,this.renderer.setRenderTarget(this.depthInferenceTarget),this.renderer.clear(),this.renderer.render(this.depthInferenceScene,this.depthCamera),this._appleDepthReadback&&this.renderer.getContext().finish(),this.renderer.readRenderTargetPixels(this.depthInferenceTarget,0,0,this.depthInset.width,this.depthInset.height,this.depthPixels)';
+
+const APPLE_DECODE =
+  'for(let R=0;R<s;R++)this.depthFrame[R]=this._appleDepthReadback?Math.max(.3,Math.min(3,.3+this.depthPixels[R*4]*(2.7/255))):this.depthPixels[R*4];if(this.policyController.setDepthImage(this.depthFrame,Y,N),this._appleDepthReadback&&this.policyController._prepareDepthInput(),this.depthRawPixels';
 
 let bundle = readFileSync(bundlePath, 'utf8');
 
@@ -53,14 +60,6 @@ const replacements = [
       \`}),this.depthInferenceScene=new nF`
   ],
   [
-    'this.depthInferenceScene.add(new VQ(new xI(2,2),this.depthInferenceMaterial)),this.depthInferenceTarget=new QI(this.depthInset.width,this.depthInset.height,{type:hg,format:SQ,minFilter:MQ,magFilter:MQ,depthBuffer:!1,stencilBuffer:!1}),this.depthPixels=new Float32Array(this.depthInset.width*this.depthInset.height*4)',
-    'this.depthInferenceScene.add(new VQ(new xI(2,2),this.depthInferenceMaterial)),this._appleDepthOverrideMaterial=new hh({depthPacking:ma}),this.depthInferenceTarget=new QI(this.depthInset.width,this.depthInset.height,{type:this._appleDepthReadback?xg:hg,format:SQ,minFilter:MQ,magFilter:MQ,depthBuffer:!1,stencilBuffer:!1}),this.depthPixels=this._appleDepthReadback?new Uint8Array(this.depthInset.width*this.depthInset.height*4):new Float32Array(this.depthInset.width*this.depthInset.height*4)'
-  ],
-  [
-    'this.depthInferenceScene.add(new VQ(new xI(2,2),this.depthInferenceMaterial)),this.depthInferenceTarget=new QI(this.depthInset.width,this.depthInset.height,{type:this._appleDepthReadback?xg:hg,format:SQ,minFilter:MQ,magFilter:MQ,depthBuffer:!1,stencilBuffer:!1}),this.depthPixels=this._appleDepthReadback?new Uint8Array(this.depthInset.width*this.depthInset.height*4):new Float32Array(this.depthInset.width*this.depthInset.height*4)',
-    'this.depthInferenceScene.add(new VQ(new xI(2,2),this.depthInferenceMaterial)),this._appleDepthOverrideMaterial=new hh({depthPacking:ma}),this.depthInferenceTarget=new QI(this.depthInset.width,this.depthInset.height,{type:this._appleDepthReadback?xg:hg,format:SQ,minFilter:MQ,magFilter:MQ,depthBuffer:!1,stencilBuffer:!1}),this.depthPixels=this._appleDepthReadback?new Uint8Array(this.depthInset.width*this.depthInset.height*4):new Float32Array(this.depthInset.width*this.depthInset.height*4)'
-  ],
-  [
     'this.depthInferenceTarget=new QI(this.depthInset.width,this.depthInset.height,{type:hg,format:SQ,minFilter:MQ,magFilter:MQ,depthBuffer:!1,stencilBuffer:!1}),this.depthPixels=new Float32Array(this.depthInset.width*this.depthInset.height*4)',
     'this.depthInferenceTarget=new QI(this.depthInset.width,this.depthInset.height,{type:this._appleDepthReadback?xg:hg,format:SQ,minFilter:MQ,magFilter:MQ,depthBuffer:!1,stencilBuffer:!1}),this.depthPixels=this._appleDepthReadback?new Uint8Array(this.depthInset.width*this.depthInset.height*4):new Float32Array(this.depthInset.width*this.depthInset.height*4)'
   ],
@@ -70,15 +69,11 @@ const replacements = [
   ],
   [
     'this.renderer.setRenderTarget(this.depthTarget),this.renderer.clear(),this.renderer.render(this.scene,this.depthCameraView),this.renderer.setRenderTarget(null),this.depthInferenceMaterial.uniforms.cameraNear.value=this.depthCameraView.near,this.depthInferenceMaterial.uniforms.cameraFar.value=this.depthCameraView.far,this.renderer.setRenderTarget(this.depthInferenceTarget),this.renderer.clear(),this.renderer.render(this.depthInferenceScene,this.depthCamera),this.renderer.readRenderTargetPixels(this.depthInferenceTarget,0,0,this.depthInset.width,this.depthInset.height,this.depthPixels)',
-    '(function(){if(this._appleDepthReadback){const _ap=this.scene.overrideMaterial;this.scene.overrideMaterial=this._appleDepthOverrideMaterial,this.renderer.setRenderTarget(this.depthInferenceTarget),this.renderer.clear(),this.renderer.render(this.scene,this.depthCameraView),this.scene.overrideMaterial=_ap}else{this.renderer.setRenderTarget(this.depthTarget),this.renderer.clear(),this.renderer.render(this.scene,this.depthCameraView),this.renderer.setRenderTarget(null),this.depthInferenceMaterial.uniforms.cameraNear.value=this.depthCameraView.near,this.depthInferenceMaterial.uniforms.cameraFar.value=this.depthCameraView.far,this.renderer.setRenderTarget(this.depthInferenceTarget),this.renderer.clear(),this.renderer.render(this.depthInferenceScene,this.depthCamera)}}).call(this),this._appleDepthReadback&&this.renderer.getContext().finish(),this.renderer.readRenderTargetPixels(this.depthInferenceTarget,0,0,this.depthInset.width,this.depthInset.height,this.depthPixels)'
+    APPLE_RENDER_TAIL
   ],
   [
     'for(let R=0;R<s;R++)this.depthFrame[R]=this.depthPixels[R*4];if(this.policyController.setDepthImage(this.depthFrame,Y,N),this.depthRawPixels',
-    'for(let R=0;R<s;R++)if(this._appleDepthReadback){const _n=this.depthCameraView.near,_f=this.depthCameraView.far,_d=this.depthPixels[R*4]/255,_z=_d>0&&_d<1?(_n*_f)/((_f-_n)*_d-_f):_f;this.depthFrame[R]=-_z}else this.depthFrame[R]=this.depthPixels[R*4];if(this.policyController.setDepthImage(this.depthFrame,Y,N),this._appleDepthReadback&&this.policyController._prepareDepthInput(),this.depthRawPixels'
-  ],
-  [
-    'for(let R=0;R<s;R++)this.depthFrame[R]=this._appleDepthReadback?.3+this.depthPixels[R*4]*(2.7/255):this.depthPixels[R*4];if(this.policyController.setDepthImage(this.depthFrame,Y,N),this._appleDepthReadback&&this.policyController._prepareDepthInput(),this.depthRawPixels',
-    'for(let R=0;R<s;R++)if(this._appleDepthReadback){const _n=this.depthCameraView.near,_f=this.depthCameraView.far,_d=this.depthPixels[R*4]/255,_z=_d>0&&_d<1?(_n*_f)/((_f-_n)*_d-_f):_f;this.depthFrame[R]=-_z}else this.depthFrame[R]=this.depthPixels[R*4];if(this.policyController.setDepthImage(this.depthFrame,Y,N),this._appleDepthReadback&&this.policyController._prepareDepthInput(),this.depthRawPixels'
+    APPLE_DECODE
   ],
   [
     'async _initOrt(){wQ.wasm.wasmPaths={mjs:new URL("./ort-wasm-simd-threaded.jsep.mjs",import.meta.url).href,wasm:new URL("./ort-wasm-simd-threaded.jsep-6MnTkKum.wasm",import.meta.url).href},wQ.wasm.numThreads=Math.min(4,navigator.hardwareConcurrency||1)}',
@@ -98,11 +93,26 @@ for (const [from, to] of replacements) {
   applied += 1;
 }
 
+const forbiddenMarkers = [
+  '_appleDepthOverrideMaterial',
+  '_appleDepthCaptureTarget',
+  'overrideMaterial=this._appleDepthOverrideMaterial'
+];
+
+for (const marker of forbiddenMarkers) {
+  if (bundle.includes(marker)) {
+    console.error('Patch should not include override capture path:', marker);
+    process.exit(1);
+  }
+}
+
 const requiredMarkers = [
   'this._appleDepthReadback=/iPad|iPhone|iPod/',
-  'this._appleDepthOverrideMaterial=new hh({depthPacking:ma})',
-  '}).call(this),this._appleDepthReadback&&this.renderer.getContext().finish(),this.renderer.readRenderTargetPixels',
-  '_d=this.depthPixels[R*4]/255',
+  'type:this._appleDepthReadback?xg:hg',
+  'uAppleDepth > 0.5 ? vec4(v, 0.0, 0.0, 1.0)',
+  'this._appleDepthReadback&&this.renderer.getContext().finish()',
+  'this.depthFrame[R]=this._appleDepthReadback?Math.max(.3,Math.min(3,.3+this.depthPixels[R*4]*(2.7/255))):this.depthPixels[R*4]',
+  'this._appleDepthReadback&&this.policyController._prepareDepthInput()',
   'wQ.wasm.numThreads=_appleOrt?1:'
 ];
 

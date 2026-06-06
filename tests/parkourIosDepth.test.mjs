@@ -35,33 +35,23 @@ test('parkour bundle gates Uint8 depth readback behind Apple hardware detection'
   );
   assert.match(
     bundle,
-    /if\(this\._appleDepthReadback\)\{const _n=this\.depthCameraView\.near,_f=this\.depthCameraView\.far,_d=this\.depthPixels\[R\*4\]\/255/,
-    'depth frame decode should use perspectiveDepthToViewZ on Apple'
+    /this\.depthFrame\[R\]=this\._appleDepthReadback\?Math\.max\(\.3,Math\.min\(3,\.3\+this\.depthPixels\[R\*4\]\*\(2\.7\/255\)\)\):this\.depthPixels\[R\*4\]/,
+    'depth frame decode should restore meters from normalized Uint8 on Apple'
   );
   assert.match(
     bundle,
-    /this\._appleDepthOverrideMaterial=new hh\(\{depthPacking:ma\}\)/,
-    'Apple path should use MeshDepthMaterial override for native depth capture'
-  );
-  assert.match(
-    bundle,
-    /overrideMaterial=this\._appleDepthOverrideMaterial/,
-    'Apple path should render depth via scene overrideMaterial'
-  );
-  assert.match(
-    bundle,
-    /\}\)\.call\(this\),this\._appleDepthReadback&&this\.renderer\.getContext\(\)\.finish\(\)/,
-    'Apple depth capture should run inside IIFE in comma-chain render loop'
+    /this\._appleDepthReadback&&this\.policyController\._prepareDepthInput\(\)/,
+    'depth preview should refresh immediately on Apple after capture'
   );
   assert.match(
     bundle,
     /this\._appleDepthReadback&&this\.renderer\.getContext\(\)\.finish\(\)/,
     'Apple path should flush WebGL before readRenderTargetPixels'
   );
-  assert.match(
+  assert.doesNotMatch(
     bundle,
-    /this\._appleDepthReadback&&this\.policyController\._prepareDepthInput\(\)/,
-    'depth preview should refresh immediately on Apple after capture'
+    /_appleDepthOverrideMaterial/,
+    'Apple path must not use MeshDepthMaterial override capture'
   );
 });
 
