@@ -113,7 +113,10 @@ const requiredMarkers = [
   'this._appleDepthReadback&&this.renderer.getContext().finish()',
   'this.depthFrame[R]=this._appleDepthReadback?Math.max(.3,Math.min(3,.3+this.depthPixels[R*4]*(2.7/255))):this.depthPixels[R*4]',
   'this._appleDepthReadback&&this.policyController._prepareDepthInput()',
-  'wQ.wasm.numThreads=_appleOrt?1:'
+  'wQ.wasm.numThreads=_appleOrt?1:',
+  'ort-wasm-simd-threaded.mjs',
+  'this._policyInitError=String(C?.message||C)',
+  'else if(this.depthPreviewPixels&&this.depthPreviewSize&&s)'
 ];
 
 for (const marker of requiredMarkers) {

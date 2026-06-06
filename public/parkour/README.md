@@ -126,6 +126,12 @@ The patch is **Apple-mobile only** — desktop and Android keep the Float32 path
   inference).
 - On iPhone/iPad, ORT is forced to **single-threaded** mode with the worker
   proxy disabled.
+- On iPhone/iPad, ORT loads the **non-JSEP** `ort-wasm-simd-threaded.wasm`
+  (not the JSEP build). WebKit 26 often fails or OOMs with JSEP; desktop keeps
+  JSEP for performance.
+- When the policy backbone is unavailable, the depth HUD preview falls back to
+  subsampled GPU readback so the inset is not blank during ORT init failures.
+- `initPolicy` stores `demo._policyInitError` for the host depth diagnostic.
 
 **If you ever re-pull the upstream build, re-apply all bundle patches.**
 
