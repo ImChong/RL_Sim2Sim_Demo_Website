@@ -613,6 +613,7 @@ import {
   isAppleMobileDevice,
   PARKOUR_IOS_MOUNT_DELAY_MS
 } from '@/utils/appleMobile.js';
+import { getParkourMobilePageUrl } from '@/utils/parkourMobileNavigation.js';
 
 const translations = {
   en: {
@@ -1931,8 +1932,14 @@ export default {
         this.clearParkourKeyboardState();
       }
       if (selected.isExternalDemo) {
+        // iOS WebKit cannot unload host mujoco-js WASM in-process; open a separate
+        // document that never loads the AMP stack (full navigation frees memory).
+        if (isAppleMobileDevice()) {
+          window.location.assign(getParkourMobilePageUrl(import.meta.env.BASE_URL));
+          return;
+        }
         // Entering Parkour: fully release host MuJoCo/ONNX/WebGL so the iframe
-        // is the only WASM + WebGL stack in the tab (critical on iOS memory).
+        // is the only WASM + WebGL stack in the tab.
         this.policyLoadError = '';
         try {
           await this.mountParkourFrameAfterTeardown();

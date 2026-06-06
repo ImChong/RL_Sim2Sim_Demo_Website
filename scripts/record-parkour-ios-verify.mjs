@@ -24,6 +24,8 @@ const OUT_VIDEO = join(OUT_DIR, 'parkour-ios-depth-verify.mp4');
 
 const USE_HOST_APP = process.env.USE_DIRECT_PARKOUR !== '1';
 const BASE_URL = process.env.VITE_URL || 'http://127.0.0.1:3000/';
+const HOST_URL = process.env.PARKOUR_HOST_URL
+  || new URL('parkour-mobile.html', BASE_URL).href;
 const CHROME_PATH =
   process.env.CHROME_PATH ||
   process.env.PUPPETEER_EXECUTABLE_PATH ||
@@ -66,7 +68,9 @@ async function waitForMainReady(page) {
 }
 
 async function selectParkour(page) {
-  if (await page.evaluate(() => Boolean(document.querySelector('.parkour-frame')))) {
+  if (await page.evaluate(() => Boolean(
+    document.querySelector('.parkour-frame, .parkour-mobile-host__frame')
+  ))) {
     return;
   }
   await page.evaluate(() => {
@@ -104,10 +108,10 @@ async function waitForParkourReady(page) {
   if (USE_HOST_APP) {
     await page.waitForFunction(
       () => {
-        const loading = /Loading Simulation|正在加载仿真环境/.test(
-          document.querySelector('.loading-simulation-dialog')?.textContent ?? ''
+        const loading = /Loading Parkour|正在加载跑酷/.test(
+          document.querySelector('.parkour-mobile-host__loading')?.textContent ?? ''
         );
-        return !loading && Boolean(document.querySelector('.parkour-frame'));
+        return !loading && Boolean(document.querySelector('.parkour-mobile-host__frame'));
       },
       { timeout: 240000, polling: 500 }
     );
@@ -195,7 +199,7 @@ async function releaseJoystick(page, point) {
 
 async function postParkourVirtualInput(page, input) {
   await page.evaluate((virtualInput) => {
-    const frame = document.querySelector('.parkour-frame');
+    const frame = document.querySelector('.parkour-frame, .parkour-mobile-host__frame');
     frame?.contentWindow?.postMessage(
       {
         source: 'parkour-host-control',
@@ -288,8 +292,9 @@ async function main() {
     }
   });
 
-  await page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 120000 });
-  if (USE_HOST_APP) {
+  const entryUrl = USE_HOST_APP ? HOST_URL : BASE_URL;
+  await page.goto(entryUrl, { waitUntil: 'domcontentloaded', timeout: 120000 });
+  if (USE_HOST_APP && entryUrl === BASE_URL) {
     await waitForMainReady(page);
     await selectParkour(page);
   }
@@ -392,7 +397,7 @@ async function main() {
     appleDepthReadback: start.appleDepthReadback,
     navigatorPlatform: start.platform,
     maxTouchPoints: start.maxTouchPoints,
-    url: BASE_URL
+    url: entryUrl
   };
   writeFileSync(join(OUT_DIR, 'parkour-ios-depth-verify.json'), JSON.stringify(summary, null, 2));
 

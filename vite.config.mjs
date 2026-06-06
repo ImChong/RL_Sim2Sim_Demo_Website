@@ -43,6 +43,10 @@ export default defineConfig({
   define: { 'process.env': {} },
   build: {
     rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        parkourMobile: fileURLToPath(new URL('./parkour-mobile.html', import.meta.url)),
+      },
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
