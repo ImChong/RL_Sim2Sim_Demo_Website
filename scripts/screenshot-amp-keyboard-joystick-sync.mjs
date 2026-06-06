@@ -11,6 +11,16 @@ const OUT = process.env.SCREENSHOT_PATH
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+function knobOffsetY(style) {
+  const match = /translate\([^,]+,\s*calc\(-50% ([+-]) ([^)]+)\)/.exec(style ?? '');
+  if (!match) {
+    return 0;
+  }
+  const sign = match[1] === '-' ? -1 : 1;
+  const px = parseFloat(match[2]);
+  return Number.isFinite(px) ? sign * px : 0;
+}
+
 async function waitForAmpReady(page) {
   await page.waitForFunction(
     () => {
@@ -37,23 +47,49 @@ async function main() {
   });
   await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 120000 });
   await waitForAmpReady(page);
+  const idleKnob = await page.evaluate(() => {
+    const style = document.querySelector('.amp-mobile-controls__stick-knob')?.getAttribute('style') ?? '';
+    return { style, offsetY: 0 };
+  });
+  idleKnob.offsetY = knobOffsetY(idleKnob.style);
+
   await page.keyboard.down('KeyW');
   await sleep(400);
-  const sync = await page.evaluate(() => {
-    const knob = document.querySelector('.amp-mobile-controls__stick-knob');
-    const style = knob?.getAttribute('style') ?? '';
-    const cmdX = document.querySelector('.controls-body .text-caption')?.textContent;
-    return {
-      knobStyle: style,
-      knobMoved: /translate\([^)]*[1-9]/.test(style)
-    };
+  const normalKnob = await page.evaluate(() => {
+    const style = document.querySelector('.amp-mobile-controls__stick-knob')?.getAttribute('style') ?? '';
+    return { style, offsetY: 0 };
   });
-  if (!sync.knobMoved) {
-    console.warn('Warning: knob may not have moved:', sync);
-  }
+  normalKnob.offsetY = knobOffsetY(normalKnob.style);
+
+  await page.keyboard.down('ShiftLeft');
+  await sleep(300);
+  const sprintKnob = await page.evaluate(() => {
+    const style = document.querySelector('.amp-mobile-controls__stick-knob')?.getAttribute('style') ?? '';
+    return { style, offsetY: 0 };
+  });
+  sprintKnob.offsetY = knobOffsetY(sprintKnob.style);
+
   await page.screenshot({ path: OUT, fullPage: false });
+  await page.keyboard.up('ShiftLeft');
   await page.keyboard.up('KeyW');
-  console.log('OK:', OUT, sync);
+
+  const knobMovedUp = normalKnob.offsetY < idleKnob.offsetY - 4;
+  const sprintFartherThanNormal = sprintKnob.offsetY < normalKnob.offsetY - 4;
+  if (!knobMovedUp) {
+    throw new Error(
+      `AMP joystick knob did not move on KeyW (idle=${idleKnob.offsetY}px, normal=${normalKnob.offsetY}px)`
+    );
+  }
+  if (!sprintFartherThanNormal) {
+    throw new Error(
+      `Shift+W did not push AMP knob farther (normal=${normalKnob.offsetY}px, sprint=${sprintKnob.offsetY}px)`
+    );
+  }
+  console.log('OK:', OUT, {
+    idleOffsetY: idleKnob.offsetY,
+    normalOffsetY: normalKnob.offsetY,
+    sprintOffsetY: sprintKnob.offsetY
+  });
   await browser.close();
 }
 

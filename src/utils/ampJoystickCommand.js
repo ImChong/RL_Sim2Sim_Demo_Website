@@ -3,6 +3,12 @@ import { AMP_CMD_LIMITS, AMP_CMD_SPRINT, AMP_CMD_WALK } from './ampKeyboardComma
 export const AMP_JOYSTICK_DEADZONE = 0.12;
 export const AMP_JOYSTICK_SPRINT_THRESHOLD = 0.85;
 
+/** Keyboard / slider sync: partial deflection for normal speed. */
+export const AMP_JOYSTICK_NORMAL_VISUAL_SCALE = 0.5;
+
+/** Keyboard / slider sync: full deflection for Shift / sprint. */
+export const AMP_JOYSTICK_HIGH_SPEED_VISUAL_SCALE = 1;
+
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
@@ -99,9 +105,12 @@ export function stickVisualFromAmpCommand(cmdX, cmdY, cmdYaw) {
   }
 
   const mag = Math.hypot(normX, normY);
-  if (mag > 1) {
-    normX /= mag;
-    normY /= mag;
+  if (mag > 0) {
+    const scale = useSprint
+      ? AMP_JOYSTICK_HIGH_SPEED_VISUAL_SCALE
+      : AMP_JOYSTICK_NORMAL_VISUAL_SCALE;
+    normX = (normX / mag) * scale;
+    normY = (normY / mag) * scale;
   }
 
   let strafeDirection = 0;

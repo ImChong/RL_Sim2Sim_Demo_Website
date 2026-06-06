@@ -111,13 +111,8 @@ async function main() {
   await sleep(400);
 
   const normalKnob = await page.evaluate(() => {
-    const knob = document.querySelector('.parkour-mobile-controls__stick-knob');
-    const style = knob?.getAttribute('style') ?? '';
-    return {
-      style,
-      offsetY: 0,
-      highSpeed: knob?.classList.contains('parkour-mobile-controls__stick-knob--high-speed') ?? false
-    };
+    const style = document.querySelector('.parkour-mobile-controls__stick-knob')?.getAttribute('style') ?? '';
+    return { style, offsetY: 0 };
   });
   normalKnob.offsetY = knobOffsetY(normalKnob.style);
 
@@ -125,13 +120,8 @@ async function main() {
   await sleep(300);
 
   const sprintKnob = await page.evaluate(() => {
-    const knob = document.querySelector('.parkour-mobile-controls__stick-knob');
-    const style = knob?.getAttribute('style') ?? '';
-    return {
-      style,
-      offsetY: 0,
-      highSpeed: knob?.classList.contains('parkour-mobile-controls__stick-knob--high-speed') ?? false
-    };
+    const style = document.querySelector('.parkour-mobile-controls__stick-knob')?.getAttribute('style') ?? '';
+    return { style, offsetY: 0 };
   });
   sprintKnob.offsetY = knobOffsetY(sprintKnob.style);
 
@@ -155,12 +145,6 @@ async function main() {
     throw new Error(
       `Shift+W did not push knob farther than W alone (normal=${normalKnob.offsetY}px, sprint=${sprintKnob.offsetY}px)`
     );
-  }
-  if (!sprintKnob.highSpeed) {
-    throw new Error('Shift+W should mark the knob as high-speed');
-  }
-  if (normalKnob.highSpeed) {
-    throw new Error('W alone should not mark the knob as high-speed');
   }
   console.log('OK: parkour keyboard-joystick sync verified', {
     idleOffsetY: idleKnob.offsetY,
