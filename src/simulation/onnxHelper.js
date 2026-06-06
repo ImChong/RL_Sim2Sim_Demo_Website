@@ -1,6 +1,7 @@
 import * as ort from 'onnxruntime-web';
 import { readResponseBodyWithProgress } from './fetchWithProgress.js';
 import { parseOnnxArchitecture } from './onnxArchitecture.js';
+import { releaseOnnxSession } from './hostDemoLifecycle.js';
 
 export class ONNXModule {
   constructor(config) {
@@ -45,6 +46,11 @@ export class ONNXModule {
 
     console.log("inputNames", this.session.inputNames);
     console.log("outputNames", this.session.outputNames);
+  }
+
+  async release() {
+    await releaseOnnxSession(this.session);
+    this.session = null;
   }
 
   initInput() {

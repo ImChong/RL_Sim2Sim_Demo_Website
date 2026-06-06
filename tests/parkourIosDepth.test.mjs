@@ -125,7 +125,7 @@ test('parkour ORT init uses non-JSEP wasm on Apple hardware', () => {
   );
 });
 
-test('parkour ORT uses low-memory session options and early preload on Apple', () => {
+test('parkour ORT uses low-memory session options and boot preload on Apple', () => {
   const bundle = readFileSync(bundlePath, 'utf8');
 
   assert.match(
@@ -135,23 +135,32 @@ test('parkour ORT uses low-memory session options and early preload on Apple', (
   );
   assert.match(
     bundle,
-    /Xo\.create\(g,this\._ortOpts\(\)\)/,
-    'ORT sessions should use _ortOpts() instead of hard-coded graphOptimizationLevel all'
+    /graphOptimizationLevel:"disabled",enableCpuMemArena:!1,enableMemPattern:!1/,
+    'Apple ORT sessions should use disabled graph optimization and no arena'
   );
   assert.match(
     bundle,
-    /enableCpuMemArena:!1,enableMemPattern:!1/,
-    'Apple ORT sessions should disable arena and mem pattern to reduce peak WASM heap'
+    /Xo\.create\(A,this\._ortOpts\(\)\)/,
+    'Apple ORT sessions should load from URL without duplicate ArrayBuffer'
   );
   assert.match(
     bundle,
-    /async beginPolicyPreload\(\)/,
-    'demo should preload ORT sessions before MuJoCo on Apple'
+    /Boot policy preload failed:/,
+    'bundle should boot-preload ORT before MuJoCo tk()'
+  );
+  assert.ok(
+    bundle.indexOf('let _applePrePol') < bundle.indexOf('const $g=await tk()'),
+    'boot ORT preload must run before MuJoCo WASM init'
   );
   assert.match(
     bundle,
-    /await this\.beginPolicyPreload\(\)/,
-    'demo init should call beginPolicyPreload on Apple hardware'
+    /await this\.initPolicy\(this\._applePrePolicy\?\?null\)/,
+    'demo init should finish preloaded policy after MuJoCo scene load'
+  );
+  assert.match(
+    bundle,
+    /I\.mujoco=this\.mujoco/,
+    'preloaded policy controller should receive real MuJoCo reference'
   );
   assert.match(
     bundle,

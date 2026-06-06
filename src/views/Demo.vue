@@ -895,7 +895,7 @@ export default {
     controlPanelWidth: loadControlPanelSize().width,
     controlPanelHeight: loadControlPanelSize().height,
     controlPanelResize: null,
-    parkourSuspended: false,
+    parkourHostTeardown: false,
     parkourLoading: false,
     parkourLoadProgress: 0,
     parkourReceivedProgress: false,
@@ -1250,41 +1250,79 @@ export default {
       }
 
       try {
-        await this.runWithSimulationLoading(async (report) => {
-          report(0.02);
-          const mujoco = await loadMujoco();
-          report(0.10);
-          this.demo = new MuJoCoDemo(mujoco);
-          this.demo.setVisualTheme?.(this.visualTheme);
-          this.demo.setFollowEnabled?.(this.cameraFollowEnabled);
-          await this.demo.init((r) => {
-            report(0.10 + 0.90 * r);
-          });
-          report(1);
-        });
-        this.demo.main_loop();
-        this.demo.params.paused = false;
-        this.reapplyCustomMotions();
-        this.availableMotions = this.getAvailableMotions();
-        this.currentMotion = this.demo.params.current_motion ?? this.availableMotions[0] ?? null;
-        this.complianceEnabled = Boolean(this.demo.params?.compliance_enabled);
-        const threshold = Number(this.demo.params?.compliance_threshold);
-        if (Number.isFinite(threshold)) {
-          this.complianceThreshold = threshold;
-        }
-        this.startTrackingPoll();
-        this.renderScale = this.demo.renderScale ?? this.renderScale;
-        this.reflectionQuality = this.demo.reflectionQuality ?? this.reflectionQuality;
+        const defaultPolicy = this.policies.find((policy) => policy.value === 'g1-amp-walk-run-getup');
+        await this.runWithSimulationLoading((report) => this.initHostDemo(defaultPolicy, report));
         const matchingPolicy = this.policies.find(
           (policy) => policy.policyPath === this.demo.currentPolicyPath
         );
         if (matchingPolicy) {
           this.currentPolicy = matchingPolicy.value;
         }
-        this.policyLabel = this.demo.currentPolicyPath?.split('/').pop() ?? this.policyLabel;
       } catch (error) {
         console.error(error);
       }
+    },
+    async initHostDemo(selected, report) {
+      if (!selected || selected.isExternalDemo) {
+        throw new Error('initHostDemo requires a MuJoCo policy');
+      }
+      report(0.02);
+      const mujoco = await loadMujoco();
+      report(0.10);
+      this.demo = new MuJoCoDemo(mujoco);
+      this.demo.setVisualTheme?.(this.visualTheme);
+      this.demo.setFollowEnabled?.(this.cameraFollowEnabled);
+      const scenePath = selected.scenePath ?? 'g1_amp/scene_g1.xml';
+      await this.demo.switchSceneAndPolicy(scenePath, selected.policyPath, {
+        onnxPath: selected.onnxPath || undefined,
+        onProgress: (ratio) => {
+          report(0.10 + 0.90 * ratio);
+        }
+      });
+      report(1);
+      this.demo.main_loop();
+      this.demo.params.paused = false;
+      this.syncHostDemoUiState(selected);
+    },
+    syncHostDemoUiState(selected) {
+      this.reapplyCustomMotions();
+      this.availableMotions = this.getAvailableMotions();
+      this.currentMotion = this.demo.params.current_motion ?? this.availableMotions[0] ?? null;
+      this.complianceEnabled = Boolean(this.demo.params?.compliance_enabled);
+      const threshold = Number(this.demo.params?.compliance_threshold);
+      if (Number.isFinite(threshold)) {
+        this.complianceThreshold = threshold;
+      }
+      this.startTrackingPoll();
+      this.renderScale = this.demo.renderScale ?? this.renderScale;
+      this.reflectionQuality = this.demo.reflectionQuality ?? this.reflectionQuality;
+      this.policyLabel = selected.policyPath?.split('/').pop() ?? this.policyLabel;
+    },
+    async teardownHostDemoForParkour() {
+      this.stopTrackingPoll();
+      if (!this.demo) {
+        this.parkourHostTeardown = true;
+        return;
+      }
+      try {
+        await this.demo.dispose();
+      } catch (error) {
+        console.error('Failed to tear down host MuJoCo demo for Parkour:', error);
+      }
+      this.demo = null;
+      this.parkourHostTeardown = true;
+      this.simStepHz = 0;
+      this.trackingState = {
+        available: false,
+        currentName: 'default',
+        currentDone: true,
+        refIdx: 0,
+        refLen: 0,
+        transitionLen: 0,
+        motionLen: 0,
+        inTransition: false,
+        isDefault: true
+      };
     },
     reapplyCustomMotions() {
       if (!this.demo || !this.customMotions) {
@@ -1870,23 +1908,28 @@ export default {
         this.clearParkourKeyboardState();
       }
       if (selected.isExternalDemo) {
-        // Entering the embedded Parkour demo: pause physics and stop the MuJoCo
-        // render loop so we don't run two WebGL apps at once. The iframe mounts
-        // via v-if="isParkourPolicy".
-        if (this.demo && !this.parkourSuspended) {
-          this.demo.suspendRendering();
-          this.parkourSuspended = true;
-        }
+        // Entering Parkour: fully release host MuJoCo/ONNX/WebGL so the iframe
+        // is the only WASM + WebGL stack in the tab (critical on iOS memory).
+        await this.teardownHostDemoForParkour();
         this.startParkourLoad();
         this.policyLoadError = '';
         return;
       }
-      // Leaving the Parkour demo for a MuJoCo policy: resume the render loop.
-      // (The iframe is unmounted by v-if, freeing its WebGL/WASM context.)
-      if (this.parkourSuspended && this.demo) {
+      // Leaving Parkour: cold-start the host demo for the selected MuJoCo policy.
+      if (this.parkourHostTeardown) {
         this.clearParkourVirtualInput();
-        this.demo.resumeRendering();
-        this.parkourSuspended = false;
+        this.policyLoadError = '';
+        try {
+          await this.runWithSimulationLoading((report) => this.initHostDemo(selected, report));
+          this.parkourHostTeardown = false;
+          if (this.isAmpPolicy) {
+            this.resetAmpCommandSliders();
+          }
+        } catch (error) {
+          console.error('Failed to restore host MuJoCo demo after Parkour:', error);
+          this.policyLoadError = error instanceof Error ? error.message : 'An unexpected error occurred';
+        }
+        return;
       }
       if (!this.demo) {
         return;
@@ -2271,6 +2314,10 @@ export default {
   beforeUnmount() {
     this.endControlPanelResize();
     this.stopTrackingPoll();
+    if (this.demo) {
+      this.demo.dispose?.();
+      this.demo = null;
+    }
     this.clearParkourLoadTimers();
     if (this.parkour_message_listener) {
       window.removeEventListener('message', this.parkour_message_listener);
