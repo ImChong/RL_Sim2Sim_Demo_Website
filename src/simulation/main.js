@@ -13,7 +13,11 @@ import {
 } from './mujocoUtils.js';
 import { getSimulationThemeSettings, normalizeSimulationThemeName } from './theme.js';
 import { REFLECTION_QUALITY_PRESETS } from './reflectionQuality.js';
-import { disposeObject3D, disposeWebGLRenderer } from './hostDemoLifecycle.js';
+import {
+  clearHostDemoContainer,
+  disposeObject3D,
+  disposeWebGLRenderer
+} from './hostDemoLifecycle.js';
 
 const defaultPolicy = './examples/checkpoints/g1/amp_policy_walk_run_getup.json';
 const defaultScene = 'g1_amp/scene_g1.xml';
@@ -316,9 +320,16 @@ export class MuJoCoDemo {
     }
 
     this.controls?.dispose?.();
+    if (this.dragStateManager?.arrow) {
+      this.scene?.remove(this.dragStateManager.arrow);
+      disposeObject3D(this.dragStateManager.arrow);
+      this.dragStateManager.arrow = null;
+    }
+    this.dragStateManager = null;
     disposeObject3D(this.scene);
     disposeWebGLRenderer(this.renderer);
     this.renderer = null;
+    clearHostDemoContainer(this.container);
 
     try {
       if (this.mujoco?.FS?.analyzePath('/working')?.exists) {
@@ -327,6 +338,27 @@ export class MuJoCoDemo {
     } catch (error) {
       console.warn('MuJoCo MEMFS unmount failed:', error);
     }
+
+    this.mujoco = null;
+    this.scene = null;
+    this.camera = null;
+    this.container = null;
+    this.controls = null;
+    this.bodies = {};
+    this.lights = {};
+    this.reflectors = [];
+    this._cachedPolicyState = {
+      jointPos: null,
+      jointVel: null,
+      rootPos: new Float32Array(3),
+      rootQuat: new Float32Array(4),
+      rootAngVel: new Float32Array(3),
+      qvel_base: null,
+      complianceEnabled: false,
+      complianceThreshold: 10.0,
+      cmd: [0.0, 0.0, 0.0]
+    };
+    this._cachedPolicyState.qvel_base = this._cachedPolicyState.rootAngVel;
   }
 
   setVisualTheme(name) {

@@ -22,8 +22,11 @@
     @pause="onParkourPause"
     @reset-run="onParkourResetRun"
   />
-  <div id="mujoco-container"></div>
-  <div v-if="isParkourPolicy" class="parkour-frame-wrap">
+  <div
+    id="mujoco-container"
+    v-show="!isParkourPolicy || !parkourFrameMounted"
+  ></div>
+  <div v-if="isParkourPolicy && parkourFrameMounted" class="parkour-frame-wrap">
     <iframe
       ref="parkourFrame"
       :key="parkourReloadKey"
@@ -606,6 +609,10 @@ import {
   fetchParkourBundleIosPatchStatus,
   formatParkourDepthDiagnosticReport
 } from '@/utils/parkourDepthDiagnostic.js';
+import {
+  isAppleMobileDevice,
+  PARKOUR_IOS_MOUNT_DELAY_MS
+} from '@/utils/appleMobile.js';
 
 const translations = {
   en: {
@@ -907,7 +914,8 @@ export default {
     parkourDepthDiagnosticOpen: false,
     parkourDepthDiagnosticReport: null,
     parkourDepthDiagnosticText: '',
-    parkourDepthDiagnosticCopied: false
+    parkourDepthDiagnosticCopied: false,
+    parkourFrameMounted: false
   }),
   computed: {
     desktopControlsPanelStyle() {
@@ -1031,7 +1039,7 @@ export default {
       return this.isAmpPolicy && !this.isParkourPolicy;
     },
     showParkourJoystick() {
-      return this.isParkourPolicy;
+      return this.isParkourPolicy && this.parkourFrameMounted;
     },
     ampJoystickLabels() {
       return {
@@ -1262,6 +1270,14 @@ export default {
         console.error(error);
       }
     },
+    async mountParkourFrameAfterTeardown() {
+      this.parkourFrameMounted = false;
+      await this.teardownHostDemoForParkour();
+      if (isAppleMobileDevice()) {
+        await new Promise((resolve) => setTimeout(resolve, PARKOUR_IOS_MOUNT_DELAY_MS));
+      }
+      this.parkourFrameMounted = true;
+    },
     async initHostDemo(selected, report) {
       if (!selected || selected.isExternalDemo) {
         throw new Error('initHostDemo requires a MuJoCo policy');
@@ -1300,6 +1316,12 @@ export default {
     },
     async teardownHostDemoForParkour() {
       this.stopTrackingPoll();
+      this.clearAmpKeyboardState();
+      this.customMotions = {};
+      this.motionUploadFiles = [];
+      this.motionUploadMessage = '';
+      this.availableMotions = [];
+      this.currentMotion = null;
       if (!this.demo) {
         this.parkourHostTeardown = true;
         return;
@@ -1310,6 +1332,7 @@ export default {
         console.error('Failed to tear down host MuJoCo demo for Parkour:', error);
       }
       this.demo = null;
+      document.getElementById('mujoco-container')?.replaceChildren();
       this.parkourHostTeardown = true;
       this.simStepHz = 0;
       this.trackingState = {
@@ -1910,11 +1933,18 @@ export default {
       if (selected.isExternalDemo) {
         // Entering Parkour: fully release host MuJoCo/ONNX/WebGL so the iframe
         // is the only WASM + WebGL stack in the tab (critical on iOS memory).
-        await this.teardownHostDemoForParkour();
-        this.startParkourLoad();
         this.policyLoadError = '';
+        try {
+          await this.mountParkourFrameAfterTeardown();
+          this.startParkourLoad();
+        } catch (error) {
+          console.error('Failed to enter Parkour:', error);
+          this.parkourFrameMounted = false;
+          this.policyLoadError = error instanceof Error ? error.message : 'An unexpected error occurred';
+        }
         return;
       }
+      this.parkourFrameMounted = false;
       // Leaving Parkour: cold-start the host demo for the selected MuJoCo policy.
       if (this.parkourHostTeardown) {
         this.clearParkourVirtualInput();

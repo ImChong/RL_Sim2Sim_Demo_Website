@@ -49,3 +49,11 @@ export function disposeWebGLRenderer(renderer) {
   loseContext?.loseContext();
   renderer.domElement?.remove();
 }
+
+/** @param {HTMLElement | null | undefined} container */
+export function clearHostDemoContainer(container) {
+  if (!container) {
+    return;
+  }
+  container.replaceChildren();
+}
