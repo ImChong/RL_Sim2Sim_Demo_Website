@@ -70,7 +70,7 @@ const replacements = [
   ],
   [
     'this.renderer.setRenderTarget(this.depthTarget),this.renderer.clear(),this.renderer.render(this.scene,this.depthCameraView),this.renderer.setRenderTarget(null),this.depthInferenceMaterial.uniforms.cameraNear.value=this.depthCameraView.near,this.depthInferenceMaterial.uniforms.cameraFar.value=this.depthCameraView.far,this.renderer.setRenderTarget(this.depthInferenceTarget),this.renderer.clear(),this.renderer.render(this.depthInferenceScene,this.depthCamera),this.renderer.readRenderTargetPixels(this.depthInferenceTarget,0,0,this.depthInset.width,this.depthInset.height,this.depthPixels)',
-    'if(this._appleDepthReadback){const _ap=this.scene.overrideMaterial;this.scene.overrideMaterial=this._appleDepthOverrideMaterial,this.renderer.setRenderTarget(this.depthInferenceTarget),this.renderer.clear(),this.renderer.render(this.scene,this.depthCameraView),this.scene.overrideMaterial=_ap}else{this.renderer.setRenderTarget(this.depthTarget),this.renderer.clear(),this.renderer.render(this.scene,this.depthCameraView),this.renderer.setRenderTarget(null),this.depthInferenceMaterial.uniforms.cameraNear.value=this.depthCameraView.near,this.depthInferenceMaterial.uniforms.cameraFar.value=this.depthCameraView.far,this.renderer.setRenderTarget(this.depthInferenceTarget),this.renderer.clear(),this.renderer.render(this.depthInferenceScene,this.depthCamera)};this._appleDepthReadback&&this.renderer.getContext().finish(),this.renderer.readRenderTargetPixels(this.depthInferenceTarget,0,0,this.depthInset.width,this.depthInset.height,this.depthPixels)'
+    '(function(){if(this._appleDepthReadback){const _ap=this.scene.overrideMaterial;this.scene.overrideMaterial=this._appleDepthOverrideMaterial,this.renderer.setRenderTarget(this.depthInferenceTarget),this.renderer.clear(),this.renderer.render(this.scene,this.depthCameraView),this.scene.overrideMaterial=_ap}else{this.renderer.setRenderTarget(this.depthTarget),this.renderer.clear(),this.renderer.render(this.scene,this.depthCameraView),this.renderer.setRenderTarget(null),this.depthInferenceMaterial.uniforms.cameraNear.value=this.depthCameraView.near,this.depthInferenceMaterial.uniforms.cameraFar.value=this.depthCameraView.far,this.renderer.setRenderTarget(this.depthInferenceTarget),this.renderer.clear(),this.renderer.render(this.depthInferenceScene,this.depthCamera)}}).call(this),this._appleDepthReadback&&this.renderer.getContext().finish(),this.renderer.readRenderTargetPixels(this.depthInferenceTarget,0,0,this.depthInset.width,this.depthInset.height,this.depthPixels)'
   ],
   [
     'for(let R=0;R<s;R++)this.depthFrame[R]=this.depthPixels[R*4];if(this.policyController.setDepthImage(this.depthFrame,Y,N),this.depthRawPixels',
@@ -101,7 +101,7 @@ for (const [from, to] of replacements) {
 const requiredMarkers = [
   'this._appleDepthReadback=/iPad|iPhone|iPod/',
   'this._appleDepthOverrideMaterial=new hh({depthPacking:ma})',
-  'overrideMaterial=this._appleDepthOverrideMaterial',
+  '}).call(this),this._appleDepthReadback&&this.renderer.getContext().finish(),this.renderer.readRenderTargetPixels',
   '_d=this.depthPixels[R*4]/255',
   'wQ.wasm.numThreads=_appleOrt?1:'
 ];

@@ -50,6 +50,11 @@ test('parkour bundle gates Uint8 depth readback behind Apple hardware detection'
   );
   assert.match(
     bundle,
+    /\}\)\.call\(this\),this\._appleDepthReadback&&this\.renderer\.getContext\(\)\.finish\(\)/,
+    'Apple depth capture should run inside IIFE in comma-chain render loop'
+  );
+  assert.match(
+    bundle,
     /this\._appleDepthReadback&&this\.renderer\.getContext\(\)\.finish\(\)/,
     'Apple path should flush WebGL before readRenderTargetPixels'
   );
