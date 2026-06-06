@@ -2139,6 +2139,17 @@ export default {
   height: 100%;
   border: 0;
 }
+.parkour-depth-diagnostic-hints {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.parkour-depth-diagnostic-text :deep(textarea) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .parkour-controls {
   display: flex;
   flex-direction: column;
