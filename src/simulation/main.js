@@ -18,6 +18,12 @@ import { disposeObject3D, disposeWebGLRenderer } from './hostDemoLifecycle.js';
 const defaultPolicy = './examples/checkpoints/g1/amp_policy_walk_run_getup.json';
 const defaultScene = 'g1_amp/scene_g1.xml';
 
+/** Whether MuJoCo scene assets must be loaded before applying a policy. */
+export function needsSceneReload(currentScenePath, nextScenePath, model) {
+  const next = nextScenePath ?? defaultScene;
+  return next !== currentScenePath || !model;
+}
+
 /** Horizontal knockdown push magnitude (N), applied in world XY; local Z (vertical) force component is zero. */
 const KNOCKDOWN_FORCE_XY_MAG = 3400;
 
@@ -207,17 +213,17 @@ export class MuJoCoDemo {
   async switchSceneAndPolicy(scenePath, policyPath, options = {}) {
     const nextScenePath = scenePath ?? defaultScene;
     const nextPolicyPath = policyPath ?? defaultPolicy;
-    const needsSceneReload = nextScenePath !== this.currentScenePath;
+    const shouldReloadScene = needsSceneReload(this.currentScenePath, nextScenePath, this.model);
     const report = (t) => {
       if (typeof options.onProgress === 'function') {
         options.onProgress(Math.min(1, Math.max(0, t)));
       }
     };
-    const sceneDownload = needsSceneReload ? 0.52 : 0;
-    const sceneBuild = needsSceneReload ? 0.13 : 0;
+    const sceneDownload = shouldReloadScene ? 0.52 : 0;
+    const sceneBuild = shouldReloadScene ? 0.13 : 0;
     const policyWeight = 1 - sceneDownload - sceneBuild;
 
-    if (needsSceneReload) {
+    if (shouldReloadScene) {
       while (this.policyRunner?.isInferencing) {
         await new Promise((resolve) => setTimeout(resolve, 10));
       }

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { releaseOnnxSession } from '../src/simulation/hostDemoLifecycle.js';
+import { needsSceneReload } from '../src/simulation/main.js';
 
 test('releaseOnnxSession calls session.release and swallows errors', async () => {
   let released = false;
@@ -17,4 +18,11 @@ test('releaseOnnxSession calls session.release and swallows errors', async () =>
     }
   }));
   await assert.doesNotReject(() => releaseOnnxSession(null));
+});
+
+test('needsSceneReload loads scene when model is missing even if path matches', () => {
+  const scene = 'g1_amp/scene_g1.xml';
+  assert.equal(needsSceneReload(scene, scene, null), true);
+  assert.equal(needsSceneReload(scene, scene, {}), false);
+  assert.equal(needsSceneReload(scene, 'g1/g1.xml', {}), true);
 });
