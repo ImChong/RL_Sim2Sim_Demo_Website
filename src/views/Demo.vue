@@ -23,7 +23,7 @@
     @reset-run="onParkourResetRun"
   />
   <div id="mujoco-container"></div>
-  <div v-if="isParkourPolicy" class="parkour-frame-wrap">
+  <div v-if="isParkourPolicy && parkourFrameMounted" class="parkour-frame-wrap">
     <iframe
       ref="parkourFrame"
       :key="parkourReloadKey"
@@ -56,6 +56,16 @@
       class="safari-alert"
     >
       {{ t.safariAlert }}
+    </v-alert>
+    <v-alert
+      v-if="hostDemoDeferred && !isParkourPolicy"
+      type="info"
+      variant="flat"
+      density="compact"
+      class="apple-deferred-alert"
+      data-test="apple-deferred-policy-hint"
+    >
+      {{ t.appleDeferredPolicyHint }}
     </v-alert>
   </div>
   <div
@@ -133,6 +143,7 @@
           class="mt-2"
           :label="t.selectPolicy"
           :aria-label="t.selectPolicy"
+          :placeholder="hostDemoDeferred ? t.selectPolicyToStart : undefined"
           density="compact"
           hide-details
           item-title="title"
@@ -606,11 +617,18 @@ import {
   fetchParkourBundleIosPatchStatus,
   formatParkourDepthDiagnosticReport
 } from '@/utils/parkourDepthDiagnostic.js';
+import {
+  isAppleMobileDevice,
+  PARKOUR_IOS_MOUNT_DELAY_MS
+} from '@/utils/appleMobile.js';
 
 const translations = {
   en: {
     mobileModeAlert: 'Mobile mode is enabled. The control panel has been compacted and docked to the bottom for touch interaction.',
     safariAlert: 'Safari has lower memory limits, which can cause WASM to crash.',
+    appleDeferredPolicyHint:
+      'On iPhone/iPad, pick a policy below to load the demo. Choose Parkour directly to avoid loading AMP first.',
+    selectPolicyToStart: 'Select a policy to start',
     panelTitle: 'General Tracking Demo',
     expandControlPanel: 'Expand control panel',
     collapseControlPanel: 'Collapse control panel',
@@ -708,6 +726,9 @@ const translations = {
   zh: {
     mobileModeAlert: '已启用移动端模式，控制面板已精简并停靠到底部，便于触控操作。',
     safariAlert: 'Safari 的内存限制较低，可能导致 WASM 崩溃。',
+    appleDeferredPolicyHint:
+      'iPhone/iPad 上请先在下方选择策略再加载演示。若要跑酷，请直接选择 Parkour，避免先加载 AMP 占用内存。',
+    selectPolicyToStart: '请选择策略以开始',
     panelTitle: '通用跟踪演示',
     expandControlPanel: '展开控制面板',
     collapseControlPanel: '收起控制面板',
@@ -907,7 +928,9 @@ export default {
     parkourDepthDiagnosticOpen: false,
     parkourDepthDiagnosticReport: null,
     parkourDepthDiagnosticText: '',
-    parkourDepthDiagnosticCopied: false
+    parkourDepthDiagnosticCopied: false,
+    hostDemoDeferred: false,
+    parkourFrameMounted: false
   }),
   computed: {
     desktopControlsPanelStyle() {
@@ -1031,7 +1054,7 @@ export default {
       return this.isAmpPolicy && !this.isParkourPolicy;
     },
     showParkourJoystick() {
-      return this.isParkourPolicy;
+      return this.isParkourPolicy && this.parkourFrameMounted;
     },
     ampJoystickLabels() {
       return {
@@ -1249,6 +1272,15 @@ export default {
         return;
       }
 
+      // iPhone/iPad WebKit cannot reliably load AMP then Parkour in one tab; defer
+      // the host MuJoCo stack until the user picks a policy (ideally Parkour).
+      if (isAppleMobileDevice()) {
+        this.hostDemoDeferred = true;
+        this.currentPolicy = null;
+        this.state = 1;
+        return;
+      }
+
       try {
         const defaultPolicy = this.policies.find((policy) => policy.value === 'g1-amp-walk-run-getup');
         await this.runWithSimulationLoading((report) => this.initHostDemo(defaultPolicy, report));
@@ -1261,6 +1293,14 @@ export default {
       } catch (error) {
         console.error(error);
       }
+    },
+    async mountParkourFrameAfterTeardown() {
+      this.parkourFrameMounted = false;
+      await this.teardownHostDemoForParkour();
+      if (isAppleMobileDevice()) {
+        await new Promise((resolve) => setTimeout(resolve, PARKOUR_IOS_MOUNT_DELAY_MS));
+      }
+      this.parkourFrameMounted = true;
     },
     async initHostDemo(selected, report) {
       if (!selected || selected.isExternalDemo) {
@@ -1910,11 +1950,19 @@ export default {
       if (selected.isExternalDemo) {
         // Entering Parkour: fully release host MuJoCo/ONNX/WebGL so the iframe
         // is the only WASM + WebGL stack in the tab (critical on iOS memory).
-        await this.teardownHostDemoForParkour();
-        this.startParkourLoad();
         this.policyLoadError = '';
+        try {
+          await this.mountParkourFrameAfterTeardown();
+          this.hostDemoDeferred = false;
+          this.startParkourLoad();
+        } catch (error) {
+          console.error('Failed to enter Parkour:', error);
+          this.parkourFrameMounted = false;
+          this.policyLoadError = error instanceof Error ? error.message : 'An unexpected error occurred';
+        }
         return;
       }
+      this.parkourFrameMounted = false;
       // Leaving Parkour: cold-start the host demo for the selected MuJoCo policy.
       if (this.parkourHostTeardown) {
         this.clearParkourVirtualInput();
@@ -1922,6 +1970,7 @@ export default {
         try {
           await this.runWithSimulationLoading((report) => this.initHostDemo(selected, report));
           this.parkourHostTeardown = false;
+          this.hostDemoDeferred = false;
           if (this.isAmpPolicy) {
             this.resetAmpCommandSliders();
           }
@@ -1932,6 +1981,17 @@ export default {
         return;
       }
       if (!this.demo) {
+        this.policyLoadError = '';
+        try {
+          await this.runWithSimulationLoading((report) => this.initHostDemo(selected, report));
+          this.hostDemoDeferred = false;
+          if (this.isAmpPolicy) {
+            this.resetAmpCommandSliders();
+          }
+        } catch (error) {
+          console.error('Failed to load host MuJoCo demo:', error);
+          this.policyLoadError = error instanceof Error ? error.message : 'An unexpected error occurred';
+        }
         return;
       }
       const targetScenePath = selected.scenePath ?? 'g1_amp/scene_g1.xml';
