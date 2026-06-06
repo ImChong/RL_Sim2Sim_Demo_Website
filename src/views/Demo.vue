@@ -1330,16 +1330,19 @@ export default {
       const stickBase = this.$refs.parkourJoystick?.$refs?.moveBase;
       if (panel && padEl && stickBase) {
         const viewportHeight = window.innerHeight;
-        const panelTopFromBottom = viewportHeight - panel.getBoundingClientRect().top;
+        const panelRect = panel.getBoundingClientRect();
+        const panelTopFromBottom = viewportHeight - panelRect.top;
         const stickRect = stickBase.getBoundingClientRect();
         const joystickCenterFromBottom = viewportHeight - (stickRect.top + stickRect.height / 2);
         const joystickPadLeft = padEl.getBoundingClientRect().left;
+        const leftOffset = Math.round(panelRect.left);
         return {
           ...computeParkourMobileDepthLayoutWithClearance({
             panelTopFromBottom,
             joystickCenterFromBottom,
             joystickPadLeft,
-            preferredScale: scale
+            preferredScale: scale,
+            leftOffset
           }),
           depthPreviewCornerRadiusPx: cornerRadiusPx
         };
