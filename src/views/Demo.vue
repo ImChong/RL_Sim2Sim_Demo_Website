@@ -577,8 +577,6 @@
 </template>
 
 <script>
-import { MuJoCoDemo } from '@/simulation/main.js';
-import loadMujoco from 'mujoco-js';
 import ModelIOFlowchart from '@/components/ModelIOFlowchart.vue';
 import AmpMobileJoystick from '@/components/AmpMobileJoystick.vue';
 import ParkourMobileJoystick from '@/components/ParkourMobileJoystick.vue';
@@ -613,7 +611,10 @@ import {
   isAppleMobileDevice,
   PARKOUR_IOS_MOUNT_DELAY_MS
 } from '@/utils/appleMobile.js';
-import { getParkourMobilePageUrl } from '@/utils/parkourMobileNavigation.js';
+import {
+  consumeIosBootPolicy,
+  scheduleIosPolicyBoot
+} from '@/utils/iosPolicyBoot.js';
 
 const translations = {
   en: {
@@ -916,7 +917,8 @@ export default {
     parkourDepthDiagnosticReport: null,
     parkourDepthDiagnosticText: '',
     parkourDepthDiagnosticCopied: false,
-    parkourFrameMounted: false
+    parkourFrameMounted: false,
+    policyBeforeChange: 'g1-amp-walk-run-getup'
   }),
   computed: {
     desktopControlsPanelStyle() {
@@ -1259,17 +1261,32 @@ export default {
       }
 
       try {
-        const defaultPolicy = this.policies.find((policy) => policy.value === 'g1-amp-walk-run-getup');
-        await this.runWithSimulationLoading((report) => this.initHostDemo(defaultPolicy, report));
-        const matchingPolicy = this.policies.find(
-          (policy) => policy.policyPath === this.demo.currentPolicyPath
-        );
-        if (matchingPolicy) {
-          this.currentPolicy = matchingPolicy.value;
+        const iosBootPolicy = isAppleMobileDevice() ? consumeIosBootPolicy() : null;
+        if (iosBootPolicy === 'g1-parkour') {
+          await this.bootParkourOnlyOnIos();
+          return;
         }
+
+        const bootHostPolicy = iosBootPolicy
+          ? this.policies.find((policy) => policy.value === iosBootPolicy && !policy.isExternalDemo)
+          : null;
+        const defaultPolicy = this.policies.find((policy) => policy.value === 'g1-amp-walk-run-getup');
+        const selected = bootHostPolicy ?? defaultPolicy;
+        await this.runWithSimulationLoading((report) => this.initHostDemo(selected, report));
+        this.parkourHostTeardown = false;
+        this.currentPolicy = selected.value;
+        this.policyBeforeChange = selected.value;
       } catch (error) {
         console.error(error);
       }
+    },
+    async bootParkourOnlyOnIos() {
+      this.currentPolicy = 'g1-parkour';
+      this.policyBeforeChange = 'g1-parkour';
+      this.parkourHostTeardown = true;
+      this.state = 1;
+      await this.mountParkourFrameAfterTeardown();
+      this.startParkourLoad();
     },
     async mountParkourFrameAfterTeardown() {
       this.parkourFrameMounted = false;
@@ -1284,7 +1301,11 @@ export default {
         throw new Error('initHostDemo requires a MuJoCo policy');
       }
       report(0.02);
-      const mujoco = await loadMujoco();
+      const [{ MuJoCoDemo }, loadMujocoModule] = await Promise.all([
+        import('@/simulation/main.js'),
+        import('mujoco-js')
+      ]);
+      const mujoco = await loadMujocoModule.default();
       report(0.10);
       this.demo = new MuJoCoDemo(mujoco);
       this.demo.setVisualTheme?.(this.visualTheme);
@@ -1925,6 +1946,8 @@ export default {
       if (!selected) {
         return;
       }
+      const previousPolicy = this.policies.find((policy) => policy.value === this.policyBeforeChange);
+      try {
       if (!value?.startsWith('g1-amp')) {
         this.clearAmpKeyboardState();
       }
@@ -1932,10 +1955,9 @@ export default {
         this.clearParkourKeyboardState();
       }
       if (selected.isExternalDemo) {
-        // iOS WebKit cannot unload host mujoco-js WASM in-process; open a separate
-        // document that never loads the AMP stack (full navigation frees memory).
+        // iOS: reload the same page so only the parkour iframe stack is loaded.
         if (isAppleMobileDevice()) {
-          window.location.assign(getParkourMobilePageUrl(import.meta.env.BASE_URL));
+          scheduleIosPolicyBoot('g1-parkour');
           return;
         }
         // Entering Parkour: fully release host MuJoCo/ONNX/WebGL so the iframe
@@ -1952,6 +1974,10 @@ export default {
         return;
       }
       this.parkourFrameMounted = false;
+      if (previousPolicy?.isExternalDemo && isAppleMobileDevice()) {
+        scheduleIosPolicyBoot(value);
+        return;
+      }
       // Leaving Parkour: cold-start the host demo for the selected MuJoCo policy.
       if (this.parkourHostTeardown) {
         this.clearParkourVirtualInput();
@@ -2001,6 +2027,9 @@ export default {
         this.policyLoadError = error instanceof Error ? error.message : 'An unexpected error occurred';
       } finally {
         this.demo.params.paused = wasPaused;
+      }
+      } finally {
+        this.policyBeforeChange = value;
       }
     },
     resetAmpCommandSliders() {
@@ -2318,6 +2347,7 @@ export default {
       window.visualViewport.addEventListener('resize', this.vvp_listener);
       window.visualViewport.addEventListener('scroll', this.vvp_listener);
     }
+    this.policyBeforeChange = this.currentPolicy;
     this.init();
     this.keydown_listener = (event) => {
       this.handleParkourKeyDown(event);
