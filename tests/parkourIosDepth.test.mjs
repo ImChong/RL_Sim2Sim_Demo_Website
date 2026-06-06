@@ -35,13 +35,23 @@ test('parkour bundle gates Uint8 depth readback behind Apple hardware detection'
   );
   assert.match(
     bundle,
-    /this\.depthFrame\[R\]=this\._appleDepthReadback\?\.3\+this\.depthPixels\[R\*4\]\*\(2\.7\/255\):this\.depthPixels\[R\*4\]/,
-    'depth frame decode should restore meters only on Apple'
+    /this\.depthFrame\[R\]=this\._appleDepthReadback\?Math\.max\(\.3,Math\.min\(3,\.3\+this\.depthPixels\[R\*4\]\*\(2\.7\/255\)\)\):this\.depthPixels\[R\*4\]/,
+    'depth frame decode should restore meters from normalized Uint8 on Apple'
   );
   assert.match(
     bundle,
     /this\._appleDepthReadback&&this\.policyController\._prepareDepthInput\(\)/,
     'depth preview should refresh immediately on Apple after capture'
+  );
+  assert.match(
+    bundle,
+    /this\._appleDepthReadback&&this\.renderer\.getContext\(\)\.finish\(\)/,
+    'Apple path should flush WebGL before readRenderTargetPixels'
+  );
+  assert.doesNotMatch(
+    bundle,
+    /_appleDepthOverrideMaterial/,
+    'Apple path must not use MeshDepthMaterial override capture'
   );
 });
 

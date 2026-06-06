@@ -112,8 +112,15 @@ Safari on iPhone/iPad often cannot read **FloatType** render targets via
 perceptive locomotion. Re-apply this patch after re-pulling the upstream bundle.
 The patch is **Apple-mobile only** — desktop and Android keep the Float32 path:
 
-- On iPhone/iPad, linearized depth is rendered into an **UnsignedByteType**
-  color target and decoded back to meters on the CPU.
+- On iPhone/iPad, the original **depth-texture inference pass is kept**, but the
+  shader packs linear depth into `[0.3, 3.0]` meters as Uint8 before CPU
+  readback. Do **not** replace this with `MeshDepthMaterial` override: that can
+  make the HUD visible while distorting depth statistics and causing falls at
+  obstacles.
+- Linear depth in meters is restored on the CPU via `0.3 + byte * 2.7 / 255`
+  (clamped to the camera clipping range).
+- `gl.finish()` is called before `readRenderTargetPixels` so Safari flushes GPU
+  work before CPU readback.
 - The depth preview is refreshed immediately via `_prepareDepthInput()` after
   each capture on Apple hardware (no longer waits for the first backbone
   inference).
