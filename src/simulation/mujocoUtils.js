@@ -210,6 +210,10 @@ export async function reloadPolicy(policy_path, options = {}) {
   while (this.policyRunner?.isInferencing) {
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
+  if (this.policyRunner) {
+    await this.policyRunner.release();
+    this.policyRunner = null;
+  }
 
   const reportInit = (t) => {
     if (typeof options.onInitProgress === 'function') {

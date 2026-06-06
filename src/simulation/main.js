@@ -13,6 +13,7 @@ import {
 } from './mujocoUtils.js';
 import { getSimulationThemeSettings, normalizeSimulationThemeName } from './theme.js';
 import { REFLECTION_QUALITY_PRESETS } from './reflectionQuality.js';
+import { disposeObject3D, disposeWebGLRenderer } from './hostDemoLifecycle.js';
 
 const defaultPolicy = './examples/checkpoints/g1/amp_policy_walk_run_getup.json';
 const defaultScene = 'g1_amp/scene_g1.xml';
@@ -131,7 +132,8 @@ export class MuJoCoDemo {
     this.controls.screenSpacePanning = true;
     this.controls.update();
 
-    window.addEventListener('resize', this.onWindowResize.bind(this));
+    this._onWindowResizeBound = this.onWindowResize.bind(this);
+    window.addEventListener('resize', this._onWindowResizeBound);
 
     this.dragStateManager = new DragStateManager(this.scene, this.renderer, this.camera, this.container.parentElement, this.controls);
 
@@ -258,24 +260,67 @@ export class MuJoCoDemo {
     }
   }
 
-  // Pause physics and stop the render loop. Used when the view is covered by an
-  // external embedded demo (e.g. the Parkour iframe) so we don't burn CPU/GPU
-  // running two WebGL apps at once.
-  suspendRendering() {
-    this.params.paused = true;
-    if (this.renderer) {
-      this.renderer.setAnimationLoop(null);
+  async releasePolicyResources() {
+    if (!this.policyRunner) {
+      return;
     }
+    await this.policyRunner.release();
+    this.policyRunner = null;
   }
 
-  // Restart the render loop and resume physics after the view becomes visible
-  // again. Re-syncs the renderer size in case the viewport changed while hidden.
-  resumeRendering() {
-    if (this.renderer) {
-      this.renderer.setAnimationLoop(this.render.bind(this));
+  /**
+   * Release MuJoCo, ONNX, and WebGL resources so Parkour can run alone in the tab.
+   */
+  async dispose() {
+    if (this._disposed) {
+      return;
     }
-    this.onWindowResize();
-    this.params.paused = false;
+    this._disposed = true;
+    this.alive = false;
+
+    while (this.policyRunner?.isInferencing) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    await this.releasePolicyResources();
+
+    if (this.simulation) {
+      this.simulation.free();
+      this.simulation = null;
+      this.model = null;
+      this.data = null;
+    }
+
+    const mujocoRoot = this.scene?.getObjectByName('MuJoCo Root');
+    if (mujocoRoot) {
+      this.scene.remove(mujocoRoot);
+      disposeObject3D(mujocoRoot);
+    }
+
+    for (const reflector of this.reflectors ?? []) {
+      reflector.dispose?.();
+    }
+    this.reflectors = [];
+    this.bodies = {};
+    this.lights = {};
+
+    if (this._onWindowResizeBound) {
+      window.removeEventListener('resize', this._onWindowResizeBound);
+      this._onWindowResizeBound = null;
+    }
+
+    this.controls?.dispose?.();
+    disposeObject3D(this.scene);
+    disposeWebGLRenderer(this.renderer);
+    this.renderer = null;
+
+    try {
+      if (this.mujoco?.FS?.analyzePath('/working')?.exists) {
+        this.mujoco.FS.unmount('/working');
+      }
+    } catch (error) {
+      console.warn('MuJoCo MEMFS unmount failed:', error);
+    }
   }
 
   setVisualTheme(name) {

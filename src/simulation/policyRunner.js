@@ -58,6 +58,14 @@ export class PolicyRunner {
     this.reset();
   }
 
+  async release() {
+    while (this.isInferencing) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    await this.module?.release?.();
+    this.tracking = null;
+  }
+
   _buildObsModules(obsConfig) {
     const obsList = (obsConfig && Array.isArray(obsConfig.policy)) ? obsConfig.policy : [];
     return obsList.map((obsConfigEntry) => {
