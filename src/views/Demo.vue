@@ -162,6 +162,20 @@
           </template>
           <div class="text-caption mt-2">{{ t.parkourClimbNote }}</div>
           <div v-if="!isSmallScreen" class="text-caption mt-2 text-medium-emphasis">{{ t.parkourSource }}</div>
+          <v-btn
+            class="mt-3"
+            color="secondary"
+            variant="tonal"
+            block
+            size="small"
+            data-test="parkour-depth-diagnostic"
+            :disabled="state !== 1 || parkourLoading"
+            :loading="parkourDepthDiagnosticLoading"
+            @click="runParkourDepthDiagnostic"
+          >
+            {{ t.parkourDepthDiagnostic }}
+          </v-btn>
+          <div class="text-caption mt-1 text-medium-emphasis">{{ t.parkourDepthDiagnosticHint }}</div>
         </div>
 
         <div v-if="isAmpPolicy" class="mt-4">
@@ -505,6 +519,58 @@
       </v-card-text>
     </v-card>
   </v-dialog>
+  <v-dialog
+    v-model="parkourDepthDiagnosticOpen"
+    max-width="640"
+    scrollable
+    class="parkour-depth-diagnostic-dialog"
+  >
+    <v-card :title="t.parkourDepthDiagnosticTitle">
+      <v-card-text>
+        <v-alert
+          v-if="parkourDepthDiagnosticSummary"
+          :type="parkourDepthDiagnosticSummary.type"
+          variant="tonal"
+          density="compact"
+          class="mb-3"
+        >
+          {{ parkourDepthDiagnosticSummary.text }}
+        </v-alert>
+        <ul v-if="parkourDepthDiagnosticHintLines.length" class="parkour-depth-diagnostic-hints mb-3">
+          <li
+            v-for="hint in parkourDepthDiagnosticHintLines"
+            :key="hint"
+            class="text-caption"
+          >
+            {{ hint }}
+          </li>
+        </ul>
+        <v-textarea
+          :model-value="parkourDepthDiagnosticText"
+          readonly
+          auto-grow
+          rows="12"
+          variant="outlined"
+          density="compact"
+          class="parkour-depth-diagnostic-text"
+          :aria-label="t.parkourDepthDiagnosticTitle"
+        />
+      </v-card-text>
+      <v-card-actions>
+        <v-btn variant="text" @click="parkourDepthDiagnosticOpen = false">
+          {{ t.parkourDepthDiagnosticClose }}
+        </v-btn>
+        <v-spacer />
+        <v-btn color="primary" @click="copyParkourDepthDiagnostic">
+          {{
+            parkourDepthDiagnosticCopied
+              ? t.parkourDepthDiagnosticCopied
+              : t.parkourDepthDiagnosticCopy
+          }}
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <script>
@@ -535,6 +601,11 @@ import {
   isParkourResetKey,
   parkourVirtualKeysFromKeyboard
 } from '@/utils/parkourKeyboardCommand.js';
+import {
+  buildParkourDepthDiagnosticReport,
+  fetchParkourBundleIosPatchStatus,
+  formatParkourDepthDiagnosticReport
+} from '@/utils/parkourDepthDiagnostic.js';
 
 const translations = {
   en: {
@@ -621,6 +692,14 @@ const translations = {
     parkourFocusHint: 'Click the demo view first, then use the keys.',
     parkourKeyboardFocusHint: 'Use WASD and Shift on the keyboard; the joystick knob follows while keys are held.',
     parkourSource: 'Embedded build from php-parkour, self-hosted in this site.',
+    parkourDepthDiagnostic: 'Depth diagnostic',
+    parkourDepthDiagnosticHint:
+      'Exports depth pipeline status (iOS readback, policy, preview brightness) as JSON for debugging.',
+    parkourDepthDiagnosticTitle: 'Parkour depth diagnostic',
+    parkourDepthDiagnosticCopy: 'Copy report',
+    parkourDepthDiagnosticCopied: 'Copied',
+    parkourDepthDiagnosticClose: 'Close',
+    parkourDepthDiagnosticHealthy: 'Depth preview and readback look healthy.',
     parkourReset: 'Restart run',
     resizeControlWidth: 'Resize control panel width (left edge)',
     resizeControlHeight: 'Resize control panel height (bottom edge)',
@@ -710,6 +789,14 @@ const translations = {
     parkourFocusHint: '请先点击演示画面，再使用键盘按键。',
     parkourKeyboardFocusHint: '可用 WASD 与 Shift 键盘控制；按住按键时摇杆会同步显示方向。',
     parkourSource: '内嵌自 php-parkour 的构建，已自托管在本站。',
+    parkourDepthDiagnostic: '深度诊断',
+    parkourDepthDiagnosticHint:
+      '导出深度管线状态（iOS 回读、策略加载、预览亮度等）JSON，便于排查黑屏问题。',
+    parkourDepthDiagnosticTitle: '跑酷深度诊断',
+    parkourDepthDiagnosticCopy: '复制报告',
+    parkourDepthDiagnosticCopied: '已复制',
+    parkourDepthDiagnosticClose: '关闭',
+    parkourDepthDiagnosticHealthy: '深度预览与 GPU 回读数据看起来正常。',
     parkourReset: '重新开始',
     resizeControlWidth: '拖拽左边框调整控制面板宽度',
     resizeControlHeight: '拖拽下边框调整控制面板高度',
@@ -815,7 +902,12 @@ export default {
     parkourReloadKey: 0,
     parkourVirtualKeys: { w: false, a: false, d: false, highSpeed: false },
     parkourKeysHeld: new Set(),
-    parkourShiftHeld: false
+    parkourShiftHeld: false,
+    parkourDepthDiagnosticLoading: false,
+    parkourDepthDiagnosticOpen: false,
+    parkourDepthDiagnosticReport: null,
+    parkourDepthDiagnosticText: '',
+    parkourDepthDiagnosticCopied: false
   }),
   computed: {
     desktopControlsPanelStyle() {
@@ -965,6 +1057,24 @@ export default {
       const base = import.meta.env.BASE_URL || '/';
       const path = this.selectedPolicy?.iframePath ?? '';
       return `${base}${path}`;
+    },
+    parkourDepthDiagnosticHintLines() {
+      const report = this.parkourDepthDiagnosticReport;
+      if (!report?.hints?.length) {
+        return [];
+      }
+      return report.hints.map((key) => report.hintLabels?.[key] ?? key);
+    },
+    parkourDepthDiagnosticSummary() {
+      const report = this.parkourDepthDiagnosticReport;
+      if (!report) {
+        return null;
+      }
+      if (!report.hints.length) {
+        return { type: 'success', text: this.t.parkourDepthDiagnosticHealthy };
+      }
+      const firstHint = report.hintLabels?.[report.hints[0]] ?? report.hints[0];
+      return { type: 'warning', text: firstHint };
     },
     parkourControls() {
       return [
@@ -1386,6 +1496,63 @@ export default {
       this.postParkourHostControl({
         virtualInput: { active: false, w: false, a: false, d: false, highSpeed: false }
       });
+    },
+    async runParkourDepthDiagnostic() {
+      if (!this.isParkourPolicy || this.state !== 1 || this.parkourLoading) {
+        return;
+      }
+
+      this.parkourDepthDiagnosticLoading = true;
+      this.parkourDepthDiagnosticCopied = false;
+
+      try {
+        const demo = this.$refs.parkourFrame?.contentWindow?.__parkourDemo ?? null;
+        const bundleStatus = await fetchParkourBundleIosPatchStatus(this.parkourIframeSrc);
+        const report = buildParkourDepthDiagnosticReport({
+          demo,
+          host: {
+            url: window.location.href,
+            userAgent: navigator.userAgent,
+            platform: navigator.platform,
+            maxTouchPoints: navigator.maxTouchPoints,
+            parkourLoading: this.parkourLoading,
+            isSmallScreen: this.isSmallScreen
+          },
+          bundleHasIosPatch: bundleStatus.hasIosPatch,
+          bundleUrl: bundleStatus.bundleUrl
+        });
+
+        if (bundleStatus.error) {
+          report.bundle.error = bundleStatus.error;
+        }
+
+        this.parkourDepthDiagnosticReport = report;
+        this.parkourDepthDiagnosticText = formatParkourDepthDiagnosticReport(report);
+        this.parkourDepthDiagnosticOpen = true;
+        await this.copyParkourDepthDiagnostic({ silent: true });
+      } finally {
+        this.parkourDepthDiagnosticLoading = false;
+      }
+    },
+    async copyParkourDepthDiagnostic({ silent = false } = {}) {
+      const text = this.parkourDepthDiagnosticText;
+      if (!text) {
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(text);
+        if (!silent) {
+          this.parkourDepthDiagnosticCopied = true;
+          window.setTimeout(() => {
+            this.parkourDepthDiagnosticCopied = false;
+          }, 2000);
+        }
+      } catch {
+        if (!silent) {
+          this.parkourDepthDiagnosticCopied = false;
+        }
+      }
     },
     onParkourJoystickInput({ active, w, a, d, highSpeed }) {
       if (!this.isParkourPolicy || this.state !== 1 || this.parkourLoading) {
