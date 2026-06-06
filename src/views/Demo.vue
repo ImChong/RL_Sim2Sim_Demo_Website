@@ -60,7 +60,11 @@
   </div>
   <div
     ref="mobileControlsPanel"
-    :class="['controls', { 'controls-mobile': isSmallScreen, 'controls-mobile-collapsed': isSmallScreen && isMobileControlsCollapsed }]"
+    :class="['controls', {
+      'controls-mobile': isSmallScreen,
+      'controls-mobile-collapsed': isSmallScreen && isMobileControlsCollapsed,
+      'controls-desktop-collapsed': !isSmallScreen && isMobileControlsCollapsed
+    }]"
     :style="desktopControlsPanelStyle"
   >
     <v-card
@@ -70,7 +74,6 @@
       <v-card-title :class="['controls-title', { 'controls-title-mobile': isSmallScreen }]">
         <span>{{ t.panelTitle }}</span>
         <v-btn
-          v-if="isSmallScreen"
           size="x-small"
           variant="text"
           color="primary"
@@ -81,7 +84,7 @@
           {{ isMobileControlsCollapsed ? t.expand : t.collapse }}
         </v-btn>
       </v-card-title>
-      <v-card-text v-show="!isSmallScreen || !isMobileControlsCollapsed" class="py-0 controls-body">
+      <v-card-text v-show="!isMobileControlsCollapsed" class="py-0 controls-body">
         <div class="training-links">
           <v-btn
             href="https://github.com/ccrpRepo/AMP_mjlab"
@@ -433,7 +436,7 @@
         <v-btn color="primary" block @click="reset">{{ isParkourPolicy ? t.parkourReset : t.reset }}</v-btn>
       </v-card-actions>
 
-      <template v-if="!isSmallScreen">
+      <template v-if="!isSmallScreen && !isMobileControlsCollapsed">
         <div
           class="controls-resize-handle controls-resize-w"
           role="separator"
@@ -795,7 +798,7 @@ export default {
     reflectionQuality: 2,
     simStepHz: 0,
     isSmallScreen: false,
-    isMobileControlsCollapsed: true,
+    isMobileControlsCollapsed: false,
     showSmallScreenAlert: true,
     isSafari: false,
     showSafariAlert: true,
@@ -818,6 +821,12 @@ export default {
     desktopControlsPanelStyle() {
       if (this.isSmallScreen) {
         return null;
+      }
+      if (this.isMobileControlsCollapsed) {
+        return {
+          width: `${this.controlPanelWidth}px`,
+          height: 'auto'
+        };
       }
       return {
         width: `${this.controlPanelWidth}px`,
@@ -1082,9 +1091,6 @@ export default {
       }
     },
     toggleMobileControls() {
-      if (!this.isSmallScreen) {
-        return;
-      }
       this.isMobileControlsCollapsed = !this.isMobileControlsCollapsed;
       this.$nextTick(() => {
         this.updateMobileControlsHeight();
@@ -2376,8 +2382,13 @@ export default {
   padding: 8px 16px calc(14px + env(safe-area-inset-bottom, 0px));
 }
 
-.controls-mobile-collapsed :deep(.v-card-actions) {
+.controls-mobile-collapsed :deep(.v-card-actions),
+.controls-desktop-collapsed :deep(.v-card-actions) {
   display: none;
+}
+
+.controls-desktop-collapsed .controls-card-resizable {
+  height: auto;
 }
 
 .controls-mobile :deep(.v-btn) {
