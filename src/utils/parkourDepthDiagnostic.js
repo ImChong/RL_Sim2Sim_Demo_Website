@@ -58,7 +58,8 @@ export function sampleDepthFrameMeters(depthFrame, { maxSamples = 1000 } = {}) {
 const HINT_LABELS = {
   demo_missing: 'Parkour iframe demo object is missing',
   policy_not_ready: 'ONNX policy is not ready (robot goes limp; preview needs policy backbone)',
-  policy_init_failed: 'Policy init failed — check policyInitError (common on iOS WebKit 26 + JSEP ORT)',
+  policy_init_failed:
+    'Policy init failed — check policyInitError (iOS: WASM OOM if MuJoCo+ORT exceed memory; non-JSEP + preload helps)',
   readback_ok_policy_failed:
     'GPU depth readback works but policy failed — not an iOS depth-texture bug',
   apple_path_inactive: 'iOS Uint8 depth path is not active on Apple hardware',

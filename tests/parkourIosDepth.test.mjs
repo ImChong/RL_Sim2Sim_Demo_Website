@@ -124,3 +124,38 @@ test('parkour ORT init uses non-JSEP wasm on Apple hardware', () => {
     'depth preview should fall back to readback when policy is unavailable'
   );
 });
+
+test('parkour ORT uses low-memory session options and early preload on Apple', () => {
+  const bundle = readFileSync(bundlePath, 'utf8');
+
+  assert.match(
+    bundle,
+    /_ortOpts\(\)\{const a=\/iPad\|iPhone\|iPod\//,
+    'policy controller should expose Apple low-memory ORT session options'
+  );
+  assert.match(
+    bundle,
+    /Xo\.create\(g,this\._ortOpts\(\)\)/,
+    'ORT sessions should use _ortOpts() instead of hard-coded graphOptimizationLevel all'
+  );
+  assert.match(
+    bundle,
+    /enableCpuMemArena:!1,enableMemPattern:!1/,
+    'Apple ORT sessions should disable arena and mem pattern to reduce peak WASM heap'
+  );
+  assert.match(
+    bundle,
+    /async beginPolicyPreload\(\)/,
+    'demo should preload ORT sessions before MuJoCo on Apple'
+  );
+  assert.match(
+    bundle,
+    /await this\.beginPolicyPreload\(\)/,
+    'demo init should call beginPolicyPreload on Apple hardware'
+  );
+  assert.match(
+    bundle,
+    /this\.session\|\|\(await this\._initOrt\(\)/,
+    'policy init should skip ORT reload when sessions were preloaded'
+  );
+});
