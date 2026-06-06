@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { clearHostDemoContainer, releaseOnnxSession } from '../src/simulation/hostDemoLifecycle.js';
+import {
+  clearHostDemoContainer,
+  prepareMujocoWorkingDirectory,
+  releaseOnnxSession
+} from '../src/simulation/hostDemoLifecycle.js';
 import { needsSceneReload } from '../src/simulation/main.js';
 
 test('releaseOnnxSession calls session.release and swallows errors', async () => {
@@ -18,6 +22,30 @@ test('releaseOnnxSession calls session.release and swallows errors', async () =>
     }
   }));
   await assert.doesNotReject(() => releaseOnnxSession(null));
+});
+
+test('prepareMujocoWorkingDirectory is idempotent', () => {
+  const mounts = [];
+  const mujoco = {
+    MEMFS: {},
+    FS: {
+      analyzePath(path) {
+        return { exists: path === '/working' };
+      },
+      mkdir(path) {
+        this._working = path;
+      },
+      mount(fs, _opts, path) {
+        if (mounts.includes(path)) {
+          throw new Error('already mounted');
+        }
+        mounts.push(path);
+      }
+    }
+  };
+  prepareMujocoWorkingDirectory(mujoco);
+  prepareMujocoWorkingDirectory(mujoco);
+  assert.equal(mounts.length, 1);
 });
 
 test('clearHostDemoContainer removes child nodes', () => {

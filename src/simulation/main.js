@@ -16,7 +16,8 @@ import { REFLECTION_QUALITY_PRESETS } from './reflectionQuality.js';
 import {
   clearHostDemoContainer,
   disposeObject3D,
-  disposeWebGLRenderer
+  disposeWebGLRenderer,
+  prepareMujocoWorkingDirectory
 } from './hostDemoLifecycle.js';
 
 const defaultPolicy = './examples/checkpoints/g1/amp_policy_walk_run_getup.json';
@@ -34,8 +35,7 @@ const KNOCKDOWN_FORCE_XY_MAG = 3400;
 export class MuJoCoDemo {
   constructor(mujoco) {
     this.mujoco = mujoco;
-    mujoco.FS.mkdir('/working');
-    mujoco.FS.mount(mujoco.MEMFS, { root: '.' }, '/working');
+    prepareMujocoWorkingDirectory(mujoco);
 
     this.params = {
       paused: true,

@@ -613,7 +613,13 @@ import {
   isAppleMobileDevice,
   PARKOUR_IOS_MOUNT_DELAY_MS
 } from '@/utils/appleMobile.js';
-import { getParkourMobilePageUrl } from '@/utils/parkourMobileNavigation.js';
+import {
+  consumeParkourStandaloneReturn,
+  getParkourMobilePageUrl,
+  markParkourStandaloneExit,
+  peekParkourStandaloneReturn,
+  stripFromParkourQuery
+} from '@/utils/parkourMobileNavigation.js';
 
 const translations = {
   en: {
@@ -916,7 +922,8 @@ export default {
     parkourDepthDiagnosticReport: null,
     parkourDepthDiagnosticText: '',
     parkourDepthDiagnosticCopied: false,
-    parkourFrameMounted: false
+    parkourFrameMounted: false,
+    policyBeforeChange: 'g1-amp-walk-run-getup'
   }),
   computed: {
     desktopControlsPanelStyle() {
@@ -1259,17 +1266,60 @@ export default {
       }
 
       try {
+        if (consumeParkourStandaloneReturn()) {
+          stripFromParkourQuery();
+          await this.resetStaleHostDemoForParkourReturn();
+          if (isAppleMobileDevice()) {
+            await new Promise((resolve) => setTimeout(resolve, PARKOUR_IOS_MOUNT_DELAY_MS));
+          }
+        }
         const defaultPolicy = this.policies.find((policy) => policy.value === 'g1-amp-walk-run-getup');
         await this.runWithSimulationLoading((report) => this.initHostDemo(defaultPolicy, report));
+        this.parkourHostTeardown = false;
+        this.policyBeforeChange = this.currentPolicy;
         const matchingPolicy = this.policies.find(
           (policy) => policy.policyPath === this.demo.currentPolicyPath
         );
         if (matchingPolicy) {
           this.currentPolicy = matchingPolicy.value;
+          this.policyBeforeChange = matchingPolicy.value;
         }
       } catch (error) {
         console.error(error);
       }
+    },
+    async resetStaleHostDemoForParkourReturn() {
+      this.stopTrackingPoll();
+      this.clearParkourKeyboardState();
+      this.parkourFrameMounted = false;
+      if (this.demo) {
+        try {
+          await this.demo.dispose();
+        } catch (error) {
+          console.error('Failed to dispose stale host demo after Parkour:', error);
+        }
+        this.demo = null;
+      }
+      document.getElementById('mujoco-container')?.replaceChildren();
+      this.parkourHostTeardown = true;
+      this.currentPolicy = 'g1-amp-walk-run-getup';
+      this.simStepHz = 0;
+    },
+    async restoreHostDemoAfterBfcache() {
+      if (!peekParkourStandaloneReturn()) {
+        return;
+      }
+      if (consumeParkourStandaloneReturn()) {
+        stripFromParkourQuery();
+      }
+      await this.resetStaleHostDemoForParkourReturn();
+      if (isAppleMobileDevice()) {
+        await new Promise((resolve) => setTimeout(resolve, PARKOUR_IOS_MOUNT_DELAY_MS));
+      }
+      const defaultPolicy = this.policies.find((policy) => policy.value === 'g1-amp-walk-run-getup');
+      await this.runWithSimulationLoading((report) => this.initHostDemo(defaultPolicy, report));
+      this.parkourHostTeardown = false;
+      this.policyBeforeChange = this.currentPolicy;
     },
     async mountParkourFrameAfterTeardown() {
       this.parkourFrameMounted = false;
@@ -1925,16 +1975,19 @@ export default {
       if (!selected) {
         return;
       }
+      try {
       if (!value?.startsWith('g1-amp')) {
         this.clearAmpKeyboardState();
       }
       if (!selected?.isExternalDemo) {
         this.clearParkourKeyboardState();
       }
+      const previousPolicy = this.policies.find((policy) => policy.value === this.policyBeforeChange);
       if (selected.isExternalDemo) {
         // iOS WebKit cannot unload host mujoco-js WASM in-process; open a separate
         // document that never loads the AMP stack (full navigation frees memory).
         if (isAppleMobileDevice()) {
+          markParkourStandaloneExit();
           window.location.assign(getParkourMobilePageUrl(import.meta.env.BASE_URL));
           return;
         }
@@ -1952,6 +2005,9 @@ export default {
         return;
       }
       this.parkourFrameMounted = false;
+      if (previousPolicy?.isExternalDemo && !this.parkourHostTeardown) {
+        await this.teardownHostDemoForParkour();
+      }
       // Leaving Parkour: cold-start the host demo for the selected MuJoCo policy.
       if (this.parkourHostTeardown) {
         this.clearParkourVirtualInput();
@@ -2001,6 +2057,9 @@ export default {
         this.policyLoadError = error instanceof Error ? error.message : 'An unexpected error occurred';
       } finally {
         this.demo.params.paused = wasPaused;
+      }
+      } finally {
+        this.policyBeforeChange = value;
       }
     },
     resetAmpCommandSliders() {
@@ -2318,6 +2377,16 @@ export default {
       window.visualViewport.addEventListener('resize', this.vvp_listener);
       window.visualViewport.addEventListener('scroll', this.vvp_listener);
     }
+    this.policyBeforeChange = this.currentPolicy;
+    this.pageshow_listener = (event) => {
+      if (!event.persisted) {
+        return;
+      }
+      this.restoreHostDemoAfterBfcache().catch((error) => {
+        console.error('Failed to restore host demo after bfcache:', error);
+      });
+    };
+    window.addEventListener('pageshow', this.pageshow_listener);
     this.init();
     this.keydown_listener = (event) => {
       this.handleParkourKeyDown(event);
@@ -2370,6 +2439,9 @@ export default {
     }
     if (this.resize_listener) {
       window.removeEventListener('resize', this.resize_listener);
+    }
+    if (this.pageshow_listener) {
+      window.removeEventListener('pageshow', this.pageshow_listener);
     }
     if (this.vvp_listener && window.visualViewport) {
       window.visualViewport.removeEventListener('resize', this.vvp_listener);

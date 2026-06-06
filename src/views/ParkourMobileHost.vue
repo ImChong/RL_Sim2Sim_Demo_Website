@@ -30,7 +30,74 @@
 
     <footer ref="bottomBar" class="parkour-mobile-host__footer">
       <p class="parkour-mobile-host__hint">{{ t.holdForward }}</p>
+      <v-btn
+        class="parkour-mobile-host__diagnostic-btn mt-2"
+        color="secondary"
+        variant="tonal"
+        block
+        size="small"
+        data-test="parkour-depth-diagnostic"
+        :disabled="parkourLoading"
+        :loading="parkourDepthDiagnosticLoading"
+        @click="runParkourDepthDiagnostic"
+      >
+        {{ t.depthDiagnostic }}
+      </v-btn>
+      <p class="parkour-mobile-host__diagnostic-hint">{{ t.depthDiagnosticHint }}</p>
     </footer>
+
+    <v-dialog
+      v-model="parkourDepthDiagnosticOpen"
+      max-width="640"
+      scrollable
+      class="parkour-depth-diagnostic-dialog"
+    >
+      <v-card :title="t.depthDiagnosticTitle">
+        <v-card-text>
+          <v-alert
+            v-if="parkourDepthDiagnosticSummary"
+            :type="parkourDepthDiagnosticSummary.type"
+            variant="tonal"
+            density="compact"
+            class="mb-3"
+          >
+            {{ parkourDepthDiagnosticSummary.text }}
+          </v-alert>
+          <ul v-if="parkourDepthDiagnosticHintLines.length" class="parkour-depth-diagnostic-hints mb-3">
+            <li
+              v-for="hint in parkourDepthDiagnosticHintLines"
+              :key="hint"
+              class="text-caption"
+            >
+              {{ hint }}
+            </li>
+          </ul>
+          <v-textarea
+            :model-value="parkourDepthDiagnosticText"
+            readonly
+            auto-grow
+            rows="12"
+            variant="outlined"
+            density="compact"
+            class="parkour-depth-diagnostic-text"
+            :aria-label="t.depthDiagnosticTitle"
+          />
+        </v-card-text>
+        <v-card-actions>
+          <v-btn variant="text" @click="parkourDepthDiagnosticOpen = false">
+            {{ t.depthDiagnosticClose }}
+          </v-btn>
+          <v-spacer />
+          <v-btn color="primary" @click="copyParkourDepthDiagnostic">
+            {{
+              parkourDepthDiagnosticCopied
+                ? t.depthDiagnosticCopied
+                : t.depthDiagnosticCopy
+            }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
 
     <div
       v-if="parkourLoading"
@@ -60,6 +127,11 @@ import {
   computeParkourMobileDepthLayoutFromMetrics,
   computeParkourMobileDepthLayoutWithClearance
 } from '@/utils/parkourDepthPreviewLayout.js';
+import {
+  buildParkourDepthDiagnosticReport,
+  fetchParkourBundleIosPatchStatus,
+  formatParkourDepthDiagnosticReport
+} from '@/utils/parkourDepthDiagnostic.js';
 import { getMainDemoPageUrl } from '@/utils/parkourMobileNavigation.js';
 
 const translations = {
@@ -71,7 +143,14 @@ const translations = {
     joystickGroup: 'Parkour movement controls',
     joystickMove: 'Move (up = forward, left/right = turn in place)',
     joystickPause: 'Pause',
-    joystickResetRun: 'Reset run'
+    joystickResetRun: 'Reset run',
+    depthDiagnostic: 'Depth diagnostic',
+    depthDiagnosticHint: 'Copy JSON report for debugging depth preview / iOS readback.',
+    depthDiagnosticTitle: 'Parkour depth diagnostic',
+    depthDiagnosticCopy: 'Copy report',
+    depthDiagnosticCopied: 'Copied',
+    depthDiagnosticClose: 'Close',
+    depthDiagnosticHealthy: 'Depth preview and readback look healthy.'
   },
   zh: {
     title: 'G1 感知跑酷',
@@ -81,7 +160,14 @@ const translations = {
     joystickGroup: '跑酷移动控制',
     joystickMove: '移动（上=前进，左/右=原地转向）',
     joystickPause: '暂停',
-    joystickResetRun: '重置回合'
+    joystickResetRun: '重置回合',
+    depthDiagnostic: '深度诊断',
+    depthDiagnosticHint: '复制 JSON 报告，便于排查深度预览 / iOS 回读问题。',
+    depthDiagnosticTitle: '跑酷深度诊断',
+    depthDiagnosticCopy: '复制报告',
+    depthDiagnosticCopied: '已复制',
+    depthDiagnosticClose: '关闭',
+    depthDiagnosticHealthy: '深度预览与 GPU 回读数据看起来正常。'
   }
 };
 
@@ -100,14 +186,37 @@ export default {
     visualTheme: getStoredTheme(),
     cameraFollowEnabled: true,
     renderScale: 2.0,
-    reflectionQuality: 2
+    reflectionQuality: 2,
+    parkourDepthDiagnosticLoading: false,
+    parkourDepthDiagnosticOpen: false,
+    parkourDepthDiagnosticReport: null,
+    parkourDepthDiagnosticText: '',
+    parkourDepthDiagnosticCopied: false
   }),
   computed: {
     t() {
       return translations[this.language] ?? translations.en;
     },
     mainDemoUrl() {
-      return getMainDemoPageUrl(import.meta.env.BASE_URL || '/');
+      return getMainDemoPageUrl(import.meta.env.BASE_URL || '/', { fromParkour: true });
+    },
+    parkourDepthDiagnosticHintLines() {
+      const report = this.parkourDepthDiagnosticReport;
+      if (!report?.hints?.length) {
+        return [];
+      }
+      return report.hints.map((key) => report.hintLabels?.[key] ?? key);
+    },
+    parkourDepthDiagnosticSummary() {
+      const report = this.parkourDepthDiagnosticReport;
+      if (!report) {
+        return null;
+      }
+      if (!report.hints.length) {
+        return { type: 'success', text: this.t.depthDiagnosticHealthy };
+      }
+      const firstHint = report.hintLabels?.[report.hints[0]] ?? report.hints[0];
+      return { type: 'warning', text: firstHint };
     },
     parkourIframeSrc() {
       const base = import.meta.env.BASE_URL || '/';
@@ -352,6 +461,58 @@ export default {
         virtualInput: { active: false, w: false, a: false, d: false, highSpeed: false },
         parkourResetRun: true
       });
+    },
+    async runParkourDepthDiagnostic() {
+      if (this.parkourLoading) {
+        return;
+      }
+      this.parkourDepthDiagnosticLoading = true;
+      this.parkourDepthDiagnosticCopied = false;
+      try {
+        const demo = this.$refs.parkourFrame?.contentWindow?.__parkourDemo ?? null;
+        const bundleStatus = await fetchParkourBundleIosPatchStatus(this.parkourIframeSrc);
+        const report = buildParkourDepthDiagnosticReport({
+          demo,
+          host: {
+            url: window.location.href,
+            userAgent: navigator.userAgent,
+            platform: navigator.platform,
+            maxTouchPoints: navigator.maxTouchPoints,
+            parkourLoading: this.parkourLoading,
+            isSmallScreen: true
+          },
+          bundleHasIosPatch: bundleStatus.hasIosPatch,
+          bundleUrl: bundleStatus.bundleUrl
+        });
+        if (bundleStatus.error) {
+          report.bundle.error = bundleStatus.error;
+        }
+        this.parkourDepthDiagnosticReport = report;
+        this.parkourDepthDiagnosticText = formatParkourDepthDiagnosticReport(report);
+        this.parkourDepthDiagnosticOpen = true;
+        await this.copyParkourDepthDiagnostic({ silent: true });
+      } finally {
+        this.parkourDepthDiagnosticLoading = false;
+      }
+    },
+    async copyParkourDepthDiagnostic({ silent = false } = {}) {
+      const text = this.parkourDepthDiagnosticText;
+      if (!text) {
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(text);
+        if (!silent) {
+          this.parkourDepthDiagnosticCopied = true;
+          window.setTimeout(() => {
+            this.parkourDepthDiagnosticCopied = false;
+          }, 2000);
+        }
+      } catch {
+        if (!silent) {
+          this.parkourDepthDiagnosticCopied = false;
+        }
+      }
     }
   }
 };
@@ -429,6 +590,28 @@ export default {
   font-size: 0.78rem;
   line-height: 1.35;
   color: rgba(236, 234, 229, 0.82);
+}
+
+.parkour-mobile-host__diagnostic-btn {
+  text-transform: none;
+}
+
+.parkour-mobile-host__diagnostic-hint {
+  margin: 6px 0 0;
+  font-size: 0.72rem;
+  line-height: 1.3;
+  color: rgba(236, 234, 229, 0.62);
+}
+
+.parkour-depth-diagnostic-hints {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.parkour-depth-diagnostic-text :deep(textarea) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .parkour-mobile-host__loading {
