@@ -105,7 +105,7 @@ const replacements = [
   ],
   [
     'async _initSession(){const A=new URL(this.modelPath,window.location.href).toString(),Q=await fetch(A);if(!Q.ok)throw new Error(`Failed to fetch policy model: ${A} (${Q.status} ${Q.statusText})`);const g=await Q.arrayBuffer();this.modelBytes=new Uint8Array(g),this.session=await Xo.create(g,this._ortOpts()),this.inputName=this.session.inputNames[0]',
-    `async _initSession(){const A=new URL(this.modelPath,window.location.href).toString(),a=${APPLE_DETECT};if(a)this.session=await Xo.create(A,this._ortOpts());else{const Q=await fetch(A);if(!Q.ok)throw new Error(\`Failed to fetch policy model: \${A} (\${Q.status} \${Q.statusText})\`);const g=await Q.arrayBuffer();this.modelBytes=new Uint8Array(g),this.session=await Xo.create(g,this._ortOpts())}this.inputName=this.session.inputNames[0]`
+    `async _initSession(){const A=new URL(this.modelPath,window.location.href).toString(),a=${APPLE_DETECT};if(a){const Q=await fetch(A);if(!Q.ok)throw new Error(\`Failed to fetch policy model for metadata: \${A} (\${Q.status} \${Q.statusText})\`);this.modelBytes=new Uint8Array(await Q.arrayBuffer()),this.session=await Xo.create(A,this._ortOpts())}else{const Q=await fetch(A);if(!Q.ok)throw new Error(\`Failed to fetch policy model: \${A} (\${Q.status} \${Q.statusText})\`);const g=await Q.arrayBuffer();this.modelBytes=new Uint8Array(g),this.session=await Xo.create(g,this._ortOpts())}this.inputName=this.session.inputNames[0]`
   ],
   [
     'this.depthSession=await Xo.create(g,{executionProviders:["wasm"],graphOptimizationLevel:"all"}),this.depthInputName=this.depthSession.inputNames[0]',
@@ -173,8 +173,21 @@ const requiredMarkers = [
   'this._applePrePolicy??null',
   'I.mujoco=this.mujoco',
   'Xo.create(A,this._ortOpts())',
+  'Failed to fetch policy model for metadata:',
   'this.session||(await this._initOrt()'
 ];
+
+const appleMetadataFetchFrom =
+  'if(a)this.session=await Xo.create(A,this._ortOpts());else{const Q=await fetch(A);if(!Q.ok)throw new Error(`Failed to fetch policy model: ${A} (${Q.status} ${Q.statusText})`);const g=await Q.arrayBuffer();this.modelBytes=new Uint8Array(g),this.session=await Xo.create(g,this._ortOpts())}this.inputName=this.session.inputNames[0]';
+const appleMetadataFetchTo =
+  `if(a){const Q=await fetch(A);if(!Q.ok)throw new Error(\`Failed to fetch policy model for metadata: \${A} (\${Q.status} \${Q.statusText})\`);this.modelBytes=new Uint8Array(await Q.arrayBuffer()),this.session=await Xo.create(A,this._ortOpts())}else{const Q=await fetch(A);if(!Q.ok)throw new Error(\`Failed to fetch policy model: \${A} (\${Q.status} \${Q.statusText})\`);const g=await Q.arrayBuffer();this.modelBytes=new Uint8Array(g),this.session=await Xo.create(g,this._ortOpts())}this.inputName=this.session.inputNames[0]`;
+
+if (!bundle.includes(appleMetadataFetchTo)) {
+  if (bundle.includes(appleMetadataFetchFrom)) {
+    bundle = bundle.replace(appleMetadataFetchFrom, appleMetadataFetchTo);
+    applied += 1;
+  }
+}
 
 for (const marker of requiredMarkers) {
   if (!bundle.includes(marker)) {
