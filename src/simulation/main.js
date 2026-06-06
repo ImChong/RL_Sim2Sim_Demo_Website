@@ -17,7 +17,8 @@ import {
   clearHostDemoContainer,
   disposeObject3D,
   disposeWebGLRenderer,
-  prepareMujocoWorkingDirectory
+  prepareMujocoWorkingDirectory,
+  unmountMujocoWorkingDirectory
 } from './hostDemoLifecycle.js';
 
 const defaultPolicy = './examples/checkpoints/g1/amp_policy_walk_run_getup.json';
@@ -288,6 +289,9 @@ export class MuJoCoDemo {
     this._disposed = true;
     this.alive = false;
 
+    this.dragStateManager?.dispose?.();
+    this.dragStateManager = null;
+
     while (this.policyRunner?.isInferencing) {
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
@@ -320,25 +324,12 @@ export class MuJoCoDemo {
     }
 
     this.controls?.dispose?.();
-    if (this.dragStateManager?.arrow) {
-      this.scene?.remove(this.dragStateManager.arrow);
-      disposeObject3D(this.dragStateManager.arrow);
-      this.dragStateManager.arrow = null;
-    }
-    this.dragStateManager = null;
     disposeObject3D(this.scene);
     disposeWebGLRenderer(this.renderer);
     this.renderer = null;
     clearHostDemoContainer(this.container);
 
-    try {
-      if (this.mujoco?.FS?.analyzePath('/working')?.exists) {
-        this.mujoco.FS.unmount('/working');
-      }
-    } catch (error) {
-      console.warn('MuJoCo MEMFS unmount failed:', error);
-    }
-
+    unmountMujocoWorkingDirectory(this.mujoco);
     this.mujoco = null;
     this.scene = null;
     this.camera = null;
@@ -526,8 +517,14 @@ export class MuJoCoDemo {
           this.alive = false;
           break;
         }
+        if (!this.alive || !this.model || !this.data || !this.simulation || !this.policyRunner) {
+          break;
+        }
 
         for (let substep = 0; substep < this.decimation; substep++) {
+          if (!this.alive || !this.simulation) {
+            break;
+          }
           if (this.control_type === 'joint_position') {
             this.applyJointPositionControl();
           } else if (this.control_type === 'unitree_position') {
@@ -543,7 +540,7 @@ export class MuJoCoDemo {
             this._knockdownSubstepsRemaining -= 1;
           }
 
-          const dragged = this.dragStateManager.physicsObject;
+          const dragged = this.dragStateManager?.physicsObject;
           if (dragged && dragged.bodyID) {
             const bodyID = dragged.bodyID;
             const bodyGroup = this.bodies[bodyID];

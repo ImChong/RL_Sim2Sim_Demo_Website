@@ -58,18 +58,34 @@ export function clearHostDemoContainer(container) {
   container.replaceChildren();
 }
 
-/** Idempotent MEMFS mount for cold starts after iOS policy reload. */
+const WORKING_PATH = '/working';
+
+/** @param {import('mujoco-js').MujocoModule | null | undefined} mujoco */
+export function unmountMujocoWorkingDirectory(mujoco) {
+  if (!mujoco?.FS) {
+    return;
+  }
+  try {
+    if (mujoco.FS.analyzePath(WORKING_PATH).exists) {
+      mujoco.FS.unmount(WORKING_PATH);
+    }
+  } catch (error) {
+    console.warn('MuJoCo MEMFS unmount failed:', error);
+  }
+}
+
+/** Idempotent MEMFS mount for cold starts after Parkour teardown or iOS policy reload. */
 export function prepareMujocoWorkingDirectory(mujoco) {
   if (!mujoco?.FS) {
     throw new Error('MuJoCo FS is unavailable');
   }
   const fs = mujoco.FS;
-  const workingPath = '/working';
-  if (!fs.analyzePath(workingPath).exists) {
-    fs.mkdir(workingPath);
+  unmountMujocoWorkingDirectory(mujoco);
+  if (!fs.analyzePath(WORKING_PATH).exists) {
+    fs.mkdir(WORKING_PATH);
   }
   try {
-    fs.mount(mujoco.MEMFS, { root: '.' }, workingPath);
+    fs.mount(mujoco.MEMFS, { root: '.' }, WORKING_PATH);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (!/already mounted|exists/i.test(message)) {
