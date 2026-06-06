@@ -918,7 +918,9 @@ export default {
     parkourDepthDiagnosticText: '',
     parkourDepthDiagnosticCopied: false,
     parkourFrameMounted: false,
-    policyBeforeChange: 'g1-amp-walk-run-getup'
+    policyBeforeChange: 'g1-amp-walk-run-getup',
+    policyChangeGeneration: 0,
+    pendingHostTeardown: null
   }),
   computed: {
     desktopControlsPanelStyle() {
@@ -1285,14 +1287,36 @@ export default {
       this.policyBeforeChange = 'g1-parkour';
       this.parkourHostTeardown = true;
       this.state = 1;
-      await this.mountParkourFrameAfterTeardown();
+      await this.mountParkourFrameAfterTeardown(this.policyChangeGeneration);
       this.startParkourLoad();
     },
-    async mountParkourFrameAfterTeardown() {
+    isStalePolicyChange(generation) {
+      return generation !== this.policyChangeGeneration;
+    },
+    async waitForPendingHostTeardown() {
+      if (!this.pendingHostTeardown) {
+        return;
+      }
+      try {
+        await this.pendingHostTeardown;
+      } catch (error) {
+        console.error('Host demo teardown failed:', error);
+      }
+    },
+    async mountParkourFrameAfterTeardown(generation) {
       this.parkourFrameMounted = false;
-      await this.teardownHostDemoForParkour();
+      const teardown = this.teardownHostDemoForParkour();
+      this.pendingHostTeardown = teardown;
+      await teardown;
+      this.pendingHostTeardown = null;
+      if (this.isStalePolicyChange(generation)) {
+        return;
+      }
       if (isAppleMobileDevice()) {
         await new Promise((resolve) => setTimeout(resolve, PARKOUR_IOS_MOUNT_DELAY_MS));
+      }
+      if (this.isStalePolicyChange(generation)) {
+        return;
       }
       this.parkourFrameMounted = true;
     },
@@ -1946,6 +1970,7 @@ export default {
       if (!selected) {
         return;
       }
+      const generation = ++this.policyChangeGeneration;
       const previousPolicy = this.policies.find((policy) => policy.value === this.policyBeforeChange);
       try {
       if (!value?.startsWith('g1-amp')) {
@@ -1964,9 +1989,15 @@ export default {
         // is the only WASM + WebGL stack in the tab.
         this.policyLoadError = '';
         try {
-          await this.mountParkourFrameAfterTeardown();
+          await this.mountParkourFrameAfterTeardown(generation);
+          if (this.isStalePolicyChange(generation)) {
+            return;
+          }
           this.startParkourLoad();
         } catch (error) {
+          if (this.isStalePolicyChange(generation)) {
+            return;
+          }
           console.error('Failed to enter Parkour:', error);
           this.parkourFrameMounted = false;
           this.policyLoadError = error instanceof Error ? error.message : 'An unexpected error occurred';
@@ -1974,6 +2005,10 @@ export default {
         return;
       }
       this.parkourFrameMounted = false;
+      await this.waitForPendingHostTeardown();
+      if (this.isStalePolicyChange(generation)) {
+        return;
+      }
       if (previousPolicy?.isExternalDemo && isAppleMobileDevice()) {
         scheduleIosPolicyBoot(value);
         return;
@@ -1984,11 +2019,17 @@ export default {
         this.policyLoadError = '';
         try {
           await this.runWithSimulationLoading((report) => this.initHostDemo(selected, report));
+          if (this.isStalePolicyChange(generation)) {
+            return;
+          }
           this.parkourHostTeardown = false;
           if (this.isAmpPolicy) {
             this.resetAmpCommandSliders();
           }
         } catch (error) {
+          if (this.isStalePolicyChange(generation)) {
+            return;
+          }
           console.error('Failed to restore host MuJoCo demo after Parkour:', error);
           this.policyLoadError = error instanceof Error ? error.message : 'An unexpected error occurred';
         }
@@ -2014,6 +2055,9 @@ export default {
             onProgress: report
           })
         );
+        if (this.isStalePolicyChange(generation)) {
+          return;
+        }
         if (this.isAmpPolicy) {
           this.resetAmpCommandSliders();
         }
@@ -2023,13 +2067,20 @@ export default {
         this.currentMotion = this.demo.params.current_motion ?? this.availableMotions[0] ?? null;
         this.updateTrackingState();
       } catch (error) {
+        if (this.isStalePolicyChange(generation)) {
+          return;
+        }
         console.error('Failed to reload policy:', error);
         this.policyLoadError = error instanceof Error ? error.message : 'An unexpected error occurred';
       } finally {
-        this.demo.params.paused = wasPaused;
+        if (!this.isStalePolicyChange(generation) && this.demo) {
+          this.demo.params.paused = wasPaused;
+        }
       }
       } finally {
-        this.policyBeforeChange = value;
+        if (!this.isStalePolicyChange(generation)) {
+          this.policyBeforeChange = value;
+        }
       }
     },
     resetAmpCommandSliders() {

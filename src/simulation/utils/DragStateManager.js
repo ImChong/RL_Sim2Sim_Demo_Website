@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Vector3 } from 'three';
+import { disposeObject3D } from '../hostDemoLifecycle.js';
 
 export class DragStateManager {
     constructor(scene, renderer, camera, container, controls) {
@@ -36,12 +37,45 @@ export class DragStateManager {
         this._offset = new Vector3();
         this._offsetDir = new Vector3();
 
-        container.addEventListener( 'pointerdown', this.onPointer.bind(this), true );
-        document.addEventListener( 'pointermove', this.onPointer.bind(this), true );
-        document.addEventListener( 'pointerup'  , this.onPointer.bind(this), true );
-        document.addEventListener( 'pointerout' , this.onPointer.bind(this), true );
-        container.addEventListener( 'dblclick', this.onPointer.bind(this), false );
+        this._container = container;
+        this._onPointerDown = this.onPointer.bind(this);
+        this._onPointerMove = this.onPointer.bind(this);
+        this._onPointerUp = this.onPointer.bind(this);
+        this._onPointerOut = this.onPointer.bind(this);
+        this._onDblClick = this.onPointer.bind(this);
+
+        container.addEventListener('pointerdown', this._onPointerDown, true);
+        document.addEventListener('pointermove', this._onPointerMove, true);
+        document.addEventListener('pointerup', this._onPointerUp, true);
+        document.addEventListener('pointerout', this._onPointerOut, true);
+        container.addEventListener('dblclick', this._onDblClick, false);
     }
+
+    dispose() {
+        this._container?.removeEventListener('pointerdown', this._onPointerDown, true);
+        document.removeEventListener('pointermove', this._onPointerMove, true);
+        document.removeEventListener('pointerup', this._onPointerUp, true);
+        document.removeEventListener('pointerout', this._onPointerOut, true);
+        this._container?.removeEventListener('dblclick', this._onDblClick, false);
+        this._container = null;
+
+        this.active = false;
+        this.mouseDown = false;
+        this.physicsObject = null;
+        this.previouslySelected = null;
+
+        if (this.arrow) {
+            this.scene?.remove(this.arrow);
+            disposeObject3D(this.arrow);
+            this.arrow = null;
+        }
+
+        this.scene = null;
+        this.renderer = null;
+        this.camera = null;
+        this.controls = null;
+    }
+
     updateRaycaster(x, y) {
         var rect = this.renderer.domElement.getBoundingClientRect();
         this.mousePos.x =  ((x - rect.left) / rect.width) * 2 - 1;
@@ -100,12 +134,19 @@ export class DragStateManager {
         this.physicsObject = null;
 
         this.active = false;
-        this.controls.enabled = true;
+        if (this.controls) {
+            this.controls.enabled = true;
+        }
         //this.controls.onPointerUp(evt);
-        this.arrow.visible = false;
+        if (this.arrow) {
+            this.arrow.visible = false;
+        }
         this.mouseDown = false;
     }
     onPointer(evt) {
+        if (!this.arrow || !this.controls || !this.scene || !this.renderer) {
+            return;
+        }
         if (evt.type == "pointerdown") {
             this.start(evt.clientX, evt.clientY);
             this.mouseDown = true;

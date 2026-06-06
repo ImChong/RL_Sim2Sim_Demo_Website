@@ -3,7 +3,8 @@ import test from 'node:test';
 import {
   clearHostDemoContainer,
   prepareMujocoWorkingDirectory,
-  releaseOnnxSession
+  releaseOnnxSession,
+  unmountMujocoWorkingDirectory
 } from '../src/simulation/hostDemoLifecycle.js';
 import { needsSceneReload } from '../src/simulation/main.js';
 
@@ -24,7 +25,7 @@ test('releaseOnnxSession calls session.release and swallows errors', async () =>
   await assert.doesNotReject(() => releaseOnnxSession(null));
 });
 
-test('prepareMujocoWorkingDirectory is idempotent', () => {
+test('prepareMujocoWorkingDirectory remounts after unmount', () => {
   const mounts = [];
   const mujoco = {
     MEMFS: {},
@@ -35,6 +36,12 @@ test('prepareMujocoWorkingDirectory is idempotent', () => {
       mkdir(path) {
         this._working = path;
       },
+      unmount(path) {
+        const idx = mounts.indexOf(path);
+        if (idx >= 0) {
+          mounts.splice(idx, 1);
+        }
+      },
       mount(_fs, _opts, path) {
         if (mounts.includes(path)) {
           throw new Error('already mounted');
@@ -44,8 +51,23 @@ test('prepareMujocoWorkingDirectory is idempotent', () => {
     }
   };
   prepareMujocoWorkingDirectory(mujoco);
+  assert.equal(mounts.length, 1);
   prepareMujocoWorkingDirectory(mujoco);
   assert.equal(mounts.length, 1);
+});
+
+test('unmountMujocoWorkingDirectory is safe when path is missing', () => {
+  const mujoco = {
+    FS: {
+      analyzePath() {
+        return { exists: false };
+      },
+      unmount() {
+        throw new Error('should not be called');
+      }
+    }
+  };
+  assert.doesNotThrow(() => unmountMujocoWorkingDirectory(mujoco));
 });
 
 test('clearHostDemoContainer removes child nodes', () => {
