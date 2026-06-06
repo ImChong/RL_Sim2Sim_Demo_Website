@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { AMP_CMD_SPRINT, AMP_CMD_WALK } from '../src/utils/ampKeyboardCommand.js';
 import {
+  AMP_JOYSTICK_HIGH_SPEED_VISUAL_SCALE,
+  AMP_JOYSTICK_NORMAL_VISUAL_SCALE,
   applyJoystickDeadzone,
   computeAmpCommandFromJoystick,
   computeAmpCommandFromMoveStick,
@@ -63,9 +65,17 @@ describe('ampJoystickCommand', () => {
 
   test('stickVisualFromAmpCommand mirrors forward walk command', () => {
     const visual = stickVisualFromAmpCommand(AMP_CMD_WALK.vx, 0, 0);
-    assert.ok(visual.normY > 0.5);
+    assert.equal(visual.normY, AMP_JOYSTICK_NORMAL_VISUAL_SCALE);
     assert.equal(visual.normX, 0);
     assert.equal(visual.yawDirection, 0);
+  });
+
+  test('stickVisualFromAmpCommand scales sprint below walk deflection', () => {
+    const normal = stickVisualFromAmpCommand(AMP_CMD_WALK.vx, 0, 0);
+    const sprint = stickVisualFromAmpCommand(AMP_CMD_SPRINT.vx, 0, 0);
+    assert.equal(normal.normY, AMP_JOYSTICK_NORMAL_VISUAL_SCALE);
+    assert.equal(sprint.normY, AMP_JOYSTICK_HIGH_SPEED_VISUAL_SCALE);
+    assert.ok(Math.abs(normal.normY) < Math.abs(sprint.normY));
   });
 
   test('stickVisualFromAmpCommand mirrors strafe left', () => {
@@ -74,8 +84,10 @@ describe('ampJoystickCommand', () => {
   });
 
   test('stickVisualFromAmpCommand mirrors yaw left', () => {
-    const visual = stickVisualFromAmpCommand(0, 0, AMP_CMD_SPRINT.yaw);
-    assert.ok(visual.normX < -0.5);
-    assert.equal(visual.yawDirection, 0);
+    const walk = stickVisualFromAmpCommand(0, 0, AMP_CMD_WALK.yaw);
+    const sprint = stickVisualFromAmpCommand(0, 0, AMP_CMD_SPRINT.yaw);
+    assert.equal(walk.normX, -AMP_JOYSTICK_NORMAL_VISUAL_SCALE);
+    assert.equal(sprint.normX, -AMP_JOYSTICK_HIGH_SPEED_VISUAL_SCALE);
+    assert.equal(walk.yawDirection, 0);
   });
 });
