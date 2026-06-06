@@ -40,9 +40,9 @@ describe('ampKeyboardCommand', () => {
 
   test('strafe and yaw signs match body frame (+Y left, +yaw left)', () => {
     assert.equal(computeAmpCommandFromKeys(new Set(['KeyQ']), false).cmdY, AMP_CMD_WALK.vy);
-    assert.equal(computeAmpCommandFromKeys(new Set(['KeyD']), false).cmdY, -AMP_CMD_WALK.vy);
+    assert.equal(computeAmpCommandFromKeys(new Set(['KeyE']), false).cmdY, -AMP_CMD_WALK.vy);
     assert.equal(computeAmpCommandFromKeys(new Set(['KeyA']), false).cmdYaw, AMP_CMD_WALK.yaw);
-    assert.equal(computeAmpCommandFromKeys(new Set(['KeyE']), false).cmdYaw, -AMP_CMD_WALK.yaw);
+    assert.equal(computeAmpCommandFromKeys(new Set(['KeyD']), false).cmdYaw, -AMP_CMD_WALK.yaw);
   });
 
   test('opposing keys cancel', () => {
@@ -51,7 +51,7 @@ describe('ampKeyboardCommand', () => {
       cmdY: 0,
       cmdYaw: 0
     });
-    assert.deepEqual(computeAmpCommandFromKeys(new Set(['KeyQ', 'KeyD']), true), {
+    assert.deepEqual(computeAmpCommandFromKeys(new Set(['KeyQ', 'KeyE']), true), {
       cmdX: 0,
       cmdY: 0,
       cmdYaw: 0
