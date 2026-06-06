@@ -80,8 +80,8 @@ const replacements = [
     `async _initOrt(){wQ.wasm.wasmPaths={mjs:new URL("./ort-wasm-simd-threaded.jsep.mjs",import.meta.url).href,wasm:new URL("./ort-wasm-simd-threaded.jsep-6MnTkKum.wasm",import.meta.url).href};const _appleOrt=${APPLE_DETECT};wQ.wasm.numThreads=_appleOrt?1:Math.min(4,navigator.hardwareConcurrency||1),_appleOrt&&(wQ.wasm.proxy=!1)}`
   ],
   [
-    'async _initOrt(){const _appleOrt=',
-    `_ortOpts(){const a=${APPLE_DETECT};return a?{executionProviders:["wasm"],graphOptimizationLevel:"basic",enableCpuMemArena:!1,enableMemPattern:!1}:{executionProviders:["wasm"],graphOptimizationLevel:"all"}}async _initOrt(){const _appleOrt=`
+    'graphOptimizationLevel:"basic",enableCpuMemArena:!1,enableMemPattern:!1}:{executionProviders:["wasm"],graphOptimizationLevel:"all"}}async _initOrt(){const _appleOrt=',
+    'graphOptimizationLevel:"disabled",enableCpuMemArena:!1,enableMemPattern:!1}:{executionProviders:["wasm"],graphOptimizationLevel:"all"}}async _initOrt(){const _appleOrt='
   ],
   [
     'Xo.create(g,{executionProviders:["wasm"],graphOptimizationLevel:"all"})',
@@ -96,8 +96,32 @@ const replacements = [
     `_policyPaths(){const A=new URLSearchParams(window.location.search),g=A.get("policy")||"./2026-01-17_09-51-30_student-new-loco-old-skill_student.onnx";return{modelPath:g,depthModelPath:A.get("depthPolicy")||g.replace("_student.onnx","_depth_backbone.onnx")}}_createPolicyController(){const{modelPath:g,depthModelPath:Q}=this._policyPaths();return new ak(this.mujoco,{modelPath:g,depthModelPath:Q,controlDt:.02})}async beginPolicyPreload(){const I=this._createPolicyController();return I._bindKeyboard(),await I._initOrt(),await I._initSession(),await I._initDepthSession(),I._readMetadata(),I.modelBytes=null,I}async initPolicy(A){const I=A??this._createPolicyController();try{await I.init(this.model),this.policyController=I,this.policyStepCounter=0;const C=this.model?.opt?.timestep??.002;this.policyDecimation=Math.max(1,Math.round(I.controlDt/C)),console.log("Policy loaded. Decimation:",this.policyDecimation)}catch(C){console.error("Failed to initialize policy:",C),this._policyInitError=String(C?.message||C),this.policyController=null}}`
   ],
   [
-    'async init(){await PZ($g),[this.model,this.data,this.bodies,this.lights]=await yR($g,hE,this),this.applySceneInitialState({resetData:!1,rebindCameras:!0}),this.gui=new hN,rZ(this),await this.initPolicy(),this.renderer.setAnimationLoop(this.render.bind(this))}',
-    `async init(){const _applePol=${APPLE_DETECT};let _pol=null;if(_applePol)try{_pol=await this.beginPolicyPreload()}catch(B){console.error("Policy preload failed:",B),this._policyInitError=String(B?.message||B)}await PZ($g),[this.model,this.data,this.bodies,this.lights]=await yR($g,hE,this),this.applySceneInitialState({resetData:!1,rebindCameras:!0}),this.gui=new hN,rZ(this),await this.initPolicy(_pol),this.renderer.setAnimationLoop(this.render.bind(this))}`
+    'async init(){const _applePol=/iPad|iPhone|iPod/.test(navigator.userAgent)||navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1;let _pol=null;if(_applePol)try{_pol=await this.beginPolicyPreload()}catch(B){console.error("Policy preload failed:",B),this._policyInitError=String(B?.message||B)}await PZ($g),[this.model,this.data,this.bodies,this.lights]=await yR($g,hE,this),this.applySceneInitialState({resetData:!1,rebindCameras:!0}),this.gui=new hN,rZ(this),await this.initPolicy(_pol),this.renderer.setAnimationLoop(this.render.bind(this))}',
+    'async init(){await PZ($g),[this.model,this.data,this.bodies,this.lights]=await yR($g,hE,this),this.applySceneInitialState({resetData:!1,rebindCameras:!0}),this.gui=new hN,rZ(this),await this.initPolicy(this._applePrePolicy??null),this.renderer.setAnimationLoop(this.render.bind(this))}'
+  ],
+  [
+    'async initPolicy(A){const I=A??this._createPolicyController();try{await I.init(this.model),this.policyController=I',
+    'async initPolicy(A){const I=A??this._createPolicyController();I.mujoco=this.mujoco;try{await I.init(this.model),this.policyController=I'
+  ],
+  [
+    'async _initSession(){const A=new URL(this.modelPath,window.location.href).toString(),Q=await fetch(A);if(!Q.ok)throw new Error(`Failed to fetch policy model: ${A} (${Q.status} ${Q.statusText})`);const g=await Q.arrayBuffer();this.modelBytes=new Uint8Array(g),this.session=await Xo.create(g,this._ortOpts()),this.inputName=this.session.inputNames[0]',
+    `async _initSession(){const A=new URL(this.modelPath,window.location.href).toString(),a=${APPLE_DETECT};if(a)this.session=await Xo.create(A,this._ortOpts());else{const Q=await fetch(A);if(!Q.ok)throw new Error(\`Failed to fetch policy model: \${A} (\${Q.status} \${Q.statusText})\`);const g=await Q.arrayBuffer();this.modelBytes=new Uint8Array(g),this.session=await Xo.create(g,this._ortOpts())}this.inputName=this.session.inputNames[0]`
+  ],
+  [
+    'this.depthSession=await Xo.create(g,{executionProviders:["wasm"],graphOptimizationLevel:"all"}),this.depthInputName=this.depthSession.inputNames[0]',
+    'this.depthSession=await Xo.create(g,this._ortOpts()),this.depthInputName=this.depthSession.inputNames[0]'
+  ],
+  [
+    'async _initDepthSession(){if(this.depthModelPath)try{const A=new URL(this.depthModelPath,window.location.href).toString(),Q=await fetch(A);if(!Q.ok)throw new Error(`Failed to fetch depth backbone: ${A} (${Q.status} ${Q.statusText})`);const g=await Q.arrayBuffer();this.depthSession=await Xo.create(g,this._ortOpts()),this.depthInputName=this.depthSession.inputNames[0]',
+    `async _initDepthSession(){if(this.depthModelPath)try{const A=new URL(this.depthModelPath,window.location.href).toString(),a=${APPLE_DETECT};if(a)this.depthSession=await Xo.create(A,this._ortOpts());else{const Q=await fetch(A);if(!Q.ok)throw new Error(\`Failed to fetch depth backbone: \${A} (\${Q.status} \${Q.statusText})\`);const g=await Q.arrayBuffer();this.depthSession=await Xo.create(g,this._ortOpts())}this.depthInputName=this.depthSession.inputNames[0]`
+  ],
+  [
+    'const $g=await tk();var hE="g1_with_terrain.xml"',
+    `let _applePrePol=null,_applePreErr=null;const _appleBoot=${APPLE_DETECT};if(_appleBoot)try{const A=new URLSearchParams(window.location.search),g=A.get("policy")||"./2026-01-17_09-51-30_student-new-loco-old-skill_student.onnx",I=new ak({},{modelPath:g,depthModelPath:A.get("depthPolicy")||g.replace("_student.onnx","_depth_backbone.onnx"),controlDt:.02});I._bindKeyboard(),await I._initOrt(),await I._initSession(),await I._initDepthSession(),I._readMetadata(),I.modelBytes=null,_applePrePol=I}catch(B){console.error("Boot policy preload failed:",B),_applePreErr=String(B?.message||B)}const $g=await tk();var hE="g1_with_terrain.xml"`
+  ],
+  [
+    'let Jk=new Zk;window.__parkourDemo=Jk;await Jk.init();',
+    'let Jk=new Zk;_applePrePol&&(Jk._applePrePolicy=_applePrePol);_applePreErr&&(Jk._policyInitError=_applePreErr);window.__parkourDemo=Jk;await Jk.init();'
   ]
 ];
 
@@ -126,6 +150,11 @@ for (const marker of forbiddenMarkers) {
   }
 }
 
+if ((bundle.match(/_ortOpts\(\)\{const a/g) || []).length > 1) {
+  console.error('Patch produced duplicate _ortOpts() definitions');
+  process.exit(1);
+}
+
 const requiredMarkers = [
   'this._appleDepthReadback=/iPad|iPhone|iPod/',
   'type:this._appleDepthReadback?xg:hg',
@@ -138,9 +167,12 @@ const requiredMarkers = [
   'this._policyInitError=String(C?.message||C)',
   'else if(this.depthPreviewPixels&&this.depthPreviewSize&&s)',
   '_ortOpts(){const a=/iPad|iPhone|iPod/',
-  'enableCpuMemArena:!1,enableMemPattern:!1',
+  'graphOptimizationLevel:"disabled",enableCpuMemArena:!1,enableMemPattern:!1',
   'async beginPolicyPreload(){',
-  'await this.beginPolicyPreload()',
+  'Boot policy preload failed:',
+  'this._applePrePolicy??null',
+  'I.mujoco=this.mujoco',
+  'Xo.create(A,this._ortOpts())',
   'this.session||(await this._initOrt()'
 ];
 

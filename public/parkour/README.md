@@ -129,10 +129,12 @@ The patch is **Apple-mobile only** — desktop and Android keep the Float32 path
 - On iPhone/iPad, ORT loads the **non-JSEP** `ort-wasm-simd-threaded.wasm`
   (not the JSEP build). WebKit 26 often fails or OOMs with JSEP; desktop keeps
   JSEP for performance.
-- On iPhone/iPad, ORT sessions are created **before** MuJoCo scene load
-  (`beginPolicyPreload`) with `graphOptimizationLevel: "basic"` and memory
-  arena/pattern disabled, then `modelBytes` is dropped after metadata parse.
-  This reduces peak WASM heap when MuJoCo and two ONNX sessions share the tab.
+- On iPhone/iPad, ORT sessions are created **before** MuJoCo WASM init
+  (`_appleBoot` block runs before `await tk()`) with `graphOptimizationLevel:
+  "disabled"`, memory arena/pattern disabled, and URL-based
+  `InferenceSession.create` (no duplicate 13MB ArrayBuffer). `modelBytes` is
+  dropped after metadata parse. `demo.init()` only runs `_buildMappings` on the
+  preloaded controller.
 - When the policy backbone is unavailable, the depth HUD preview falls back to
   subsampled GPU readback so the inset is not blank during ORT init failures.
 - `initPolicy` stores `demo._policyInitError` for the host depth diagnostic.
