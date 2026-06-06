@@ -13,6 +13,9 @@ export const PARKOUR_MOBILE_DOCK_STICK_SIZE = 108;
 /** Minimum horizontal gap between depth preview right edge and joystick pad left edge. */
 export const PARKOUR_MOBILE_JOYSTICK_HORIZONTAL_GAP = 12;
 
+/** Must match .controls-mobile left/right inset. */
+export const MOBILE_CONTROLS_HORIZONTAL_GAP = 12;
+
 /** Must match .controls-mobile bottom gap. */
 export const MOBILE_CONTROLS_BOTTOM_GAP = 12;
 
@@ -20,24 +23,26 @@ export const MOBILE_CONTROLS_BOTTOM_GAP = 12;
 export const MOBILE_JOYSTICK_GAP_ABOVE_PANEL = 12;
 
 /**
- * Position the depth HUD so its vertical center matches the joystick center and
- * left/bottom outer gaps are equal (WebGL viewport coordinates, origin bottom-left).
+ * Position the depth HUD so its vertical center matches the joystick center.
+ * Left inset matches the mobile control panel; bottom gap keeps the preview above the panel.
+ * (WebGL viewport coordinates, origin bottom-left.)
  */
 export function computeParkourMobileDepthLayout({
   panelTopFromBottom,
   joystickCenterFromBottom,
   previewScale = 2,
-  minGap = 8
+  minGap = 8,
+  leftOffset = MOBILE_CONTROLS_HORIZONTAL_GAP
 }) {
   const depthHeightPx = PARKOUR_DEPTH_PROCESSED_HEIGHT * previewScale;
   const depthBottomOffset = Math.ceil(joystickCenterFromBottom - depthHeightPx / 2);
-  const equalGap = Math.max(minGap, Math.round(depthBottomOffset - panelTopFromBottom));
+  const bottomGap = Math.max(minGap, Math.round(depthBottomOffset - panelTopFromBottom));
 
   return {
     depthPreviewScale: previewScale,
-    depthPreviewMargin: equalGap,
-    depthPreviewLeftOffset: equalGap,
-    depthPreviewBottomOffset: Math.ceil(panelTopFromBottom + equalGap)
+    depthPreviewMargin: bottomGap,
+    depthPreviewLeftOffset: leftOffset,
+    depthPreviewBottomOffset: Math.ceil(panelTopFromBottom + bottomGap)
   };
 }
 
@@ -50,6 +55,7 @@ export function computeParkourMobileDepthLayoutWithClearance({
   joystickPadLeft,
   preferredScale = 2,
   minGap = 8,
+  leftOffset = MOBILE_CONTROLS_HORIZONTAL_GAP,
   horizontalGap = PARKOUR_MOBILE_JOYSTICK_HORIZONTAL_GAP,
   minScale = 1.25
 }) {
@@ -58,7 +64,8 @@ export function computeParkourMobileDepthLayoutWithClearance({
     panelTopFromBottom,
     joystickCenterFromBottom,
     previewScale,
-    minGap
+    minGap,
+    leftOffset
   });
 
   for (let attempt = 0; attempt < 4; attempt += 1) {
@@ -74,7 +81,8 @@ export function computeParkourMobileDepthLayoutWithClearance({
       panelTopFromBottom,
       joystickCenterFromBottom,
       previewScale,
-      minGap
+      minGap,
+      leftOffset
     });
   }
 
@@ -90,18 +98,20 @@ export function computeParkourMobileDepthLayoutFromMetrics({
   controlsBottomGap = MOBILE_CONTROLS_BOTTOM_GAP,
   joystickGapAbovePanel = MOBILE_JOYSTICK_GAP_ABOVE_PANEL,
   viewportWidth = 390,
+  leftOffset = MOBILE_CONTROLS_HORIZONTAL_GAP,
   horizontalGap = PARKOUR_MOBILE_JOYSTICK_HORIZONTAL_GAP
 }) {
   const panelTopFromBottom = panelHeight + controlsBottomGap + bottomInset;
   const joystickCenterFromBottom = panelTopFromBottom + joystickGapAbovePanel + stickSize / 2;
   const orbitRadius = stickSize / 2 + 20 + 12;
   const padWidth = stickSize + orbitRadius + 20;
-  const joystickPadLeft = viewportWidth - 12 - padWidth;
+  const joystickPadLeft = viewportWidth - MOBILE_CONTROLS_HORIZONTAL_GAP - padWidth;
   return computeParkourMobileDepthLayoutWithClearance({
     panelTopFromBottom,
     joystickCenterFromBottom,
     joystickPadLeft,
     previewScale,
+    leftOffset,
     horizontalGap
   });
 }
