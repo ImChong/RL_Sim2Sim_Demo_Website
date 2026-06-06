@@ -22,7 +22,10 @@
     @pause="onParkourPause"
     @reset-run="onParkourResetRun"
   />
-  <div id="mujoco-container"></div>
+  <div
+    id="mujoco-container"
+    v-show="!isParkourPolicy || !parkourFrameMounted"
+  ></div>
   <div v-if="isParkourPolicy && parkourFrameMounted" class="parkour-frame-wrap">
     <iframe
       ref="parkourFrame"
@@ -56,16 +59,6 @@
       class="safari-alert"
     >
       {{ t.safariAlert }}
-    </v-alert>
-    <v-alert
-      v-if="hostDemoDeferred && !isParkourPolicy"
-      type="info"
-      variant="flat"
-      density="compact"
-      class="apple-deferred-alert"
-      data-test="apple-deferred-policy-hint"
-    >
-      {{ t.appleDeferredPolicyHint }}
     </v-alert>
   </div>
   <div
@@ -143,7 +136,6 @@
           class="mt-2"
           :label="t.selectPolicy"
           :aria-label="t.selectPolicy"
-          :placeholder="hostDemoDeferred ? t.selectPolicyToStart : undefined"
           density="compact"
           hide-details
           item-title="title"
@@ -626,9 +618,6 @@ const translations = {
   en: {
     mobileModeAlert: 'Mobile mode is enabled. The control panel has been compacted and docked to the bottom for touch interaction.',
     safariAlert: 'Safari has lower memory limits, which can cause WASM to crash.',
-    appleDeferredPolicyHint:
-      'On iPhone/iPad, pick a policy below to load the demo. Choose Parkour directly to avoid loading AMP first.',
-    selectPolicyToStart: 'Select a policy to start',
     panelTitle: 'General Tracking Demo',
     expandControlPanel: 'Expand control panel',
     collapseControlPanel: 'Collapse control panel',
@@ -726,9 +715,6 @@ const translations = {
   zh: {
     mobileModeAlert: '已启用移动端模式，控制面板已精简并停靠到底部，便于触控操作。',
     safariAlert: 'Safari 的内存限制较低，可能导致 WASM 崩溃。',
-    appleDeferredPolicyHint:
-      'iPhone/iPad 上请先在下方选择策略再加载演示。若要跑酷，请直接选择 Parkour，避免先加载 AMP 占用内存。',
-    selectPolicyToStart: '请选择策略以开始',
     panelTitle: '通用跟踪演示',
     expandControlPanel: '展开控制面板',
     collapseControlPanel: '收起控制面板',
@@ -929,7 +915,6 @@ export default {
     parkourDepthDiagnosticReport: null,
     parkourDepthDiagnosticText: '',
     parkourDepthDiagnosticCopied: false,
-    hostDemoDeferred: false,
     parkourFrameMounted: false
   }),
   computed: {
@@ -1272,15 +1257,6 @@ export default {
         return;
       }
 
-      // iPhone/iPad WebKit cannot reliably load AMP then Parkour in one tab; defer
-      // the host MuJoCo stack until the user picks a policy (ideally Parkour).
-      if (isAppleMobileDevice()) {
-        this.hostDemoDeferred = true;
-        this.currentPolicy = null;
-        this.state = 1;
-        return;
-      }
-
       try {
         const defaultPolicy = this.policies.find((policy) => policy.value === 'g1-amp-walk-run-getup');
         await this.runWithSimulationLoading((report) => this.initHostDemo(defaultPolicy, report));
@@ -1340,6 +1316,12 @@ export default {
     },
     async teardownHostDemoForParkour() {
       this.stopTrackingPoll();
+      this.clearAmpKeyboardState();
+      this.customMotions = {};
+      this.motionUploadFiles = [];
+      this.motionUploadMessage = '';
+      this.availableMotions = [];
+      this.currentMotion = null;
       if (!this.demo) {
         this.parkourHostTeardown = true;
         return;
@@ -1350,6 +1332,7 @@ export default {
         console.error('Failed to tear down host MuJoCo demo for Parkour:', error);
       }
       this.demo = null;
+      document.getElementById('mujoco-container')?.replaceChildren();
       this.parkourHostTeardown = true;
       this.simStepHz = 0;
       this.trackingState = {
@@ -1953,7 +1936,6 @@ export default {
         this.policyLoadError = '';
         try {
           await this.mountParkourFrameAfterTeardown();
-          this.hostDemoDeferred = false;
           this.startParkourLoad();
         } catch (error) {
           console.error('Failed to enter Parkour:', error);
@@ -1970,7 +1952,6 @@ export default {
         try {
           await this.runWithSimulationLoading((report) => this.initHostDemo(selected, report));
           this.parkourHostTeardown = false;
-          this.hostDemoDeferred = false;
           if (this.isAmpPolicy) {
             this.resetAmpCommandSliders();
           }
@@ -1981,17 +1962,6 @@ export default {
         return;
       }
       if (!this.demo) {
-        this.policyLoadError = '';
-        try {
-          await this.runWithSimulationLoading((report) => this.initHostDemo(selected, report));
-          this.hostDemoDeferred = false;
-          if (this.isAmpPolicy) {
-            this.resetAmpCommandSliders();
-          }
-        } catch (error) {
-          console.error('Failed to load host MuJoCo demo:', error);
-          this.policyLoadError = error instanceof Error ? error.message : 'An unexpected error occurred';
-        }
         return;
       }
       const targetScenePath = selected.scenePath ?? 'g1_amp/scene_g1.xml';

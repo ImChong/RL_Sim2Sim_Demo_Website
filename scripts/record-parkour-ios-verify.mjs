@@ -58,8 +58,7 @@ async function waitForMainReady(page) {
         document.querySelector('.v-dialog')?.textContent ?? ''
       );
       const ampReady = document.querySelector('[data-test="knockdown-test"]');
-      const deferredReady = document.querySelector('[data-test="apple-deferred-policy-hint"]');
-      return !loading && ((ampReady && !ampReady.disabled) || Boolean(deferredReady));
+      return ampReady && !ampReady.disabled && !loading;
     },
     { timeout: 240000, polling: 500 }
   );

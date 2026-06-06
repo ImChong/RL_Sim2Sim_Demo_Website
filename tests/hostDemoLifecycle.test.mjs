@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { releaseOnnxSession } from '../src/simulation/hostDemoLifecycle.js';
+import { clearHostDemoContainer, releaseOnnxSession } from '../src/simulation/hostDemoLifecycle.js';
 import { needsSceneReload } from '../src/simulation/main.js';
 
 test('releaseOnnxSession calls session.release and swallows errors', async () => {
@@ -18,6 +18,12 @@ test('releaseOnnxSession calls session.release and swallows errors', async () =>
     }
   }));
   await assert.doesNotReject(() => releaseOnnxSession(null));
+});
+
+test('clearHostDemoContainer removes child nodes', () => {
+  const container = { children: [{}, {}], replaceChildren() { this.children = []; } };
+  clearHostDemoContainer(container);
+  assert.equal(container.children.length, 0);
 });
 
 test('needsSceneReload loads scene when model is missing even if path matches', () => {
