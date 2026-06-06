@@ -115,6 +115,16 @@ test('parkour ORT init uses non-JSEP wasm on Apple hardware', () => {
   );
   assert.match(
     bundle,
+    /Failed to fetch policy model for metadata:/,
+    'Apple should fetch ONNX bytes for metadata fallback before URL session create'
+  );
+  assert.match(
+    bundle,
+    /this\.modelBytes=new Uint8Array\(await Q\.arrayBuffer\(\)\),this\.session=await Xo\.create\(A,this\._ortOpts\(\)\)/,
+    'Apple should keep modelBytes until _readMetadata then create session from URL'
+  );
+  assert.match(
+    bundle,
     /this\._policyInitError=String\(C\?\.message\|\|C\)/,
     'policy init should record error message for diagnostics'
   );

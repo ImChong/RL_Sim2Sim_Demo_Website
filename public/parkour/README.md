@@ -138,9 +138,10 @@ The patch is **Apple-mobile only** — desktop and Android keep the Float32 path
 - On iPhone/iPad, ORT sessions are created **before** MuJoCo WASM init
   (`_appleBoot` block runs before `await tk()`) with `graphOptimizationLevel:
   "disabled"`, memory arena/pattern disabled, and URL-based
-  `InferenceSession.create` (no duplicate 13MB ArrayBuffer). `modelBytes` is
-  dropped after metadata parse. `demo.init()` only runs `_buildMappings` on the
-  preloaded controller.
+  `InferenceSession.create`. WebKit ORT often omits `session.metadata`, so the
+  policy ONNX is fetched once into `modelBytes` for the protobuf metadata
+  fallback parser, then `modelBytes` is dropped after `_readMetadata()`.
+  `demo.init()` only runs `_buildMappings` on the preloaded controller.
 - When the policy backbone is unavailable, the depth HUD preview falls back to
   subsampled GPU readback so the inset is not blank during ORT init failures.
 - `initPolicy` stores `demo._policyInitError` for the host depth diagnostic.
