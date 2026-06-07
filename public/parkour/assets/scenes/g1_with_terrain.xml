@@ -79,7 +79,7 @@
 
     <asset>
         <material name="silver" rgba="0.7 0.7 0.7 1"/>
-        <material name="black" rgba="0.2 0.2 0.2 1"/>
+        <material name="black" rgba="0.02 0.02 0.02 1"/>
 
         <mesh name="pelvis" file="pelvis.STL"/>
         <mesh name="pelvis_contour_link" file="pelvis_contour_link.STL"/>
@@ -135,7 +135,6 @@
             <freejoint name="floating_base_joint"/>
             <geom class="visual" material="black" mesh="pelvis"/>
             <geom class="visual" mesh="pelvis_contour_link"/>
-            <geom mesh="pelvis_contour_link" class="visual"/>
             <geom name="pelvis_collision" class="collision" type="sphere" size="0.07" pos="0 0 -0.08"/>
             <site name="imu_in_pelvis" size="0.01" pos="0.04525 0 -0.08339"/>
             <site name="pelvis" size="0.01" pos="0 0 0"/>
@@ -144,13 +143,11 @@
                           diaginertia="0.00181517 0.00153422 0.00116212"/>
                 <joint name="left_hip_pitch_joint" class="hip_pitch"/>
                 <geom class="visual" material="black" mesh="left_hip_pitch_link"/>
-                <geom material="black" mesh="left_hip_pitch_link" class="visual"/>
                 <body name="left_hip_roll_link" pos="0 0.052 -0.030465" quat="0.996179 0 -0.0873386 0">
                     <inertial pos="0.029812 -0.001045 -0.087934" quat="0.977808 -1.97119e-05 0.205576 -0.0403793" mass="1.52"
                               diaginertia="0.00254986 0.00241169 0.00148755"/>
                     <joint name="left_hip_roll_joint" class="hip_roll" range="-0.5236 2.9671"/>
                     <geom class="visual" mesh="left_hip_roll_link"/>
-                    <geom mesh="left_hip_roll_link" class="visual"/>
                     <geom name="left_thigh" class="collision" type="capsule" size="0.05" fromto="0.02 0 0 0.02 0 -0.2"/>
                     <body name="left_hip_yaw_link" pos="0.025001 0 -0.12412">
                         <inertial pos="-0.057709 -0.010981 -0.15078" quat="0.600598 0.15832 0.223482 0.751181" mass="1.702"
