@@ -19,10 +19,10 @@ function getCspDirective(directive) {
 
 test('CSP script-src allows Emscripten glue (MuJoCo / ONNX Runtime Web)', () => {
   const scriptSrc = getCspDirective('script-src');
-  assert.match(
+  assert.doesNotMatch(
     scriptSrc,
     /'unsafe-eval'/,
-    "script-src must include 'unsafe-eval': Emscripten uses new Function() at runtime; wasm-unsafe-eval alone is insufficient"
+    "script-src must not include 'unsafe-eval' to prevent XSS vulnerabilities"
   );
   assert.match(
     scriptSrc,
