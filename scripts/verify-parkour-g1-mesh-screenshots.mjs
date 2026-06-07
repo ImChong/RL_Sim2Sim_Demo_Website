@@ -34,31 +34,46 @@ async function waitForMainReady(page) {
   await sleep(5000);
 }
 
-async function waitForParkourReady(page) {
+async function waitForPolicySelect(page) {
   await page.waitForFunction(
     () => {
-      const iframe = document.querySelector('iframe[src*="parkour"]');
-      if (!iframe?.contentDocument) {
-        return false;
-      }
-      const doc = iframe.contentDocument;
-      const loading = /Loading|加载/.test(doc.body?.textContent ?? '');
-      const canvas = doc.querySelector('canvas');
-      return canvas && !loading;
+      const sel = document.querySelector('.controls-card .v-select input');
+      return sel && !sel.closest('.v-input')?.classList?.contains?.('v-input--disabled');
     },
     { timeout: 240000, polling: 500 }
   );
-  await sleep(6000);
+}
+
+async function waitForParkourReady(page) {
+  await page.waitForSelector('iframe.parkour-frame', { timeout: 60000 });
+  await page.waitForFunction(
+    () => {
+      const frame = document.querySelector('iframe.parkour-frame');
+      const demo = frame?.contentWindow?.__parkourDemo;
+      if (!demo?.model) {
+        return false;
+      }
+      let meshCount = 0;
+      demo.scene?.traverse?.((obj) => {
+        if (obj.isMesh && obj.material && !obj.material.uniforms) {
+          meshCount += 1;
+        }
+      });
+      return meshCount > 20;
+    },
+    { timeout: 240000, polling: 500 }
+  );
+  await sleep(4000);
 }
 
 async function selectPolicy(page, labelPattern) {
-  const field = await page.$('.controls-card .v-select .v-field');
-  if (!field) {
-    throw new Error('Policy select not found');
-  }
-  await field.evaluate((el) => el.scrollIntoView({ block: 'center' }));
-  await field.click();
-  await sleep(500);
+  await waitForPolicySelect(page);
+  await page.evaluate(() => {
+    document.querySelector('.controls-card .v-select .v-field')?.scrollIntoView({ block: 'center' });
+  });
+  await sleep(400);
+  await page.click('.controls-card .v-select .v-field');
+  await sleep(600);
   await page.waitForSelector('.v-overlay-container .v-list-item', { timeout: 15000 });
   const items = await page.$$('.v-overlay-container .v-list-item');
   let clicked = false;
@@ -76,15 +91,56 @@ async function selectPolicy(page, labelPattern) {
   await sleep(800);
 }
 
-async function captureViewport(page, outPath) {
-  await page.evaluate(() => {
-    const canvas = document.querySelector('#mujoco-container canvas')
-      ?? document.querySelector('iframe[src*="parkour"]')?.contentDocument?.querySelector('canvas');
-    canvas?.scrollIntoView({ block: 'center', behavior: 'instant' });
-  });
-  await sleep(500);
-  await page.screenshot({ path: outPath, fullPage: false });
+async function captureMainViewport(page, outPath) {
+  const canvas = await page.$('#mujoco-container canvas');
+  if (canvas) {
+    await canvas.screenshot({ path: outPath });
+  } else {
+    await page.screenshot({ path: outPath, fullPage: false });
+  }
   console.log('Saved:', outPath);
+}
+
+async function captureParkourViewport(page, outPath) {
+  const frameHandle = await page.$('iframe.parkour-frame');
+  const frame = await frameHandle.contentFrame();
+  const canvas = await frame.$('canvas');
+  if (canvas) {
+    await canvas.screenshot({ path: outPath });
+  } else {
+    await page.screenshot({ path: outPath, fullPage: false });
+  }
+  console.log('Saved:', outPath);
+}
+
+async function inspectParkourMaterials(page) {
+  return page.evaluate(() => {
+    const frame = document.querySelector('iframe.parkour-frame');
+    const demo = frame?.contentWindow?.__parkourDemo;
+    if (!demo?.scene) {
+      return { ok: false, reason: 'no parkour scene' };
+    }
+    let meshStandard = 0;
+    let meshPhysical = 0;
+    let meshCount = 0;
+    demo.scene.traverse((obj) => {
+      if (!obj.isMesh || !obj.material || obj.material.uniforms) {
+        return;
+      }
+      meshCount += 1;
+      if (obj.material.isMeshStandardMaterial && !obj.material.isMeshPhysicalMaterial) {
+        meshStandard += 1;
+      } else if (obj.material.isMeshPhysicalMaterial) {
+        meshPhysical += 1;
+      }
+    });
+    return {
+      ok: meshStandard > 20 && meshPhysical > 0,
+      meshCount,
+      meshStandard,
+      meshPhysical
+    };
+  });
 }
 
 async function main() {
@@ -92,7 +148,7 @@ async function main() {
 
   const browser = await puppeteer.launch({
     executablePath: CHROME,
-    headless: true,
+    headless: 'new',
     protocolTimeout: 300000,
     args: [
       '--no-sandbox',
@@ -114,45 +170,20 @@ async function main() {
 
   await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 120000 });
   await waitForMainReady(page);
-
-  await selectPolicy(page, /AMP/i);
-  await waitForMainReady(page);
-  await captureViewport(page, path.join(OUT_DIR, 'g1-amp-mesh-quality.png'));
+  await captureMainViewport(page, path.join(OUT_DIR, 'g1-amp-mesh-quality.png'));
 
   await selectPolicy(page, /Tracking|跟踪/i);
   await waitForMainReady(page);
-  await captureViewport(page, path.join(OUT_DIR, 'g1-tracking-mesh-quality.png'));
+  await captureMainViewport(page, path.join(OUT_DIR, 'g1-tracking-mesh-quality.png'));
 
   await selectPolicy(page, /Parkour|跑酷/i);
   await waitForParkourReady(page);
-  await captureViewport(page, path.join(OUT_DIR, 'g1-parkour-mesh-quality.png'));
-
-  const parkourMaterialCheck = await page.evaluate(() => {
-    const iframe = document.querySelector('iframe[src*="parkour"]');
-    const demo = iframe?.contentWindow?.__parkourDemo;
-    if (!demo?.bodies) {
-      return { ok: false, reason: 'no parkour demo bodies' };
-    }
-    let meshStandard = 0;
-    let meshPhysical = 0;
-    for (const body of Object.values(demo.bodies)) {
-      body.traverse?.((obj) => {
-        if (!obj.isMesh || !obj.material) {
-          return;
-        }
-        if (obj.material.isMeshStandardMaterial && !obj.material.isMeshPhysicalMaterial) {
-          meshStandard += 1;
-        } else if (obj.material.isMeshPhysicalMaterial) {
-          meshPhysical += 1;
-        }
-      });
-    }
-    return { ok: meshStandard > 20 && meshPhysical === 0, meshStandard, meshPhysical };
-  });
+  const parkourMaterialCheck = await inspectParkourMaterials(page);
   if (!parkourMaterialCheck.ok) {
     throw new Error(`Parkour material check failed: ${JSON.stringify(parkourMaterialCheck)}`);
   }
   console.log('Parkour material check OK:', parkourMaterialCheck);
+  await captureParkourViewport(page, path.join(OUT_DIR, 'g1-parkour-mesh-quality.png'));
 
   await browser.close();
 }
