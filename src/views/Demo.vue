@@ -800,7 +800,7 @@ const translations = {
     parkourSource: '内嵌自 php-parkour 的构建，已自托管在本站。',
     parkourDepthDiagnostic: '深度诊断',
     parkourDepthDiagnosticHint:
-      '导出深度管线状态（iOS 回读、策略加载、预览亮度等）JSON，便于排查黑屏问题。',
+      '导出深度管线状态（iOS 回读、策略加载、预览亮度等）JSON，便于分析报错与排查问题。',
     parkourDepthDiagnosticTitle: '跑酷深度诊断',
     parkourDepthDiagnosticCopy: '复制报告',
     parkourDepthDiagnosticCopied: '已复制',
