@@ -2000,7 +2000,7 @@ export default {
           }
           console.error('Failed to enter Parkour:', error);
           this.parkourFrameMounted = false;
-          this.policyLoadError = error instanceof Error ? error.message : 'An unexpected error occurred';
+          this.policyLoadError = 'An unexpected error occurred';
         }
         return;
       }
@@ -2031,7 +2031,7 @@ export default {
             return;
           }
           console.error('Failed to restore host MuJoCo demo after Parkour:', error);
-          this.policyLoadError = error instanceof Error ? error.message : 'An unexpected error occurred';
+          this.policyLoadError = 'An unexpected error occurred';
         }
         return;
       }
@@ -2071,7 +2071,7 @@ export default {
           return;
         }
         console.error('Failed to reload policy:', error);
-        this.policyLoadError = error instanceof Error ? error.message : 'An unexpected error occurred';
+        this.policyLoadError = 'An unexpected error occurred';
       } finally {
         if (!this.isStalePolicyChange(generation) && this.demo) {
           this.demo.params.paused = wasPaused;
