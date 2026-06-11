@@ -7,6 +7,8 @@
   <style>
     /* Hide upstream paper link when embedded in the host control panel. */
     .hud-back { display: none !important; }
+    /* Host page already shows a loading dialog; keep iframe overlay minimal. */
+    .loading-status { display: none !important; }
   </style>
   <script src="./loader-progress.js"></script>
   <script type="module" crossorigin src="./assets/index-B8-l08f_.js"></script>
@@ -18,7 +20,7 @@
       <h2>Perceptive BFM</h2>
       <p>Loading MuJoCo simulation...</p>
       <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
-      <p class="loading-status" id="loading-status">Initializing...</p>
+      <p class="loading-status" id="loading-status" hidden aria-hidden="true"></p>
     </div>
   </div>
 
