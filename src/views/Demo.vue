@@ -208,6 +208,60 @@
           >
             {{ t.bfmDesktopHint }}
           </v-alert>
+          <div class="status-legend follow-controls">
+            <span class="status-name">{{ t.bfmFps }}</span>
+            <span class="text-caption">{{ bfmFpsLabel }}</span>
+          </div>
+          <div class="status-legend follow-controls mt-2">
+            <span class="status-name">{{ t.bfmSimTime }}</span>
+            <span class="text-caption">{{ bfmSimTimeLabel }}</span>
+          </div>
+          <v-divider class="my-3"/>
+          <span class="status-name">{{ t.bfmTerrain }}</span>
+          <div class="status-legend follow-controls mt-2">
+            <span class="status-name">{{ t.bfmTerrainDifficulty }}</span>
+            <span class="text-caption">{{ bfmTerrainDifficulty.toFixed(2) }}</span>
+          </div>
+          <v-slider
+            v-model="bfmTerrainDifficulty"
+            min="0"
+            max="1"
+            step="0.05"
+            density="compact"
+            hide-details
+            :aria-label="t.bfmTerrainDifficulty"
+          ></v-slider>
+          <div class="status-legend follow-controls mt-2">
+            <span class="status-name">{{ t.bfmTerrainSeed }}</span>
+            <v-text-field
+              v-model.number="bfmTerrainSeed"
+              type="number"
+              density="compact"
+              hide-details
+              variant="outlined"
+              class="bfm-terrain-seed-field"
+              :aria-label="t.bfmTerrainSeed"
+            ></v-text-field>
+          </div>
+          <div class="d-flex gap-2 mt-2">
+            <v-btn
+              size="small"
+              variant="tonal"
+              color="secondary"
+              @click="bfmTerrainRandomize"
+            >
+              {{ t.bfmTerrainRandomize }}
+            </v-btn>
+            <v-btn
+              size="small"
+              color="primary"
+              :disabled="state !== 1 || parkourLoading"
+              @click="bfmTerrainGenerate"
+            >
+              {{ t.bfmTerrainGenerate }}
+            </v-btn>
+          </div>
+          <v-divider class="my-3"/>
           <span class="status-name">{{ t.bfmHowToPlay }}</span>
           <div class="parkour-keys mt-2">
             <template v-for="row in bfmControls" :key="row.key">
@@ -752,7 +806,14 @@ const translations = {
     bfmPolicyDescription:
       'Perceptive Behavior Foundation Model demo (embedded). Switch motion references and watch terrain-aware tracking in the browser.',
     bfmDesktopHint:
-      'Use a desktop browser with WebGL and SharedArrayBuffer. Motion buttons and terrain controls are inside the demo view.',
+      'Terrain and telemetry live in this control panel. Motion buttons stay in the demo view at the bottom.',
+    bfmFps: 'Render FPS',
+    bfmSimTime: 'Sim time',
+    bfmTerrain: 'Terrain',
+    bfmTerrainDifficulty: 'Difficulty',
+    bfmTerrainSeed: 'Seed',
+    bfmTerrainRandomize: 'Randomize seed',
+    bfmTerrainGenerate: 'Generate terrain',
     bfmHowToPlay: 'How to play',
     bfmMoveForward: 'Move forward',
     bfmMoveBackward: 'Move backward',
@@ -871,7 +932,14 @@ const translations = {
     bfmPolicyDescription:
       '感知行为基础模型演示（内嵌）。在浏览器中切换动作参考并观察地形感知跟踪效果。',
     bfmDesktopHint:
-      '请使用支持 WebGL 与 SharedArrayBuffer 的桌面浏览器。动作按钮与地形控制在演示画面内。',
+      '地形与遥测数据已移至本控制面板；动作按钮仍保留在演示画面下方。',
+    bfmFps: '渲染 FPS',
+    bfmSimTime: '仿真时间',
+    bfmTerrain: '地形',
+    bfmTerrainDifficulty: '难度',
+    bfmTerrainSeed: '随机种子',
+    bfmTerrainRandomize: '随机种子',
+    bfmTerrainGenerate: '生成地形',
     bfmHowToPlay: '操作说明',
     bfmMoveForward: '前进',
     bfmMoveBackward: '后退',
@@ -1009,6 +1077,10 @@ export default {
     parkourDepthDiagnosticText: '',
     parkourDepthDiagnosticCopied: false,
     parkourFrameMounted: false,
+    bfmFps: null,
+    bfmSimTime: null,
+    bfmTerrainDifficulty: 0.4,
+    bfmTerrainSeed: 1,
     policyBeforeChange: 'g1-amp-walk-run-getup',
     policyChangeGeneration: 0,
     pendingHostTeardown: null
@@ -1220,6 +1292,18 @@ export default {
         { key: 'S', label: this.t.bfmSlowMotion },
         { key: 'H', label: this.t.bfmHeightScan }
       ];
+    },
+    bfmFpsLabel() {
+      if (this.bfmFps == null || !Number.isFinite(this.bfmFps)) {
+        return '—';
+      }
+      return `${this.bfmFps} FPS`;
+    },
+    bfmSimTimeLabel() {
+      if (this.bfmSimTime == null || !Number.isFinite(this.bfmSimTime)) {
+        return '—';
+      }
+      return `t = ${this.bfmSimTime.toFixed(2)}s`;
     },
     ampKeyboardControls() {
       return AMP_KEYBOARD_CONTROL_ROWS.map((row) => ({
@@ -1643,6 +1727,62 @@ export default {
       } catch (error) {
         /* iframe may not be ready */
       }
+    },
+    postBfmHostControl(partial) {
+      const win = this.$refs.parkourFrame?.contentWindow;
+      if (!win) {
+        return;
+      }
+      try {
+        win.postMessage(
+          {
+            source: 'bfm-host-control',
+            ...partial
+          },
+          window.location.origin
+        );
+      } catch (error) {
+        /* iframe may not be ready */
+      }
+    },
+    loadBfmTerrainConfig() {
+      try {
+        const saved = JSON.parse(localStorage.getItem('bfm-terrain') || 'null');
+        if (!saved || typeof saved !== 'object') {
+          return;
+        }
+        if (Number.isFinite(Number(saved.difficulty))) {
+          this.bfmTerrainDifficulty = Number(saved.difficulty);
+        }
+        if (Number.isFinite(Number(saved.seed))) {
+          this.bfmTerrainSeed = Number(saved.seed);
+        }
+      } catch {
+        /* ignore malformed storage */
+      }
+    },
+    resetBfmTelemetry() {
+      this.bfmFps = null;
+      this.bfmSimTime = null;
+    },
+    bfmTerrainRandomize() {
+      this.bfmTerrainSeed = Math.floor(Math.random() * 1e9) + 1;
+    },
+    bfmTerrainGenerate() {
+      const cfg = {
+        difficulty: this.bfmTerrainDifficulty,
+        seed: this.bfmTerrainSeed
+      };
+      try {
+        localStorage.setItem('bfm-terrain', JSON.stringify(cfg));
+      } catch {
+        /* storage may be unavailable */
+      }
+      this.postBfmHostControl({
+        type: 'terrainGenerate',
+        difficulty: cfg.difficulty,
+        seed: cfg.seed
+      });
     },
     syncParkourHostControls() {
       if (!this.isParkourPolicy) {
@@ -2246,6 +2386,10 @@ export default {
       this.parkourLoadProgress = 0;
       this.parkourReceivedProgress = false;
       this.simStepHz = 0;
+      if (this.isBfmPolicy) {
+        this.loadBfmTerrainConfig();
+        this.resetBfmTelemetry();
+      }
     },
     clearParkourLoadTimers() {
       if (this.parkourFallbackTimer) {
@@ -2277,6 +2421,9 @@ export default {
       this.$nextTick(() => {
         this.updateMobileControlsHeight();
         this.syncParkourHostControls();
+        if (this.isBfmPolicy) {
+          this.postBfmHostControl({ type: 'getStats' });
+        }
         this.focusParkourFrame();
       });
     },
@@ -2297,6 +2444,29 @@ export default {
           const hz = Number(data.simStepHz);
           if (Number.isFinite(hz)) {
             this.simStepHz = hz;
+          }
+        }
+        return;
+      }
+      if (data.source === 'bfm-host') {
+        if (data.type === 'stats') {
+          const fps = Number(data.fps);
+          if (Number.isFinite(fps)) {
+            this.bfmFps = fps;
+            this.simStepHz = fps;
+          }
+          const simTime = Number(data.simTime);
+          if (Number.isFinite(simTime)) {
+            this.bfmSimTime = simTime;
+          }
+          const terrain = data.terrainConfig;
+          if (terrain && typeof terrain === 'object') {
+            if (Number.isFinite(Number(terrain.difficulty))) {
+              this.bfmTerrainDifficulty = Number(terrain.difficulty);
+            }
+            if (Number.isFinite(Number(terrain.seed))) {
+              this.bfmTerrainSeed = Number(terrain.seed);
+            }
           }
         }
         return;
@@ -2649,6 +2819,11 @@ export default {
 .parkour-controls {
   display: flex;
   flex-direction: column;
+}
+
+.bfm-terrain-seed-field {
+  max-width: 8rem;
+  flex: 1;
 }
 
 .parkour-keys {

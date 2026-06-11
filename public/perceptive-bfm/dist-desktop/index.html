@@ -9,6 +9,11 @@
     .hud-back { display: none !important; }
     /* Host page already shows a loading dialog; keep iframe overlay minimal. */
     .loading-status { display: none !important; }
+    /* Corner HUD is merged into the host control panel; keep bottom HUD only. */
+    .hud-top-left,
+    .hud-top-right {
+      display: none !important;
+    }
 
     .mobile-unsupported-fallback {
       display: none;
@@ -57,6 +62,7 @@
   </script>
   <script src="./loader-progress.js"></script>
   <script type="module" crossorigin src="./assets/index-B8-l08f_.js"></script>
+  <script src="./host-bridge.js"></script>
   <link rel="stylesheet" crossorigin href="./assets/index-CCprXFdY.css">
 </head>
 <body>
