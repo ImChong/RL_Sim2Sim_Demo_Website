@@ -30,9 +30,9 @@ in sync with other policies.
 
 - Loads `loader-progress.js` before the app bundle.
 - Hides the upstream "← Paper" link when embedded in the host page.
-- Hides the top-left title and top-right telemetry/terrain HUD; those controls are
-  shown in the host control panel instead. The bottom HUD (velocity command, motion
-  buttons) stays inside the iframe.
+- Hides the top-left title, runtime model badge, and top-right telemetry/terrain HUD;
+  those controls are shown in the host control panel instead. The bottom HUD
+  (velocity command, motion buttons) stays inside the iframe.
 - On iPhone/iPad or viewports under 769px, shows a **Desktop Required** fallback
   (matches upstream `demo.html`) instead of loading MuJoCo/ONNX. The host page also
   omits BFM from the policy dropdown on those devices.

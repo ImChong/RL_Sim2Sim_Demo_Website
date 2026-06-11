@@ -10,11 +10,11 @@ const bundlePath = join(
   '../public/parkour/dist-desktop/assets/index-BLR_wER3.js'
 );
 
-test('parkour mouse drag uses AMP/Tracking force scale (60, max 30)', () => {
+test('parkour mouse drag uses upstream body_mass force scale', () => {
   const bundle = readFileSync(bundlePath, 'utf8');
-  assert.match(
+  assert.match(bundle, /body_mass\[s\]\*250/);
+  assert.doesNotMatch(
     bundle,
     /multiplyScalar\(60\)\),_pf=Math\.sqrt\(R\.x\*R\.x\+R\.y\*R\.y\+R\.z\*R\.z\);if\(_pf>30\)/
   );
-  assert.doesNotMatch(bundle, /body_mass\[s\]\*250/);
 });
