@@ -14,6 +14,9 @@ from the same origin so no Content-Security-Policy changes are required.
 - `dist-desktop/` — upstream Vite build (`index.html`, `assets/index-*.js`,
   `assets/index-*.css`, bundled ORT wasm), policy ONNX files under `models/`,
   motion clips under `motions/`, and G1 scene assets under `scenes/`.
+- `dist-desktop/mujoco_wasm.js` — MuJoCo WASM glue imported by the app bundle
+  (`import … from "../mujoco_wasm.js"`). **Required**; without it init hangs
+  around 90% on the host loading bar.
 
 ## Local modifications
 
