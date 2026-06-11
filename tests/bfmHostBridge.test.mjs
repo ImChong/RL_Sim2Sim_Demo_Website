@@ -13,6 +13,7 @@ test('BFM embed hides corner HUD chrome in index.html', () => {
   const html = readFileSync(indexPath, 'utf8');
   assert.match(html, /\.hud-top-left[\s\S]*display:\s*none\s*!important/);
   assert.match(html, /\.hud-top-right[\s\S]*display:\s*none\s*!important/);
+  assert.match(html, /#model-badge[\s\S]*display:\s*none\s*!important/);
   assert.match(html, /host-bridge\.js/);
   assert.doesNotMatch(html, /\.hud-bottom[\s\S]*display:\s*none/);
 });

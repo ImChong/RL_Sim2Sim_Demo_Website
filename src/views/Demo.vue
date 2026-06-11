@@ -208,6 +208,27 @@
           >
             {{ t.bfmDesktopHint }}
           </v-alert>
+          <span class="status-name">{{ t.bfmModel }}</span>
+          <div class="d-flex gap-2 mt-2">
+            <v-btn
+              size="small"
+              :variant="bfmModel === 'pmt' ? 'flat' : 'tonal'"
+              :color="bfmModel === 'pmt' ? 'success' : 'secondary'"
+              :disabled="state !== 1 || parkourLoading"
+              @click="onBfmModelChange('pmt')"
+            >
+              {{ t.bfmModelPmt }}
+            </v-btn>
+            <v-btn
+              size="small"
+              :variant="bfmModel === 'legacy' ? 'flat' : 'tonal'"
+              :color="bfmModel === 'legacy' ? 'warning' : 'secondary'"
+              :disabled="state !== 1 || parkourLoading"
+              @click="onBfmModelChange('legacy')"
+            >
+              {{ t.bfmModelLegacy }}
+            </v-btn>
+          </div>
           <div class="status-legend follow-controls">
             <span class="status-name">{{ t.bfmFps }}</span>
             <span class="text-caption">{{ bfmFpsLabel }}</span>
@@ -807,6 +828,9 @@ const translations = {
       'Perceptive Behavior Foundation Model demo (embedded). Switch motion references and watch terrain-aware tracking in the browser.',
     bfmDesktopHint:
       'Terrain and telemetry live in this control panel. Motion buttons stay in the demo view at the bottom.',
+    bfmModel: 'Robot model',
+    bfmModelPmt: 'PMT-faithful',
+    bfmModelLegacy: 'Legacy',
     bfmFps: 'Render FPS',
     bfmSimTime: 'Sim time',
     bfmTerrain: 'Terrain',
@@ -825,7 +849,6 @@ const translations = {
     bfmPause: 'Pause / resume',
     bfmReset: 'Restart demo',
     bfmResetSim: 'Reset simulation',
-    bfmSlowMotion: 'Toggle slow motion',
     bfmHeightScan: 'Toggle height scan viz',
     bfmFocusHint: 'Click the demo view first, then use the keyboard or motion buttons in the embedded HUD.',
     bfmSource: 'Embedded build from acodedog.github.io/perceptive-bfm, self-hosted in this site.',
@@ -933,6 +956,9 @@ const translations = {
       '感知行为基础模型演示（内嵌）。在浏览器中切换动作参考并观察地形感知跟踪效果。',
     bfmDesktopHint:
       '地形与遥测数据已移至本控制面板；动作按钮仍保留在演示画面下方。',
+    bfmModel: '机器人模型',
+    bfmModelPmt: 'PMT-faithful',
+    bfmModelLegacy: 'Legacy',
     bfmFps: '渲染 FPS',
     bfmSimTime: '仿真时间',
     bfmTerrain: '地形',
@@ -951,7 +977,6 @@ const translations = {
     bfmPause: '暂停 / 继续',
     bfmReset: '重新开始',
     bfmResetSim: '重置仿真',
-    bfmSlowMotion: '切换慢动作',
     bfmHeightScan: '切换高度扫描可视化',
     bfmFocusHint: '请先点击演示画面，再使用键盘或内嵌 HUD 中的动作按钮。',
     bfmSource: '内嵌自 acodedog.github.io/perceptive-bfm 的构建，已自托管在本站。',
@@ -1079,6 +1104,7 @@ export default {
     parkourFrameMounted: false,
     bfmFps: null,
     bfmSimTime: null,
+    bfmModel: 'pmt',
     bfmTerrainDifficulty: 0.4,
     bfmTerrainSeed: 1,
     policyBeforeChange: 'g1-amp-walk-run-getup',
@@ -1251,7 +1277,12 @@ export default {
     parkourIframeSrc() {
       const base = import.meta.env.BASE_URL || '/';
       const path = this.selectedPolicy?.iframePath ?? '';
-      return `${base}${path}`;
+      let url = `${base}${path}`;
+      if (this.isBfmPolicy) {
+        const sep = url.includes('?') ? '&' : '?';
+        url += `${sep}model=${encodeURIComponent(this.bfmModel)}`;
+      }
+      return url;
     },
     parkourDepthDiagnosticHintLines() {
       const report = this.parkourDepthDiagnosticReport;
@@ -1289,7 +1320,6 @@ export default {
         { key: 'X', label: this.t.bfmStop },
         { key: 'SPACE', label: this.t.bfmPause },
         { key: 'R', label: this.t.bfmResetSim },
-        { key: 'S', label: this.t.bfmSlowMotion },
         { key: 'H', label: this.t.bfmHeightScan }
       ];
     },
@@ -1760,6 +1790,32 @@ export default {
       } catch {
         /* ignore malformed storage */
       }
+    },
+    loadBfmModelConfig() {
+      try {
+        const saved = localStorage.getItem('bfm-model');
+        if (saved === 'pmt' || saved === 'legacy') {
+          this.bfmModel = saved;
+        }
+      } catch {
+        /* storage may be unavailable */
+      }
+    },
+    onBfmModelChange(model) {
+      if (this.bfmModel === model) {
+        return;
+      }
+      this.bfmModel = model;
+      try {
+        localStorage.setItem('bfm-model', model);
+      } catch {
+        /* storage may be unavailable */
+      }
+      if (!this.isBfmPolicy) {
+        return;
+      }
+      this.startParkourLoad();
+      this.parkourReloadKey += 1;
     },
     resetBfmTelemetry() {
       this.bfmFps = null;
@@ -2257,6 +2313,9 @@ export default {
         // Entering an embedded demo: fully release host MuJoCo/ONNX/WebGL so the iframe
         // is the only WASM + WebGL stack in the tab.
         this.policyLoadError = '';
+        if (value === 'g1-perceptive-bfm') {
+          this.loadBfmModelConfig();
+        }
         try {
           await this.mountParkourFrameAfterTeardown(generation);
           if (this.isStalePolicyChange(generation)) {
@@ -2388,6 +2447,7 @@ export default {
       this.simStepHz = 0;
       if (this.isBfmPolicy) {
         this.loadBfmTerrainConfig();
+        this.loadBfmModelConfig();
         this.resetBfmTelemetry();
       }
     },
