@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Perceptive BFM — Interactive MuJoCo Demo</title>
+  <style>
+    /* Hide upstream paper link when embedded in the host control panel. */
+    .hud-back { display: none !important; }
+  </style>
+  <script src="./loader-progress.js"></script>
+  <script type="module" crossorigin src="./assets/index-B8-l08f_.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CCprXFdY.css">
+</head>
+<body>
+  <div id="loading-screen">
+    <div class="loader-content">
+      <h2>Perceptive BFM</h2>
+      <p>Loading MuJoCo simulation...</p>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+      <p class="loading-status" id="loading-status">Initializing...</p>
+    </div>
+  </div>
+
+  <div id="app">
+    <canvas id="render-canvas"></canvas>
+
+    <!-- HUD Overlay -->
+    <div id="hud">
+      <div class="hud-top-left">
+        <a href="../index.html" class="hud-back">← Paper</a>
+        <h3>Perceptive BFM Demo</h3>
+      </div>
+
+      <div class="hud-top-right">
+        <div class="fps-counter" id="fps-counter">-- FPS</div>
+        <div class="sim-time" id="sim-time">t = 0.00s</div>
+
+        <!-- Terrain generator panel -->
+        <div class="terrain-panel">
+          <div class="terrain-panel-title">🏔️ Terrain</div>
+          <label class="terrain-row">
+            <span>Difficulty</span>
+            <input type="range" id="terrain-difficulty" min="0" max="1" step="0.05" value="0.4">
+            <b id="terrain-difficulty-val">0.40</b>
+          </label>
+          <label class="terrain-row">
+            <span>Seed</span>
+            <input type="number" id="terrain-seed" value="1" step="1" class="terrain-seed-input">
+            <button id="terrain-randomize" class="ctrl-btn ctrl-btn-sm" title="Randomize seed">🎲</button>
+          </label>
+          <button id="terrain-generate" class="terrain-gen-btn">Generate Terrain</button>
+        </div>
+      </div>
+
+      <!-- Status pill: which policy is driving the robot right now -->
+      <div class="policy-status" id="policy-status">
+        <span class="policy-dot"></span>
+        <span id="policy-status-text">Locomotion · balancing</span>
+      </div>
+
+      <!-- Blocking overlay shown during terrain recompile -->
+      <div class="terrain-overlay hidden" id="terrain-overlay">
+        <div class="terrain-overlay-box">
+          <div class="spinner"></div>
+          <p>Generating terrain…</p>
+        </div>
+      </div>
+
+      <!-- Unified bottom HUD: locomotion command + motion buttons -->
+      <div class="hud-bottom" id="hud-main">
+        <div class="cmd-display">
+          <span class="cmd-label">Velocity command:</span>
+          <span class="cmd-val">vx <b id="cmd-vx">0.00</b></span>
+          <span class="cmd-val">vy <b id="cmd-vy">0.00</b></span>
+          <span class="cmd-val">ωz <b id="cmd-wz">0.00</b></span>
+          <button id="btn-stop" class="ctrl-btn ctrl-btn-sm" title="Stop / balance (X)">■ Stop</button>
+        </div>
+
+        <!-- Motion buttons: click to track a motion, then auto-return to balance -->
+        <div class="motion-buttons" id="motion-buttons"><!-- populated by JS --></div>
+
+        <div class="controls-tips">
+          <span><kbd>W</kbd>/<kbd>S</kbd> Fwd/Back</span>
+          <span><kbd>A</kbd>/<kbd>D</kbd> Strafe</span>
+          <span><kbd>Q</kbd>/<kbd>E</kbd> Turn</span>
+          <span><kbd>X</kbd> Stop</span>
+          <span><kbd>Space</kbd> Pause</span>
+          <span><kbd>R</kbd> Reset</span>
+          <span><kbd>H</kbd> Height scan <b id="scan-viz-state">off</b></span>
+          <span><kbd>Mouse</kbd> Orbit</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

@@ -24,15 +24,15 @@
   />
   <div
     id="mujoco-container"
-    v-show="!isParkourPolicy || !parkourFrameMounted"
+    v-show="!isExternalDemoPolicy || !parkourFrameMounted"
   ></div>
-  <div v-if="isParkourPolicy && parkourFrameMounted" class="parkour-frame-wrap">
+  <div v-if="isExternalDemoPolicy && parkourFrameMounted" class="parkour-frame-wrap">
     <iframe
       ref="parkourFrame"
       :key="parkourReloadKey"
       :src="parkourIframeSrc"
       class="parkour-frame"
-      title="G1 Perceptive Parkour Demo"
+      :title="embeddedDemoFrameTitle"
       allow="autoplay; fullscreen"
       @load="onParkourLoad"
     ></iframe>
@@ -125,6 +125,18 @@
             <v-icon icon="mdi-github" class="mr-1"></v-icon>
             G1 Tracking Training Code
           </v-btn>
+          <v-btn
+            href="https://acodedog.github.io/perceptive-bfm/"
+            target="_blank"
+            rel="noopener noreferrer"
+            variant="text"
+            size="small"
+            color="primary"
+            class="text-capitalize"
+          >
+            <v-icon icon="mdi-file-document-outline" class="mr-1"></v-icon>
+            G1 Perceptive BFM Paper
+          </v-btn>
         </div>
 
         <v-divider class="my-2"/>
@@ -179,6 +191,26 @@
             {{ t.parkourDepthDiagnostic }}
           </v-btn>
           <div class="text-caption mt-1 text-medium-emphasis">{{ t.parkourDepthDiagnosticHint }}</div>
+        </div>
+
+        <div v-if="isBfmPolicy" class="parkour-controls mt-4">
+          <v-alert
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mb-3"
+          >
+            {{ t.bfmDesktopHint }}
+          </v-alert>
+          <span class="status-name">{{ t.bfmHowToPlay }}</span>
+          <div class="parkour-keys mt-2">
+            <template v-for="row in bfmControls" :key="row.key">
+              <kbd class="parkour-key">{{ row.key }}</kbd>
+              <span class="text-caption">{{ row.label }}</span>
+            </template>
+          </div>
+          <div class="text-caption mt-2 text-medium-emphasis">{{ t.bfmFocusHint }}</div>
+          <div v-if="!isSmallScreen" class="text-caption mt-2 text-medium-emphasis">{{ t.bfmSource }}</div>
         </div>
 
         <div v-if="isAmpPolicy" class="mt-4">
@@ -259,7 +291,7 @@
           {{ policyLoadError }}
         </v-alert>
 
-        <div v-if="!isAmpPolicy && !isParkourPolicy" class="status-legend follow-controls mt-2">
+        <div v-if="!isAmpPolicy && !isExternalDemoPolicy" class="status-legend follow-controls mt-2">
           <span class="status-name">{{ t.compliance }}</span>
           <v-btn
             size="x-small"
@@ -274,7 +306,7 @@
           <span class="text-caption">{{ complianceThresholdLabel }}</span>
         </div>
         <v-slider
-          v-if="!isAmpPolicy && !isParkourPolicy"
+          v-if="!isAmpPolicy && !isExternalDemoPolicy"
           v-model="complianceThreshold"
           min="10"
           max="20"
@@ -286,7 +318,7 @@
           @update:modelValue="onComplianceThresholdChange"
         ></v-slider>
 
-        <template v-if="!isAmpPolicy && !isParkourPolicy">
+        <template v-if="!isAmpPolicy && !isExternalDemoPolicy">
         <v-divider class="my-2"/>
         <div class="motion-status" v-if="trackingState" role="status" aria-live="polite">
           <div class="status-legend" v-if="trackingState.available">
@@ -450,7 +482,7 @@
         ></v-slider>
       </v-card-text>
       <v-card-actions class="controls-actions">
-        <v-btn color="primary" block @click="reset">{{ isParkourPolicy ? t.parkourReset : t.reset }}</v-btn>
+        <v-btn color="primary" block @click="reset">{{ isExternalDemoPolicy ? (isParkourPolicy ? t.parkourReset : t.bfmReset) : t.reset }}</v-btn>
       </v-card-actions>
 
       <template v-if="!isSmallScreen && !isMobileControlsCollapsed">
@@ -502,7 +534,7 @@
     </v-card>
   </v-dialog>
   <ModelIOFlowchart
-    v-if="!isParkourPolicy"
+    v-if="!isExternalDemoPolicy"
     :demo="demo"
     :ready="state === 1"
     :language="language"
@@ -710,6 +742,25 @@ const translations = {
     parkourDepthDiagnosticClose: 'Close',
     parkourDepthDiagnosticHealthy: 'Depth preview and readback look healthy.',
     parkourReset: 'Restart run',
+    bfmPolicyDescription:
+      'Perceptive Behavior Foundation Model demo (embedded). Switch motion references and watch terrain-aware tracking in the browser.',
+    bfmDesktopHint:
+      'Use a desktop browser with WebGL and SharedArrayBuffer. Motion buttons and terrain controls are inside the demo view.',
+    bfmHowToPlay: 'How to play',
+    bfmMoveForward: 'Move forward',
+    bfmMoveBackward: 'Move backward',
+    bfmStrafeLeft: 'Strafe left',
+    bfmStrafeRight: 'Strafe right',
+    bfmTurnLeft: 'Turn left',
+    bfmTurnRight: 'Turn right',
+    bfmStop: 'Stop / balance',
+    bfmPause: 'Pause / resume',
+    bfmReset: 'Restart demo',
+    bfmResetSim: 'Reset simulation',
+    bfmSlowMotion: 'Toggle slow motion',
+    bfmHeightScan: 'Toggle height scan viz',
+    bfmFocusHint: 'Click the demo view first, then use the keyboard or motion buttons in the embedded HUD.',
+    bfmSource: 'Embedded build from acodedog.github.io/perceptive-bfm, self-hosted in this site.',
     resizeControlWidth: 'Resize control panel width (left edge)',
     resizeControlHeight: 'Resize control panel height (bottom edge)',
     resizeControlBoth: 'Resize control panel (bottom-left corner)'
@@ -807,6 +858,25 @@ const translations = {
     parkourDepthDiagnosticClose: '关闭',
     parkourDepthDiagnosticHealthy: '深度预览与 GPU 回读数据看起来正常。',
     parkourReset: '重新开始',
+    bfmPolicyDescription:
+      '感知行为基础模型演示（内嵌）。在浏览器中切换动作参考并观察地形感知跟踪效果。',
+    bfmDesktopHint:
+      '请使用支持 WebGL 与 SharedArrayBuffer 的桌面浏览器。动作按钮与地形控制在演示画面内。',
+    bfmHowToPlay: '操作说明',
+    bfmMoveForward: '前进',
+    bfmMoveBackward: '后退',
+    bfmStrafeLeft: '左平移',
+    bfmStrafeRight: '右平移',
+    bfmTurnLeft: '左转',
+    bfmTurnRight: '右转',
+    bfmStop: '停止 / 平衡',
+    bfmPause: '暂停 / 继续',
+    bfmReset: '重新开始',
+    bfmResetSim: '重置仿真',
+    bfmSlowMotion: '切换慢动作',
+    bfmHeightScan: '切换高度扫描可视化',
+    bfmFocusHint: '请先点击演示画面，再使用键盘或内嵌 HUD 中的动作按钮。',
+    bfmSource: '内嵌自 acodedog.github.io/perceptive-bfm 的构建，已自托管在本站。',
     resizeControlWidth: '拖拽左边框调整控制面板宽度',
     resizeControlHeight: '拖拽下边框调整控制面板高度',
     resizeControlBoth: '拖拽左下角同时调整控制面板大小'
@@ -873,6 +943,13 @@ export default {
         policyPath: './examples/checkpoints/g1/tracking_policy_latest.json',
         onnxPath: './examples/checkpoints/g1/tracking/policy_latest.onnx',
         scenePath: 'g1/g1.xml'
+      },
+      {
+        value: 'g1-perceptive-bfm',
+        title: 'G1 Perceptive BFM',
+        descriptionKey: 'bfmPolicyDescription',
+        isExternalDemo: true,
+        iframePath: 'perceptive-bfm/dist-desktop/index.html'
       }
     ],
     currentPolicy: 'g1-amp-walk-run-getup',
@@ -1041,7 +1118,7 @@ export default {
       return this.currentPolicy?.startsWith('g1-amp');
     },
     showAmpJoystick() {
-      return this.isAmpPolicy && !this.isParkourPolicy;
+      return this.isAmpPolicy && !this.isExternalDemoPolicy;
     },
     showParkourJoystick() {
       return this.isParkourPolicy && this.parkourFrameMounted;
@@ -1063,8 +1140,17 @@ export default {
         resetRun: this.t.parkourJoystickResetRun
       };
     },
-    isParkourPolicy() {
+    isExternalDemoPolicy() {
       return this.selectedPolicy?.isExternalDemo === true;
+    },
+    isParkourPolicy() {
+      return this.currentPolicy === 'g1-parkour';
+    },
+    isBfmPolicy() {
+      return this.currentPolicy === 'g1-perceptive-bfm';
+    },
+    embeddedDemoFrameTitle() {
+      return this.selectedPolicy?.title ?? 'Embedded demo';
     },
     parkourIframeSrc() {
       const base = import.meta.env.BASE_URL || '/';
@@ -1097,6 +1183,18 @@ export default {
         { key: 'SHIFT', label: this.t.parkourSpeed },
         { key: 'SPACE', label: this.t.parkourPause },
         { key: 'BACKSPACE', label: this.t.parkourResetRun }
+      ];
+    },
+    bfmControls() {
+      return [
+        { key: 'W / S', label: `${this.t.bfmMoveForward} / ${this.t.bfmMoveBackward}` },
+        { key: 'A / D', label: `${this.t.bfmStrafeLeft} / ${this.t.bfmStrafeRight}` },
+        { key: 'Q / E', label: `${this.t.bfmTurnLeft} / ${this.t.bfmTurnRight}` },
+        { key: 'X', label: this.t.bfmStop },
+        { key: 'SPACE', label: this.t.bfmPause },
+        { key: 'R', label: this.t.bfmResetSim },
+        { key: 'S', label: this.t.bfmSlowMotion },
+        { key: 'H', label: this.t.bfmHeightScan }
       ];
     },
     ampKeyboardControls() {
@@ -1264,8 +1362,8 @@ export default {
 
       try {
         const iosBootPolicy = isAppleMobileDevice() ? consumeIosBootPolicy() : null;
-        if (iosBootPolicy === 'g1-parkour') {
-          await this.bootParkourOnlyOnIos();
+        if (iosBootPolicy === 'g1-parkour' || iosBootPolicy === 'g1-perceptive-bfm') {
+          await this.bootExternalDemoOnlyOnIos(iosBootPolicy);
           return;
         }
 
@@ -1282,9 +1380,9 @@ export default {
         console.error(error);
       }
     },
-    async bootParkourOnlyOnIos() {
-      this.currentPolicy = 'g1-parkour';
-      this.policyBeforeChange = 'g1-parkour';
+    async bootExternalDemoOnlyOnIos(policyValue) {
+      this.currentPolicy = policyValue;
+      this.policyBeforeChange = policyValue;
       this.parkourHostTeardown = true;
       this.state = 1;
       await this.mountParkourFrameAfterTeardown(this.policyChangeGeneration);
@@ -1980,12 +2078,12 @@ export default {
         this.clearParkourKeyboardState();
       }
       if (selected.isExternalDemo) {
-        // iOS: reload the same page so only the parkour iframe stack is loaded.
+        // iOS: reload the same page so only the embedded demo iframe stack is loaded.
         if (isAppleMobileDevice()) {
-          scheduleIosPolicyBoot('g1-parkour');
+          scheduleIosPolicyBoot(value);
           return;
         }
-        // Entering Parkour: fully release host MuJoCo/ONNX/WebGL so the iframe
+        // Entering an embedded demo: fully release host MuJoCo/ONNX/WebGL so the iframe
         // is the only WASM + WebGL stack in the tab.
         this.policyLoadError = '';
         try {
@@ -2091,8 +2189,10 @@ export default {
       this.onCmdChange();
     },
     reset() {
-      if (this.isParkourPolicy) {
-        this.clearParkourVirtualInput();
+      if (this.isExternalDemoPolicy) {
+        if (this.isParkourPolicy) {
+          this.clearParkourVirtualInput();
+        }
         // Reload the embedded demo for a clean restart (remounts via :key).
         this.startParkourLoad();
         this.parkourReloadKey += 1;
@@ -2265,7 +2365,7 @@ export default {
       }
     },
     updatePerformanceStats() {
-      if (this.isParkourPolicy) {
+      if (this.isExternalDemoPolicy) {
         return;
       }
       if (!this.demo) {
