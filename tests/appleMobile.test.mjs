@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   isAppleMobileDevice,
+  isBfmDesktopRequired,
   PARKOUR_IOS_MOUNT_DELAY_MS
 } from '../src/utils/appleMobile.js';
 
@@ -43,4 +44,46 @@ test('isAppleMobileDevice rejects desktop Chrome', () => {
 
 test('PARKOUR_IOS_MOUNT_DELAY_MS is a positive delay', () => {
   assert.ok(PARKOUR_IOS_MOUNT_DELAY_MS >= 200);
+});
+
+test('isBfmDesktopRequired is true on iPhone', () => {
+  assert.equal(
+    isBfmDesktopRequired(
+      {
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
+        platform: 'iPhone',
+        maxTouchPoints: 5
+      },
+      { innerWidth: 390 }
+    ),
+    true
+  );
+});
+
+test('isBfmDesktopRequired is true for narrow viewports', () => {
+  assert.equal(
+    isBfmDesktopRequired(
+      {
+        userAgent: 'Mozilla/5.0 (X11; Linux x86_64) Chrome/120.0.0.0',
+        platform: 'Linux x86_64',
+        maxTouchPoints: 0
+      },
+      { innerWidth: 768 }
+    ),
+    true
+  );
+});
+
+test('isBfmDesktopRequired is false on desktop widths', () => {
+  assert.equal(
+    isBfmDesktopRequired(
+      {
+        userAgent: 'Mozilla/5.0 (X11; Linux x86_64) Chrome/120.0.0.0',
+        platform: 'Linux x86_64',
+        maxTouchPoints: 0
+      },
+      { innerWidth: 1280 }
+    ),
+    false
+  );
 });

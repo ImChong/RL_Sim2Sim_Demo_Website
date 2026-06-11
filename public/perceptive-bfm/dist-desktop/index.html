@@ -9,12 +9,64 @@
     .hud-back { display: none !important; }
     /* Host page already shows a loading dialog; keep iframe overlay minimal. */
     .loading-status { display: none !important; }
+
+    .mobile-unsupported-fallback {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      background: #0a0a0f;
+      color: #cbd5e1;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      text-align: center;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    .mobile-unsupported-fallback h2 {
+      color: #818cf8;
+      margin-bottom: 12px;
+      font-size: 1.25rem;
+    }
+    .mobile-unsupported-fallback p {
+      font-size: 0.95rem;
+      line-height: 1.5;
+      max-width: 22rem;
+      margin: 0 auto;
+    }
+    html.bfm-mobile-unsupported #loading-screen,
+    html.bfm-mobile-unsupported #app {
+      display: none !important;
+    }
+    html.bfm-mobile-unsupported .mobile-unsupported-fallback {
+      display: flex;
+    }
   </style>
+  <script>
+    (function () {
+      var ua = navigator.userAgent || '';
+      var mobile = /iPad|iPhone|iPod/.test(ua) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ||
+        window.matchMedia('(max-width: 768px)').matches;
+      if (!mobile) return;
+      document.documentElement.classList.add('bfm-mobile-unsupported');
+      try {
+        parent.postMessage({ source: 'parkour-loader', type: 'ready', value: 1 }, window.location.origin);
+      } catch (e) { /* not embedded */ }
+    })();
+  </script>
   <script src="./loader-progress.js"></script>
   <script type="module" crossorigin src="./assets/index-B8-l08f_.js"></script>
   <link rel="stylesheet" crossorigin href="./assets/index-CCprXFdY.css">
 </head>
 <body>
+  <div class="mobile-unsupported-fallback" role="alert">
+    <div>
+      <h2>Desktop Required</h2>
+      <p>The interactive MuJoCo demo requires a desktop browser with WebGL and SharedArrayBuffer support.</p>
+    </div>
+  </div>
+
   <div id="loading-screen">
     <div class="loader-content">
       <h2>Perceptive BFM</h2>

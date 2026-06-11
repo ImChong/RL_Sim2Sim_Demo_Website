@@ -24,9 +24,15 @@
   />
   <div
     id="mujoco-container"
-    v-show="!isExternalDemoPolicy || !parkourFrameMounted"
+    v-show="!showEmbeddedDemoFrame && !showBfmMobileBlocked"
   ></div>
-  <div v-if="isExternalDemoPolicy && parkourFrameMounted" class="parkour-frame-wrap">
+  <div v-if="showBfmMobileBlocked" class="parkour-frame-wrap bfm-mobile-blocked">
+    <div class="bfm-mobile-blocked-inner">
+      <h2 class="bfm-mobile-blocked-title">{{ t.bfmMobileBlockedTitle }}</h2>
+      <p class="bfm-mobile-blocked-text">{{ t.bfmMobileUnsupported }}</p>
+    </div>
+  </div>
+  <div v-if="showEmbeddedDemoFrame" class="parkour-frame-wrap">
     <iframe
       ref="parkourFrame"
       :key="parkourReloadKey"
@@ -641,6 +647,7 @@ import {
 } from '@/utils/parkourDepthDiagnostic.js';
 import {
   isAppleMobileDevice,
+  isBfmDesktopRequired,
   PARKOUR_IOS_MOUNT_DELAY_MS
 } from '@/utils/appleMobile.js';
 import {
@@ -761,6 +768,9 @@ const translations = {
     bfmHeightScan: 'Toggle height scan viz',
     bfmFocusHint: 'Click the demo view first, then use the keyboard or motion buttons in the embedded HUD.',
     bfmSource: 'Embedded build from acodedog.github.io/perceptive-bfm, self-hosted in this site.',
+    bfmMobileBlockedTitle: 'Desktop required',
+    bfmMobileUnsupported:
+      'Perceptive BFM needs a desktop browser with WebGL and SharedArrayBuffer. Open this page on a computer to use the embedded demo.',
     resizeControlWidth: 'Resize control panel width (left edge)',
     resizeControlHeight: 'Resize control panel height (bottom edge)',
     resizeControlBoth: 'Resize control panel (bottom-left corner)'
@@ -877,6 +887,9 @@ const translations = {
     bfmHeightScan: '切换高度扫描可视化',
     bfmFocusHint: '请先点击演示画面，再使用键盘或内嵌 HUD 中的动作按钮。',
     bfmSource: '内嵌自 acodedog.github.io/perceptive-bfm 的构建，已自托管在本站。',
+    bfmMobileBlockedTitle: '需要桌面浏览器',
+    bfmMobileUnsupported:
+      'Perceptive BFM 需要支持 WebGL 与 SharedArrayBuffer 的桌面浏览器，请在电脑上打开本页面体验内嵌演示。',
     resizeControlWidth: '拖拽左边框调整控制面板宽度',
     resizeControlHeight: '拖拽下边框调整控制面板高度',
     resizeControlBoth: '拖拽左下角同时调整控制面板大小'
@@ -949,6 +962,7 @@ export default {
         title: 'G1 Perceptive BFM',
         descriptionKey: 'bfmPolicyDescription',
         isExternalDemo: true,
+        desktopOnly: true,
         iframePath: 'perceptive-bfm/dist-desktop/index.html'
       }
     ],
@@ -1106,10 +1120,12 @@ export default {
       return groups;
     },
     policyItems() {
-      return this.policies.map((policy) => ({
-        title: policy.title,
-        value: policy.value
-      }));
+      return this.policies
+        .filter((policy) => !(policy.desktopOnly && isBfmDesktopRequired()))
+        .map((policy) => ({
+          title: policy.title,
+          value: policy.value
+        }));
     },
     selectedPolicy() {
       return this.policies.find((policy) => policy.value === this.currentPolicy) ?? null;
@@ -1148,6 +1164,14 @@ export default {
     },
     isBfmPolicy() {
       return this.currentPolicy === 'g1-perceptive-bfm';
+    },
+    showBfmMobileBlocked() {
+      return this.isBfmPolicy && isBfmDesktopRequired();
+    },
+    showEmbeddedDemoFrame() {
+      return this.isExternalDemoPolicy
+        && this.parkourFrameMounted
+        && !this.showBfmMobileBlocked;
     },
     embeddedDemoFrameTitle() {
       return this.selectedPolicy?.title ?? 'Embedded demo';
@@ -1362,7 +1386,7 @@ export default {
 
       try {
         const iosBootPolicy = isAppleMobileDevice() ? consumeIosBootPolicy() : null;
-        if (iosBootPolicy === 'g1-parkour' || iosBootPolicy === 'g1-perceptive-bfm') {
+        if (iosBootPolicy === 'g1-parkour') {
           await this.bootExternalDemoOnlyOnIos(iosBootPolicy);
           return;
         }
@@ -2078,6 +2102,13 @@ export default {
         this.clearParkourKeyboardState();
       }
       if (selected.isExternalDemo) {
+        if (selected.desktopOnly && isBfmDesktopRequired()) {
+          this.policyLoadError = this.t.bfmMobileUnsupported;
+          this.$nextTick(() => {
+            this.currentPolicy = this.policyBeforeChange;
+          });
+          return;
+        }
         // iOS: reload the same page so only the embedded demo iframe stack is loaded.
         if (isAppleMobileDevice()) {
           scheduleIosPolicyBoot(value);
@@ -2569,6 +2600,33 @@ export default {
   bottom: 0;
   z-index: 500;
   background: #0f172a;
+}
+
+.bfm-mobile-blocked {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0a0a0f;
+  padding: 24px;
+}
+
+.bfm-mobile-blocked-inner {
+  max-width: 22rem;
+  text-align: center;
+  color: #cbd5e1;
+}
+
+.bfm-mobile-blocked-title {
+  color: #818cf8;
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.bfm-mobile-blocked-text {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin: 0;
 }
 
 .parkour-frame {

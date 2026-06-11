@@ -30,6 +30,9 @@ in sync with other policies.
 
 - Loads `loader-progress.js` before the app bundle.
 - Hides the upstream "← Paper" link when embedded in the host page.
+- On iPhone/iPad or viewports under 769px, shows a **Desktop Required** fallback
+  (matches upstream `demo.html`) instead of loading MuJoCo/ONNX. The host page also
+  omits BFM from the policy dropdown on those devices.
 
 ## License / attribution
 
