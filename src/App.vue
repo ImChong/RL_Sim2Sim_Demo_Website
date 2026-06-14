@@ -226,11 +226,12 @@ body {
 .github-link {
   display: inline-flex;
   align-items: center;
-  height: 38px;
+  height: 30px;
   padding: 0 2px;
   font-size: 0.85rem;
   color: var(--text-muted);
   text-decoration: none;
+  box-sizing: border-box;
 }
 
 .github-link:hover {
@@ -243,22 +244,24 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 44px;
+  min-width: 36px;
   height: 30px;
-  padding: 0 8px;
+  padding: 0 0.6rem;
   background: none;
   border: 1px solid var(--border);
   border-radius: 6px;
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   line-height: 1;
   text-align: center;
   color: var(--text);
+  box-sizing: border-box;
 }
 
 .language-toggle {
-  min-width: 48px;
-  font-weight: 600;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
 }
 
 .theme-toggle:hover,
@@ -278,24 +281,37 @@ body {
 
 @media (max-width: 768px) {
   .header-inner {
-    gap: 12px;
-    padding: 8px 16px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.45rem;
+    padding: 8px 8px;
   }
 
   .site-title {
     font-size: 0.94rem;
+    min-width: 0;
+  }
+
+  .header-spacer {
+    display: none;
   }
 
   .header-right {
-    gap: 0.75rem;
+    gap: 0.35rem;
+    margin-left: 0;
+    justify-content: flex-start;
   }
 
   .github-link {
-    font-size: 0.8rem;
+    font-size: 0.78rem;
+    white-space: nowrap;
   }
 
-  .theme-toggle {
-    min-width: 40px;
+  .theme-toggle,
+  .language-toggle {
+    min-width: 32px;
+    height: 30px;
+    padding: 0 0.45rem;
   }
 }
 </style>
