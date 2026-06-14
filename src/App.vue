@@ -281,15 +281,23 @@ body {
 
 @media (max-width: 768px) {
   .header-inner {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0.45rem;
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    gap: 0.5rem;
     padding: 8px 8px;
   }
 
   .site-title {
+    display: block;
+    flex: 0 1 auto;
+    width: calc(100% - 170px);
+    max-width: calc(100% - 170px);
     font-size: 0.94rem;
     min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .header-spacer {
@@ -297,9 +305,10 @@ body {
   }
 
   .header-right {
+    flex: 0 0 auto;
     gap: 0.35rem;
-    margin-left: 0;
-    justify-content: flex-start;
+    margin-left: auto;
+    justify-content: flex-end;
   }
 
   .github-link {
