@@ -434,6 +434,11 @@ export class MuJoCoDemo {
   }
 
   applyJointPositionControl() {
+    const simQpos = this.simulation.qpos;
+    const simQvel = this.simulation.qvel;
+    const simCtrl = this.simulation.ctrl;
+    const ctrlRange = this.model?.actuator_ctrlrange;
+
     for (let i = 0; i < this.numActions; i++) {
       const qpos_adr = this.qpos_adr_policy[i];
       const qvel_adr = this.qvel_adr_policy[i];
@@ -442,9 +447,9 @@ export class MuJoCoDemo {
       const targetJpos = this.actionTarget ? this.actionTarget[i] : 0.0;
       const kp = this.kpPolicy ? this.kpPolicy[i] : 0.0;
       const kd = this.kdPolicy ? this.kdPolicy[i] : 0.0;
-      const torque = kp * (targetJpos - this.simulation.qpos[qpos_adr]) + kd * (0 - this.simulation.qvel[qvel_adr]);
+      const torque = kp * (targetJpos - simQpos[qpos_adr]) + kd * (0 - simQvel[qvel_adr]);
       let ctrlValue = torque;
-      const ctrlRange = this.model?.actuator_ctrlrange;
+
       if (ctrlRange && ctrlRange.length >= (ctrl_adr + 1) * 2) {
         const min = ctrlRange[ctrl_adr * 2];
         const max = ctrlRange[(ctrl_adr * 2) + 1];
@@ -452,11 +457,16 @@ export class MuJoCoDemo {
           ctrlValue = Math.min(Math.max(ctrlValue, min), max);
         }
       }
-      this.simulation.ctrl[ctrl_adr] = ctrlValue;
+      simCtrl[ctrl_adr] = ctrlValue;
     }
   }
 
   applyUnitreePositionControl() {
+    const simQpos = this.simulation.qpos;
+    const simQvel = this.simulation.qvel;
+    const simCtrl = this.simulation.ctrl;
+    const ctrlRange = this.model?.actuator_ctrlrange;
+
     for (let i = 0; i < this.numActions; i++) {
       const qpos_adr = this.qpos_adr_policy[i];
       const qvel_adr = this.qvel_adr_policy[i];
@@ -465,8 +475,8 @@ export class MuJoCoDemo {
       const targetJpos = this.actionTarget ? this.actionTarget[i] : 0.0;
       const kp = this.kpPolicy ? this.kpPolicy[i] : 0.0;
       const kd = this.kdPolicy ? this.kdPolicy[i] : 0.0;
-      const qpos = this.simulation.qpos[qpos_adr];
-      const qvel = this.simulation.qvel[qvel_adr];
+      const qpos = simQpos[qpos_adr];
+      const qvel = simQvel[qvel_adr];
       let torque = kp * (targetJpos - qpos) + kd * (0 - qvel);
       const sameDirection = qvel * torque > 0;
       const y1 = this.Y1Policy ? this.Y1Policy[i] : Infinity;
@@ -487,7 +497,7 @@ export class MuJoCoDemo {
       torque -= fs * Math.tanh(qvel / va) + fd * qvel;
 
       let ctrlValue = torque;
-      const ctrlRange = this.model?.actuator_ctrlrange;
+
       if (ctrlRange && ctrlRange.length >= (ctrl_adr + 1) * 2) {
         const min = ctrlRange[ctrl_adr * 2];
         const max = ctrlRange[(ctrl_adr * 2) + 1];
@@ -495,7 +505,7 @@ export class MuJoCoDemo {
           ctrlValue = Math.min(Math.max(ctrlValue, min), max);
         }
       }
-      this.simulation.ctrl[ctrl_adr] = ctrlValue;
+      simCtrl[ctrl_adr] = ctrlValue;
     }
   }
 
@@ -574,6 +584,8 @@ export class MuJoCoDemo {
           this.simulation.step();
         }
 
+        const simXpos = this.simulation.xpos;
+        const simXquat = this.simulation.xquat;
         for (let b = 0; b < this.model.nbody; b++) {
           if (!this.bodies[b]) {
             continue;
@@ -585,11 +597,13 @@ export class MuJoCoDemo {
             });
           }
           const cached = this.lastSimState.bodies.get(b);
-          getPosition(this.simulation.xpos, b, cached.position);
-          getQuaternion(this.simulation.xquat, b, cached.quaternion);
+          getPosition(simXpos, b, cached.position);
+          getQuaternion(simXquat, b, cached.quaternion);
         }
 
         const numLights = this.model.nlight;
+        const simLightXpos = this.simulation.light_xpos;
+        const simLightXdir = this.simulation.light_xdir;
         for (let l = 0; l < numLights; l++) {
           if (!this.lights[l]) {
             continue;
@@ -601,8 +615,8 @@ export class MuJoCoDemo {
             });
           }
           const cached = this.lastSimState.lights.get(l);
-          getPosition(this.simulation.light_xpos, l, cached.position);
-          getPosition(this.simulation.light_xdir, l, cached.direction);
+          getPosition(simLightXpos, l, cached.position);
+          getPosition(simLightXdir, l, cached.direction);
         }
 
         this.lastSimState.tendons.count = this.model.nwrap;
