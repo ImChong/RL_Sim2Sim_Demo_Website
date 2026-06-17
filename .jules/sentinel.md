@@ -46,3 +46,7 @@
 **Vulnerability:** The application was exposing raw `error.message` directly to the UI when an internal error occurred during simulation loading in `src/views/Demo.vue`.
 **Learning:** This is considered a security risk as it can leak stack traces or sensitive internal system information to the user.
 **Prevention:** Always fail securely by rendering a generic fallback message (e.g., 'An unexpected error occurred') while logging the actual error to the console for debugging.
+## 2026-06-17 - [Dependency Updates for Security]
+**Vulnerability:** Outdated dependencies `vite` (CVE-2026-53571, CVE-2026-53632) and `protobufjs` (CVE-2026-54269) allowed vulnerabilities such as server.fs bypass and path handling leaks.
+**Learning:** Security vulnerabilities often stem from sub-dependencies or out-of-date tooling like dev servers, not just main runtime code.
+**Prevention:** Regularly run `pnpm audit` and bump dependencies (using overrides if necessary) to stay ahead of known CVEs.
