@@ -70,8 +70,11 @@
               :key="edge.id"
               :d="edge.d"
               class="pipeline-edge"
-              :class="{ 'pipeline-edge-active': live }"
-              :marker-end="`url(#${arrowMarkerId})`"
+              :class="{
+                'pipeline-edge-active': live,
+                'pipeline-edge-scope': edge.kind === 'scope'
+              }"
+              :marker-end="edge.kind === 'scope' ? undefined : `url(#${arrowMarkerId})`"
             />
           </svg>
 
@@ -84,7 +87,8 @@
               `pipeline-node-${node.kind}`,
               {
                 'pipeline-node-live': live,
-                'pipeline-node-active': activeNodeId === node.id
+                'pipeline-node-active': activeNodeId === node.id,
+                'pipeline-node-scope': node.kind === 'scope'
               }
             ]"
             :style="{
@@ -103,6 +107,7 @@
                   class="pipeline-node-head"
                   @mousedown.stop="onNodeMoveStart(node.id, $event)"
                   @touchstart.stop="onNodeMoveStart(node.id, $event)"
+                  @dblclick.stop="onNodeProbeAll(node)"
                 >
                   <div class="pipeline-node-title" :title="node.title">{{ node.title }}</div>
                   <div
@@ -119,9 +124,26 @@
                     :live="live"
                   />
                   <template v-else>
-                    <div v-for="(line, idx) in node.lines" :key="idx" class="pipeline-node-line">
+                    <div
+                      v-for="(line, idx) in node.lines"
+                      :key="idx"
+                      class="pipeline-node-line"
+                      :class="{
+                        'pipeline-node-line-probed': isLineProbed(node.id, line.k),
+                        'pipeline-node-line-probeable': isLineProbeable(line)
+                      }"
+                      @click.stop="onLineProbe(node, line)"
+                    >
                       <span class="pipeline-node-key" :title="line.k">{{ line.k }}</span>
-                      <span class="pipeline-node-val" :title="line.v">{{ line.v }}</span>
+                      <span class="pipeline-node-val" :title="line.v">
+                        <v-icon
+                          v-if="isLineProbeable(line)"
+                          icon="mdi-chart-line-variant"
+                          size="10"
+                          class="pipeline-probe-icon"
+                        />
+                        {{ line.v }}
+                      </span>
                     </div>
                   </template>
                 </div>
@@ -194,8 +216,13 @@ export default {
     isMobile: {
       type: Boolean,
       default: false
+    },
+    activeProbes: {
+      type: Array,
+      default: () => []
     }
   },
+  emits: ['toggle-probe', 'open-scope'],
   data: () => ({
     resizeObserver: null,
     arrowMarkerId: `pipeline-arrow-${++graphInstanceCounter}`,
@@ -213,7 +240,13 @@ export default {
   computed: {
     layout() {
       const lang = this.language === 'en' ? 'en' : 'zh';
-      return buildPipelineGraph(this.telemetry, lang, { layout: 'horizontal' });
+      return buildPipelineGraph(this.telemetry, lang, {
+        layout: this.isMobile ? 'vertical' : 'horizontal',
+        activeProbes: this.activeProbes
+      });
+    },
+    activeProbeIds() {
+      return new Set(this.activeProbes.map((probe) => probe.id));
     },
     scrollHint() {
       if (this.isMobile) {
@@ -272,7 +305,8 @@ export default {
           }
           return {
             id: edge.id,
-            d: this.horizontalBezierPath(from, to)
+            d: this.horizontalBezierPath(from, to),
+            kind: edge.kind
           };
         })
         .filter(Boolean);
@@ -627,6 +661,49 @@ export default {
       const c1x = from.x + dx;
       const c2x = to.x - dx;
       return `M ${from.x} ${from.y} C ${c1x} ${from.y}, ${c2x} ${to.y}, ${to.x} ${to.y}`;
+    },
+    isLineProbeable(line) {
+      return Boolean(line?.k && line.k !== '…' && line.k !== 'in' && line.k !== 'out' && line.k !== 'act');
+    },
+    isLineProbed(nodeId, lineKey) {
+      return this.activeProbeIds.has(`${nodeId}:${lineKey}`);
+    },
+    onLineProbe(node, line) {
+      if (!this.isLineProbeable(line)) {
+        return;
+      }
+      const title = node.title ?? node.id;
+      this.$emit('toggle-probe', {
+        id: `${node.id}:${line.k}`,
+        nodeId: node.id,
+        lineKey: line.k,
+        label: `${title} · ${line.k}`
+      });
+    },
+    onNodeProbeAll(node) {
+      if (node.kind === 'scope') {
+        this.$emit('open-scope');
+        return;
+      }
+      if (!node.lines?.length) {
+        return;
+      }
+      for (const line of node.lines) {
+        if (!this.isLineProbeable(line)) {
+          continue;
+        }
+        const probeId = `${node.id}:${line.k}`;
+        if (this.activeProbeIds.has(probeId)) {
+          continue;
+        }
+        const title = node.title ?? node.id;
+        this.$emit('toggle-probe', {
+          id: probeId,
+          nodeId: node.id,
+          lineKey: line.k,
+          label: `${title} · ${line.k}`
+        });
+      }
     }
   }
 };
@@ -774,6 +851,17 @@ export default {
   filter: drop-shadow(0 0 4px rgba(var(--v-theme-primary), 0.35));
 }
 
+.pipeline-edge-scope {
+  stroke: rgba(76, 179, 212, 0.75);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+}
+
+.pipeline-node-scope .pipeline-node-card {
+  border-color: rgba(76, 179, 212, 0.55);
+  background: linear-gradient(180deg, rgba(15, 35, 48, 0.95) 0%, rgba(10, 20, 30, 0.98) 100%);
+}
+
 .pipeline-node {
   position: absolute;
   top: 0;
@@ -891,6 +979,27 @@ export default {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.6rem;
   line-height: 1.3;
+}
+
+.pipeline-node-line-probeable {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 1px 2px;
+}
+
+.pipeline-node-line-probeable:hover {
+  background: rgba(var(--v-theme-primary), 0.12);
+}
+
+.pipeline-node-line-probed {
+  background: rgba(76, 179, 212, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(76, 179, 212, 0.35);
+}
+
+.pipeline-probe-icon {
+  margin-right: 2px;
+  opacity: 0.65;
+  vertical-align: -1px;
 }
 
 .pipeline-shell-mobile .pipeline-node-title {
