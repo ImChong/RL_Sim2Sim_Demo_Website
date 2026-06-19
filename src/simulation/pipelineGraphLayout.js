@@ -149,7 +149,7 @@ function buildNetworkColumns(architecture, zh) {
 /**
  * @param {ReturnType<import('./policyTelemetry.js').buildPolicyTelemetry>} telemetry
  * @param {'zh'|'en'} lang
- * @param {{ layout?: 'horizontal' | 'vertical' }} [options]
+ * @param {{ layout?: 'horizontal' | 'vertical', activeProbes?: Array<{ id: string, nodeId: string, lineKey: string }> }} [options]
  */
 export function buildPipelineGraph(telemetry, lang = 'zh', options = {}) {
   const zh = lang === 'zh';
@@ -162,10 +162,82 @@ export function buildPipelineGraph(telemetry, lang = 'zh', options = {}) {
     return { nodes: [], edges: [], lanes: [], width: 480, height: 200, layout: options.layout ?? 'horizontal' };
   }
 
+  const activeProbes = options.activeProbes ?? [];
   if (options.layout === 'vertical') {
-    return buildVerticalAtomicGraph(telemetry, zh, atomic);
+    return appendScopeSink(buildVerticalAtomicGraph(telemetry, zh, atomic), activeProbes, zh);
   }
-  return buildHorizontalAtomicGraph(telemetry, zh, atomic);
+  return appendScopeSink(buildHorizontalAtomicGraph(telemetry, zh, atomic), activeProbes, zh);
+}
+
+function appendScopeSink(graph, activeProbes, zh) {
+  const probes = activeProbes ?? [];
+  const uniqueNodeIds = [...new Set(probes.map((p) => p.nodeId))];
+  const channelCount = probes.length;
+  const previewLines = probes.slice(0, 4).map((probe) => ({
+    k: probe.lineKey,
+    v: '●'
+  }));
+  const lines = [
+    { k: zh ? '通道' : 'ch', v: String(channelCount) },
+    ...previewLines
+  ];
+  if (channelCount > previewLines.length) {
+    lines.push({ k: '…', v: `+${channelCount - previewLines.length}` });
+  }
+
+  const scopeHeight = nodeHeightForLines(lines.length);
+  const scopeWidth = 200;
+  let scopeX;
+  let scopeY;
+
+  if (graph.layout === 'vertical') {
+    scopeX = graph.nodes[0]?.x ?? MARGIN_X;
+    scopeY = graph.height + ROW_GAP_MOBILE;
+    graph.height += scopeHeight + ROW_GAP_MOBILE + 8;
+    graph.width = Math.max(graph.width, scopeWidth + MARGIN_X * 2);
+  } else {
+    const rightmost = graph.nodes.reduce((max, node) => Math.max(max, (node.x ?? 0) + (node.width ?? 0)), 0);
+    scopeX = rightmost + COL_GAP;
+    const coreY = graph.height / 2;
+    scopeY = coreY - scopeHeight / 2;
+    graph.width = scopeX + scopeWidth + MARGIN_X;
+    graph.lanes.push({
+      id: 'scope',
+      label: zh ? '可视化' : 'Scope',
+      x: scopeX - LANE_PAD_X,
+      width: scopeWidth + LANE_PAD_X * 2
+    });
+  }
+
+  graph.nodes.push({
+    id: 'out-scope',
+    kind: 'scope',
+    title: zh ? '示波器' : 'Scope',
+    subtitle: zh ? 'uPlot 风格波形' : 'Waveform sink',
+    width: scopeWidth,
+    height: scopeHeight,
+    x: scopeX,
+    y: scopeY,
+    lines
+  });
+
+  const prev = graph.nodes
+    .filter((n) => n.group === 'motor' || n.group === 'output')
+    .map((n) => n.id)
+    .pop();
+  if (prev && !uniqueNodeIds.length) {
+    graph.edges.push({ id: `e-${prev}-scope`, from: prev, to: 'out-scope', kind: 'scope' });
+  }
+  for (const nodeId of uniqueNodeIds) {
+    graph.edges.push({
+      id: `e-${nodeId}-scope`,
+      from: nodeId,
+      to: 'out-scope',
+      kind: 'scope'
+    });
+  }
+
+  return graph;
 }
 
 function buildHorizontalAtomicGraph(telemetry, zh, atomic) {

@@ -103,3 +103,16 @@ test('buildPipelineGraph vertical layout stacks nodes', () => {
   assert.ok(tail);
   assert.ok(tail.y > rootPos.y);
 });
+
+test('buildPipelineGraph appends scope sink and probe edges', () => {
+  const graph = buildPipelineGraph(baseTelemetry, 'zh', {
+    activeProbes: [
+      { id: 'sim-cmd-vx:vx', nodeId: 'sim-cmd-vx', lineKey: 'vx' },
+      { id: 'out-action:L_hip', nodeId: 'out-action', lineKey: 'L_hip' }
+    ]
+  });
+  const scopeNode = graph.nodes.find((n) => n.id === 'out-scope');
+  assert.ok(scopeNode);
+  assert.equal(scopeNode.kind, 'scope');
+  assert.ok(graph.edges.some((e) => e.from === 'sim-cmd-vx' && e.to === 'out-scope' && e.kind === 'scope'));
+});

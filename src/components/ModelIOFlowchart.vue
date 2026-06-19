@@ -55,6 +55,23 @@
           {{ t.waiting }}
         </v-chip>
         <v-spacer />
+        <v-btn-toggle
+          v-if="telemetry.ready"
+          v-model="viewTab"
+          density="compact"
+          mandatory
+          color="primary"
+          class="model-io-tabs"
+        >
+          <v-btn value="graph" size="x-small" variant="text">
+            <v-icon icon="mdi-graph-outline" size="small" start />
+            {{ t.tabGraph }}
+          </v-btn>
+          <v-btn value="scope" size="x-small" variant="text">
+            <v-icon icon="mdi-chart-line-variant" size="small" start />
+            {{ t.tabScope }}
+          </v-btn>
+        </v-btn-toggle>
         <v-btn
           v-if="isSmallScreen"
           icon="mdi-close"
@@ -71,14 +88,38 @@
         </p>
 
         <template v-else>
-          <p v-if="!isSmallScreen" class="text-caption text-medium-emphasis pipeline-hint">
-            {{ telemetry.model.normalizerNote }}
+          <p v-if="!isSmallScreen && viewTab === 'graph'" class="text-caption text-medium-emphasis pipeline-hint">
+            {{ t.graphHint }}
           </p>
           <ModelIOPipelineGraph
+            v-show="viewTab === 'graph'"
             :telemetry="telemetry"
             :language="language"
             :live="telemetry.ready"
             :is-mobile="isSmallScreen"
+            :active-probes="activeProbes"
+            @probe-node="onProbeNode"
+            @open-scope="openScopeTab"
+          />
+          <SignalOscilloscope
+            v-show="viewTab === 'scope'"
+            :snapshot="scopeSnapshot"
+            :active-probe-ids="activeProbeIds"
+            :paused="signalScope.paused"
+            :channels-label="t.scopeChannels"
+            :samples-label="t.scopeSamples"
+            :reset-zoom-label="t.scopeResetZoom"
+            :clear-label="t.scopeClear"
+            :pause-label="t.scopePause"
+            :resume-label="t.scopeResume"
+            :empty-label="t.scopeEmpty"
+            :hint="t.scopeHint"
+            :can-reset-zoom="Boolean(scopeZoom)"
+            :zoom="scopeZoom"
+            @toggle-pause="toggleScopePause"
+            @reset-zoom="resetScopeZoom"
+            @clear="clearScope"
+            @remove-probe="onRemoveProbe"
           />
         </template>
       </v-card-text>
@@ -110,6 +151,16 @@
 <script>
 import { buildPolicyTelemetry } from '@/simulation/policyTelemetry.js';
 import ModelIOPipelineGraph from '@/components/ModelIOPipelineGraph.vue';
+import SignalOscilloscope from '@/components/SignalOscilloscope.vue';
+import {
+  clearScopeBuffer,
+  createSignalScope,
+  getScopeSnapshot,
+  listNodeProbes,
+  pushScopeSample,
+  removeScopeProbe,
+  setScopeProbes
+} from '@/simulation/signalScope.js';
 import {
   clampPanelSize,
   loadPanelSize,
@@ -127,7 +178,19 @@ const translations = {
     notReady: 'Simulation is loading. The pipeline graph will update once the policy is running.',
     resizeWidth: 'Resize panel width (right edge)',
     resizeHeight: 'Resize panel height (top edge)',
-    resizeBoth: 'Resize panel (top-right corner)'
+    resizeBoth: 'Resize panel (top-right corner)',
+    tabGraph: 'Graph',
+    tabScope: 'Scope',
+    graphHint: 'Click a node to view its signals in the scope · Drag the title bar to reposition nodes',
+    scopeChannels: 'Channels',
+    scopeSamples: 'Samples',
+    scopeResetZoom: 'Reset zoom',
+    scopeClear: 'Clear',
+    scopePause: 'Pause',
+    scopeResume: 'Resume',
+    scopeEmpty: 'Waiting for samples…',
+    scopeHint: 'Switch to Graph and click a node to plot its signals (up to 8 channels).',
+    scopeMaxChannels: 'Maximum 8 scope channels'
   },
   zh: {
     panelTitle: '模型 I/O 连接图',
@@ -139,14 +202,27 @@ const translations = {
     notReady: '仿真仍在加载，策略就绪后将显示实时连接图。',
     resizeWidth: '拖拽右边框调整宽度',
     resizeHeight: '拖拽上边框调整高度',
-    resizeBoth: '拖拽右上角同时调整'
+    resizeBoth: '拖拽右上角同时调整',
+    tabGraph: '流程图',
+    tabScope: '示波器',
+    graphHint: '点击节点在示波器查看信号曲线 · 拖标题栏可移动节点',
+    scopeChannels: '通道',
+    scopeSamples: '采样',
+    scopeResetZoom: '重置缩放',
+    scopeClear: '清空',
+    scopePause: '暂停',
+    scopeResume: '继续',
+    scopeEmpty: '等待采样数据…',
+    scopeHint: '切到「流程图」后点击节点即可绘制该节点信号（最多 8 路）。',
+    scopeMaxChannels: '示波器最多 8 路通道'
   }
 };
 
 export default {
   name: 'ModelIOFlowchart',
   components: {
-    ModelIOPipelineGraph
+    ModelIOPipelineGraph,
+    SignalOscilloscope
   },
   props: {
     demo: {
@@ -174,13 +250,28 @@ export default {
     const panelSize = loadPanelSize();
     return {
       expanded: false,
+      viewTab: 'graph',
       telemetry: { ready: false },
+      signalScope: createSignalScope(),
+      scopeSnapshot: getScopeSnapshot(createSignalScope()),
+      scopeZoom: null,
       panelWidth: panelSize.width,
       panelHeight: panelSize.height,
       panelResize: null
     };
   },
   computed: {
+    activeProbes() {
+      return this.signalScope.channels.map((ch) => ({
+        id: ch.id,
+        nodeId: ch.nodeId,
+        lineKey: ch.lineKey,
+        label: ch.label
+      }));
+    },
+    activeProbeIds() {
+      return this.activeProbes.map((probe) => probe.id);
+    },
     desktopPanelStyle() {
       if (this.isSmallScreen) {
         return null;
@@ -209,6 +300,8 @@ export default {
     ready(isReady) {
       if (!isReady) {
         this.telemetry = { ready: false };
+        clearScopeBuffer(this.signalScope);
+        this.scopeSnapshot = getScopeSnapshot(this.signalScope);
       }
     },
     isSmallScreen(isSmall) {
@@ -310,6 +403,10 @@ export default {
       this.pollTimer = setInterval(() => {
         if (this.expanded && this.ready) {
           this.refreshTelemetry();
+          if (this.activeProbes.length > 0) {
+            pushScopeSample(this.signalScope, this.demo?.policyRunner, this.demo);
+            this.scopeSnapshot = getScopeSnapshot(this.signalScope);
+          }
         }
       }, this.pollIntervalMs);
     },
@@ -339,6 +436,38 @@ export default {
       this.telemetry = buildPolicyTelemetry(this.demo.policyRunner, this.demo, {
         lang: this.language
       });
+    },
+    onProbeNode(node) {
+      const probes = listNodeProbes(node);
+      if (!probes.length) {
+        return;
+      }
+      setScopeProbes(this.signalScope, probes);
+      this.scopeZoom = null;
+      this.viewTab = 'scope';
+      if (this.ready && this.demo?.policyRunner) {
+        pushScopeSample(this.signalScope, this.demo.policyRunner, this.demo);
+      }
+      this.scopeSnapshot = getScopeSnapshot(this.signalScope);
+    },
+    onRemoveProbe(probeId) {
+      removeScopeProbe(this.signalScope, probeId);
+      this.scopeSnapshot = getScopeSnapshot(this.signalScope);
+    },
+    openScopeTab() {
+      this.viewTab = 'scope';
+    },
+    toggleScopePause() {
+      this.signalScope.paused = !this.signalScope.paused;
+    },
+    resetScopeZoom() {
+      this.scopeZoom = null;
+    },
+    clearScope() {
+      clearScopeBuffer(this.signalScope);
+      this.signalScope.channels = [];
+      this.scopeZoom = null;
+      this.scopeSnapshot = getScopeSnapshot(this.signalScope);
     }
   }
 };
@@ -453,6 +582,10 @@ export default {
   font-size: 0.95rem;
   padding: 12px 14px 8px;
   flex-shrink: 0;
+}
+
+.model-io-tabs {
+  margin-right: 4px;
 }
 
 .model-io-body {

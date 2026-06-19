@@ -70,8 +70,11 @@
               :key="edge.id"
               :d="edge.d"
               class="pipeline-edge"
-              :class="{ 'pipeline-edge-active': live }"
-              :marker-end="`url(#${arrowMarkerId})`"
+              :class="{
+                'pipeline-edge-active': live,
+                'pipeline-edge-scope': edge.kind === 'scope'
+              }"
+              :marker-end="edge.kind === 'scope' ? undefined : `url(#${arrowMarkerId})`"
             />
           </svg>
 
@@ -84,7 +87,10 @@
               `pipeline-node-${node.kind}`,
               {
                 'pipeline-node-live': live,
-                'pipeline-node-active': activeNodeId === node.id
+                'pipeline-node-active': activeNodeId === node.id,
+                'pipeline-node-scope': node.kind === 'scope',
+                'pipeline-node-clickable': isNodeClickable(node),
+                'pipeline-node-probed': isNodeProbed(node)
               }
             ]"
             :style="{
@@ -111,7 +117,11 @@
                     :title="node.subtitle"
                   >{{ node.subtitle }}</div>
                 </div>
-                <div class="pipeline-node-card">
+                <div
+                  class="pipeline-node-card"
+                  :class="{ 'pipeline-node-card-clickable': isNodeClickable(node) }"
+                  @click.stop="onNodeClick(node)"
+                >
                   <NetworkDiagram
                     v-if="node.kind === 'network'"
                     :columns="node.networkColumns"
@@ -119,10 +129,27 @@
                     :live="live"
                   />
                   <template v-else>
-                    <div v-for="(line, idx) in node.lines" :key="idx" class="pipeline-node-line">
+                    <div
+                      v-for="(line, idx) in node.lines"
+                      :key="idx"
+                      class="pipeline-node-line"
+                      :class="{
+                        'pipeline-node-line-probed': isLineProbed(node.id, line.k)
+                      }"
+                    >
                       <span class="pipeline-node-key" :title="line.k">{{ line.k }}</span>
-                      <span class="pipeline-node-val" :title="line.v">{{ line.v }}</span>
+                      <span
+                        v-if="line.v"
+                        class="pipeline-node-val pipeline-node-meta"
+                        :title="line.v"
+                      >{{ line.v }}</span>
                     </div>
+                    <v-icon
+                      v-if="isNodeClickable(node)"
+                      icon="mdi-chart-line-variant"
+                      size="12"
+                      class="pipeline-node-scope-hint"
+                    />
                   </template>
                 </div>
               </div>
@@ -141,6 +168,7 @@
 <script>
 import { buildPipelineGraph } from '@/simulation/pipelineGraphLayout.js';
 import { portPointFromLayoutNode } from '@/simulation/pipelineGraphEdgeCoords.js';
+import { isProbeableLine } from '@/simulation/signalScope.js';
 import NetworkDiagram from '@/components/NetworkDiagram.vue';
 import {
   computeGraphBounds,
@@ -194,8 +222,13 @@ export default {
     isMobile: {
       type: Boolean,
       default: false
+    },
+    activeProbes: {
+      type: Array,
+      default: () => []
     }
   },
+  emits: ['probe-node', 'open-scope'],
   data: () => ({
     resizeObserver: null,
     arrowMarkerId: `pipeline-arrow-${++graphInstanceCounter}`,
@@ -213,17 +246,23 @@ export default {
   computed: {
     layout() {
       const lang = this.language === 'en' ? 'en' : 'zh';
-      return buildPipelineGraph(this.telemetry, lang, { layout: 'horizontal' });
+      return buildPipelineGraph(this.telemetry, lang, {
+        layout: this.isMobile ? 'vertical' : 'horizontal',
+        activeProbes: this.activeProbes
+      });
+    },
+    activeProbeIds() {
+      return new Set(this.activeProbes.map((probe) => probe.id));
     },
     scrollHint() {
       if (this.isMobile) {
         return this.language === 'en'
-          ? 'Drag title to move node · Drag canvas to pan · Pinch to zoom'
-          : '拖标题移动节点 · 拖空白平移画布 · 双指缩放';
+          ? 'Drag title to move node · Click node body to open scope · Drag canvas to pan · Pinch to zoom'
+          : '拖标题移动节点 · 点击节点查看示波器 · 拖空白平移画布 · 双指缩放';
       }
       return this.language === 'en'
-        ? 'Drag title to move node · Drag canvas to pan · Wheel to zoom'
-        : '拖标题移动节点 · 拖空白平移画布 · 滚轮缩放';
+        ? 'Drag title to move node · Click node body to open scope · Drag canvas to pan · Wheel to zoom'
+        : '拖标题移动节点 · 点击节点查看示波器 · 拖空白平移画布 · 滚轮缩放';
     },
     viewportStyle() {
       if (this.isMobile) {
@@ -272,7 +311,8 @@ export default {
           }
           return {
             id: edge.id,
-            d: this.horizontalBezierPath(from, to)
+            d: this.horizontalBezierPath(from, to),
+            kind: edge.kind
           };
         })
         .filter(Boolean);
@@ -627,6 +667,40 @@ export default {
       const c1x = from.x + dx;
       const c2x = to.x - dx;
       return `M ${from.x} ${from.y} C ${c1x} ${from.y}, ${c2x} ${to.y}, ${to.x} ${to.y}`;
+    },
+    isLineProbeable(line) {
+      return isProbeableLine(line);
+    },
+    isNodeClickable(node) {
+      if (!node) {
+        return false;
+      }
+      if (node.kind === 'scope') {
+        return true;
+      }
+      if (node.kind === 'network') {
+        return false;
+      }
+      return node.lines?.some((line) => this.isLineProbeable(line));
+    },
+    isNodeProbed(node) {
+      if (!node?.lines?.length) {
+        return false;
+      }
+      return node.lines.some((line) => this.isLineProbed(node.id, line.k));
+    },
+    isLineProbed(nodeId, lineKey) {
+      return this.activeProbeIds.has(`${nodeId}:${lineKey}`);
+    },
+    onNodeClick(node) {
+      if (node.kind === 'scope') {
+        this.$emit('open-scope');
+        return;
+      }
+      if (!this.isNodeClickable(node)) {
+        return;
+      }
+      this.$emit('probe-node', node);
     }
   }
 };
@@ -774,6 +848,17 @@ export default {
   filter: drop-shadow(0 0 4px rgba(var(--v-theme-primary), 0.35));
 }
 
+.pipeline-edge-scope {
+  stroke: rgba(76, 179, 212, 0.75);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+}
+
+.pipeline-node-scope .pipeline-node-card {
+  border-color: rgba(76, 179, 212, 0.55);
+  background: linear-gradient(180deg, rgba(15, 35, 48, 0.95) 0%, rgba(10, 20, 30, 0.98) 100%);
+}
+
 .pipeline-node {
   position: absolute;
   top: 0;
@@ -829,6 +914,29 @@ export default {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
   cursor: default;
   user-select: text;
+  position: relative;
+}
+
+.pipeline-node-card-clickable {
+  cursor: pointer;
+}
+
+.pipeline-node-card-clickable:hover {
+  border-color: rgba(var(--v-theme-primary), 0.55);
+  background: linear-gradient(180deg, rgba(35, 48, 68, 0.96) 0%, rgba(18, 28, 44, 0.99) 100%);
+}
+
+.pipeline-node-probed .pipeline-node-card {
+  border-color: rgba(76, 179, 212, 0.55);
+  box-shadow: 0 0 0 1px rgba(76, 179, 212, 0.2), 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+.pipeline-node-scope-hint {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  opacity: 0.55;
+  pointer-events: none;
 }
 
 .pipeline-node-live .pipeline-node-card {
@@ -893,6 +1001,10 @@ export default {
   line-height: 1.3;
 }
 
+.pipeline-node-line-probed .pipeline-node-key {
+  color: rgba(76, 179, 212, 0.95);
+}
+
 .pipeline-shell-mobile .pipeline-node-title {
   font-size: 0.78rem;
 }
@@ -909,11 +1021,15 @@ export default {
 }
 
 .pipeline-node-val {
-  color: rgba(var(--v-theme-primary), 0.95);
+  color: #94a3b8;
   white-space: nowrap;
   flex-shrink: 0;
   margin-left: auto;
   padding-left: 8px;
+}
+
+.pipeline-node-meta {
+  color: #94a3b8;
 }
 
 .pipeline-port {
