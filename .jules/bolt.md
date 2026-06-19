@@ -55,3 +55,6 @@
 ## 2024-06-16 - Hoisting Emscripten Array Getters in Hot Paths
 **Learning:** In the MuJoCo WASM bindings, dynamically accessing properties like `simulation.qpos` or `simulation.xpos` inside high-frequency loops (e.g., iterating over `numActions` or `nbody` during physics substeps) causes a new `Float32Array` or `Float64Array` view to be allocated upon each access. This leads to tens of thousands of unnecessary allocations per second, creating severe Garbage Collection pressure and degrading performance in the main loop.
 **Action:** Always cache/hoist Emscripten TypedArray getters (such as `qpos`, `qvel`, `ctrl`, `xpos`, `xquat`, etc.) outside of inner physics or rendering iteration loops to avoid redundant view allocations in hot paths.
+## 2025-06-25 - Avoid null reference exceptions when hoisting simulation array getters
+**Learning:** Found that hoisting `this.simulation.qpos`, `this.simulation.qvel`, etc., outside of loops in `main.js` must be done after carefully checking if `this.simulation` actually exists. Hoisting them above `if (!this.alive || !this.simulation)` causes a fatal `TypeError` during demo shutdown or reload when the simulation object is null.
+**Action:** Always check loop entry guards or exit conditions to ensure you don't hoist variables to a point in the code where the parent object might be null or undefined.
