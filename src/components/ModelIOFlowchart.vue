@@ -98,7 +98,7 @@
             :live="telemetry.ready"
             :is-mobile="isSmallScreen"
             :active-probes="activeProbes"
-            @toggle-probe="onToggleProbe"
+            @probe-node="onProbeNode"
             @open-scope="openScopeTab"
           />
           <SignalOscilloscope
@@ -156,9 +156,10 @@ import {
   clearScopeBuffer,
   createSignalScope,
   getScopeSnapshot,
+  listNodeProbes,
   pushScopeSample,
   removeScopeProbe,
-  toggleScopeProbe
+  setScopeProbes
 } from '@/simulation/signalScope.js';
 import {
   clampPanelSize,
@@ -180,7 +181,7 @@ const translations = {
     resizeBoth: 'Resize panel (top-right corner)',
     tabGraph: 'Graph',
     tabScope: 'Scope',
-    graphHint: 'Click a signal value to probe · Double-click node title to add all · Double-click Scope to open waveform',
+    graphHint: 'Click a node to view its signals in the scope · Drag the title bar to reposition nodes',
     scopeChannels: 'Channels',
     scopeSamples: 'Samples',
     scopeResetZoom: 'Reset zoom',
@@ -188,7 +189,7 @@ const translations = {
     scopePause: 'Pause',
     scopeResume: 'Resume',
     scopeEmpty: 'Waiting for samples…',
-    scopeHint: 'Switch to Graph and click signal values to add channels (max 8).',
+    scopeHint: 'Switch to Graph and click a node to plot its signals (up to 8 channels).',
     scopeMaxChannels: 'Maximum 8 scope channels'
   },
   zh: {
@@ -204,7 +205,7 @@ const translations = {
     resizeBoth: '拖拽右上角同时调整',
     tabGraph: '流程图',
     tabScope: '示波器',
-    graphHint: '点击信号值添加探测 · 双击节点标题批量添加 · 双击示波器节点打开波形',
+    graphHint: '点击节点在示波器查看信号曲线 · 拖标题栏可移动节点',
     scopeChannels: '通道',
     scopeSamples: '采样',
     scopeResetZoom: '重置缩放',
@@ -212,7 +213,7 @@ const translations = {
     scopePause: '暂停',
     scopeResume: '继续',
     scopeEmpty: '等待采样数据…',
-    scopeHint: '切到「流程图」后点击信号值添加通道（最多 8 路）。',
+    scopeHint: '切到「流程图」后点击节点即可绘制该节点信号（最多 8 路）。',
     scopeMaxChannels: '示波器最多 8 路通道'
   }
 };
@@ -436,13 +437,16 @@ export default {
         lang: this.language
       });
     },
-    onToggleProbe(probe) {
-      const result = toggleScopeProbe(this.signalScope, probe);
-      if (result === null) {
+    onProbeNode(node) {
+      const probes = listNodeProbes(node);
+      if (!probes.length) {
         return;
       }
-      if (result) {
-        this.viewTab = 'scope';
+      setScopeProbes(this.signalScope, probes);
+      this.scopeZoom = null;
+      this.viewTab = 'scope';
+      if (this.ready && this.demo?.policyRunner) {
+        pushScopeSample(this.signalScope, this.demo.policyRunner, this.demo);
       }
       this.scopeSnapshot = getScopeSnapshot(this.signalScope);
     },

@@ -113,7 +113,7 @@ export default {
     },
     hint: {
       type: String,
-      default: 'Click a signal value in the pipeline graph to probe it.'
+      default: 'Switch to the pipeline graph and click a node to plot its signals.'
     },
     canResetZoom: {
       type: Boolean,

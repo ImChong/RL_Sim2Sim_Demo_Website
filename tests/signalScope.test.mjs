@@ -7,6 +7,7 @@ import {
   getScopeSnapshot,
   pushScopeSample,
   resolveSignalValue,
+  setScopeProbes,
   toggleScopeProbe
 } from '../src/simulation/signalScope.js';
 
@@ -89,6 +90,34 @@ test('resolveSignalValue reads command and joint action signals', () => {
   assert.equal(resolveSignalValue(runner, demo, { nodeId: 'sim-cmd-vx', lineKey: 'vx' }), 0.8);
   assert.ok(Math.abs(resolveSignalValue(runner, demo, { nodeId: 'out-action', lineKey: 'L_hip_pitch' }) - 0.2) < 1e-5);
   assert.equal(resolveSignalValue(runner, demo, { nodeId: 'obs-Command-vx', lineKey: 'vx' }), 0.5);
+});
+
+test('setScopeProbes replaces active channels', () => {
+  const scope = createSignalScope({ capacity: 8, maxChannels: 4 });
+  toggleScopeProbe(scope, {
+    id: 'sim-cmd-vx:vx',
+    nodeId: 'sim-cmd-vx',
+    lineKey: 'vx',
+    label: 'Cmd vx'
+  });
+  const probes = [
+    {
+      id: buildProbeId('sim-root-angvel', 'x'),
+      nodeId: 'sim-root-angvel',
+      lineKey: 'x',
+      label: 'Root AngVel · x'
+    },
+    {
+      id: buildProbeId('sim-root-angvel', 'y'),
+      nodeId: 'sim-root-angvel',
+      lineKey: 'y',
+      label: 'Root AngVel · y'
+    }
+  ];
+  setScopeProbes(scope, probes);
+  assert.equal(scope.channels.length, 2);
+  assert.equal(scope.channels[0].id, 'sim-root-angvel:x');
+  assert.equal(getScopeSnapshot(scope).sampleCount, 0);
 });
 
 test('clearScopeBuffer resets timeline but keeps channels', () => {

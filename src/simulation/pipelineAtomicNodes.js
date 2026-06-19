@@ -1,5 +1,3 @@
-import { formatFloat } from './policyTelemetry.js';
-
 function shortJointName(name) {
   if (!name) {
     return 'j';
@@ -10,22 +8,20 @@ function shortJointName(name) {
     .replace(/^right_/, 'R_');
 }
 
-function vec3Lines(prefix, values) {
-  const v = values ?? [];
+function vec3Lines(prefix) {
   return [
-    { k: `${prefix}x`, v: formatFloat(v[0]) },
-    { k: `${prefix}y`, v: formatFloat(v[1]) },
-    { k: `${prefix}z`, v: formatFloat(v[2]) }
+    { k: `${prefix}x` },
+    { k: `${prefix}y` },
+    { k: `${prefix}z` }
   ];
 }
 
-function jointLines(jointNames, values, max = Infinity) {
+function jointLines(jointNames, max = Infinity) {
   const lines = [];
-  const n = Math.min(jointNames.length, values?.length ?? 0, max);
+  const n = Math.min(jointNames.length, max);
   for (let i = 0; i < n; i++) {
     lines.push({
-      k: shortJointName(jointNames[i]),
-      v: formatFloat(values[i])
+      k: shortJointName(jointNames[i])
     });
   }
   if (jointNames.length > n) {
@@ -57,7 +53,7 @@ function decomposeObsBlock(block, slice, jointNames, lang) {
         group: 'obs',
         title: zh ? '根角速度' : 'Root AngVel',
         subtitle: zh ? '机体系 ω' : 'body ω',
-        lines: vec3Lines('', data),
+        lines: vec3Lines(''),
         concatOffset: block.offset,
         concatSize: block.size
       }];
@@ -68,7 +64,7 @@ function decomposeObsBlock(block, slice, jointNames, lang) {
         group: 'obs',
         title: zh ? '投影重力' : 'Proj Gravity',
         subtitle: zh ? '机体系' : 'body frame',
-        lines: vec3Lines('', data),
+        lines: vec3Lines(''),
         concatOffset: block.offset,
         concatSize: block.size
       }];
@@ -79,7 +75,7 @@ function decomposeObsBlock(block, slice, jointNames, lang) {
           kind: 'signal',
           group: 'obs',
           title: zh ? '指令 vx' : 'Cmd vx',
-          lines: [{ k: 'vx', v: formatFloat(data[0]) }],
+          lines: [{ k: 'vx' }],
           concatOffset: block.offset,
           concatSize: 1
         },
@@ -88,7 +84,7 @@ function decomposeObsBlock(block, slice, jointNames, lang) {
           kind: 'signal',
           group: 'obs',
           title: zh ? '指令 vy' : 'Cmd vy',
-          lines: [{ k: 'vy', v: formatFloat(data[1]) }],
+          lines: [{ k: 'vy' }],
           concatOffset: block.offset + 1,
           concatSize: 1
         },
@@ -97,7 +93,7 @@ function decomposeObsBlock(block, slice, jointNames, lang) {
           kind: 'signal',
           group: 'obs',
           title: zh ? '指令 yaw' : 'Cmd yaw',
-          lines: [{ k: 'yaw', v: formatFloat(data[2]) }],
+          lines: [{ k: 'yaw' }],
           concatOffset: block.offset + 2,
           concatSize: 1
         }
@@ -111,7 +107,7 @@ function decomposeObsBlock(block, slice, jointNames, lang) {
         subtitle: block.kwargs?.pos_steps
           ? `step ${JSON.stringify(block.kwargs.pos_steps)}`
           : undefined,
-        lines: jointLines(jointNames, data),
+        lines: jointLines(jointNames),
         concatOffset: block.offset,
         concatSize: block.size,
         scrollable: true
@@ -125,7 +121,7 @@ function decomposeObsBlock(block, slice, jointNames, lang) {
         subtitle: block.kwargs?.vel_steps
           ? `step ${JSON.stringify(block.kwargs.vel_steps)}`
           : undefined,
-        lines: jointLines(jointNames, data),
+        lines: jointLines(jointNames),
         concatOffset: block.offset,
         concatSize: block.size,
         scrollable: true
@@ -139,7 +135,7 @@ function decomposeObsBlock(block, slice, jointNames, lang) {
         subtitle: block.kwargs?.history_steps
           ? `×${block.kwargs.history_steps}`
           : undefined,
-        lines: jointLines(jointNames, data),
+        lines: jointLines(jointNames),
         concatOffset: block.offset,
         concatSize: block.size,
         scrollable: true
@@ -150,7 +146,7 @@ function decomposeObsBlock(block, slice, jointNames, lang) {
         kind: 'signal',
         group: 'obs',
         title: 'Boot',
-        lines: [{ k: 'val', v: formatFloat(data[0]) }],
+        lines: [{ k: 'val' }],
         concatOffset: block.offset,
         concatSize: block.size
       }];
@@ -161,7 +157,7 @@ function decomposeObsBlock(block, slice, jointNames, lang) {
           kind: 'signal',
           group: 'obs',
           title: zh ? '顺应 开关' : 'Compliance on',
-          lines: [{ k: 'on', v: formatFloat(data[0]) }],
+          lines: [{ k: 'on' }],
           concatOffset: block.offset,
           concatSize: 1
         },
@@ -170,7 +166,7 @@ function decomposeObsBlock(block, slice, jointNames, lang) {
           kind: 'signal',
           group: 'obs',
           title: zh ? '顺应 阈值' : 'Compliance thr',
-          lines: [{ k: 'thr', v: formatFloat(data[1]) }],
+          lines: [{ k: 'thr' }],
           concatOffset: block.offset + 1,
           concatSize: 1
         },
@@ -179,7 +175,7 @@ function decomposeObsBlock(block, slice, jointNames, lang) {
           kind: 'signal',
           group: 'obs',
           title: zh ? '顺应 kp' : 'Compliance kp',
-          lines: [{ k: 'kp', v: formatFloat(data[2]) }],
+          lines: [{ k: 'kp' }],
           concatOffset: block.offset + 2,
           concatSize: 1
         }
@@ -191,9 +187,8 @@ function decomposeObsBlock(block, slice, jointNames, lang) {
         group: 'obs',
         title: block.name,
         subtitle: `${block.size}D`,
-        lines: data.slice(0, 6).map((v, i) => ({
-          k: `[${block.offset + i}]`,
-          v: formatFloat(v)
+        lines: data.slice(0, 6).map((_, i) => ({
+          k: `[${block.offset + i}]`
         })),
         concatOffset: block.offset,
         concatSize: block.size,
@@ -223,11 +218,7 @@ export function buildAtomicNodes(runner, state, obsVector, obsLayout, lang = 'zh
     });
   };
 
-  const rootPos = state?.rootPos;
   const rootQuat = state?.rootQuat;
-  const rootAngVel = state?.rootAngVel;
-  const jointPos = state?.jointPos;
-  const jointVel = state?.jointVel;
   const cmd = state?.cmd ?? [0, 0, 0];
 
   push({
@@ -236,7 +227,7 @@ export function buildAtomicNodes(runner, state, obsVector, obsLayout, lang = 'zh
     group: 'sim',
     title: zh ? '根位置' : 'Root Position',
     subtitle: 'x, y, z',
-    lines: vec3Lines('', rootPos)
+    lines: vec3Lines('')
   });
 
   push({
@@ -246,10 +237,10 @@ export function buildAtomicNodes(runner, state, obsVector, obsLayout, lang = 'zh
     title: zh ? '根姿态' : 'Root Orientation',
     subtitle: 'w, x, y, z',
     lines: [
-      { k: 'w', v: formatFloat(rootQuat?.[0]) },
-      { k: 'x', v: formatFloat(rootQuat?.[1]) },
-      { k: 'y', v: formatFloat(rootQuat?.[2]) },
-      { k: 'z', v: formatFloat(rootQuat?.[3]) }
+      { k: 'w' },
+      { k: 'x' },
+      { k: 'y' },
+      { k: 'z' }
     ]
   });
 
@@ -259,7 +250,7 @@ export function buildAtomicNodes(runner, state, obsVector, obsLayout, lang = 'zh
     group: 'sim',
     title: zh ? '根角速度' : 'Root AngVel',
     subtitle: zh ? '机体系' : 'body frame',
-    lines: vec3Lines('', rootAngVel)
+    lines: vec3Lines('')
   });
 
   push({
@@ -268,7 +259,7 @@ export function buildAtomicNodes(runner, state, obsVector, obsLayout, lang = 'zh
     group: 'sim',
     title: zh ? '关节位置' : 'Joint Position',
     subtitle: zh ? 'MuJoCo qpos' : 'MuJoCo qpos',
-    lines: jointLines(jointNames, jointPos),
+    lines: jointLines(jointNames),
     scrollable: true
   });
 
@@ -278,7 +269,7 @@ export function buildAtomicNodes(runner, state, obsVector, obsLayout, lang = 'zh
     group: 'sim',
     title: zh ? '关节速度' : 'Joint Velocity',
     subtitle: zh ? 'MuJoCo qvel' : 'MuJoCo qvel',
-    lines: jointLines(jointNames, jointVel),
+    lines: jointLines(jointNames),
     scrollable: true
   });
 
@@ -287,21 +278,21 @@ export function buildAtomicNodes(runner, state, obsVector, obsLayout, lang = 'zh
     kind: 'signal',
     group: 'sim',
     title: zh ? '速度指令 vx' : 'Cmd vx',
-    lines: [{ k: 'vx', v: formatFloat(cmd[0]) }]
+    lines: [{ k: 'vx' }]
   });
   push({
     id: 'sim-cmd-vy',
     kind: 'signal',
     group: 'sim',
     title: zh ? '速度指令 vy' : 'Cmd vy',
-    lines: [{ k: 'vy', v: formatFloat(cmd[1]) }]
+    lines: [{ k: 'vy' }]
   });
   push({
     id: 'sim-cmd-yaw',
     kind: 'signal',
     group: 'sim',
     title: zh ? '速度指令 yaw' : 'Cmd yaw',
-    lines: [{ k: 'yaw', v: formatFloat(cmd[2]) }]
+    lines: [{ k: 'yaw' }]
   });
 
   if (runner.obsJointPosRelative) {
@@ -311,7 +302,7 @@ export function buildAtomicNodes(runner, state, obsVector, obsLayout, lang = 'zh
       group: 'preprocess',
       title: zh ? '关节相对化' : 'Joint relative',
       subtitle: zh ? 'q − default' : 'q − default',
-      lines: jointLines(jointNames, runner.cachedJointPosRel),
+      lines: jointLines(jointNames),
       width: 248
     });
   }
@@ -338,7 +329,7 @@ export function buildAtomicNodes(runner, state, obsVector, obsLayout, lang = 'zh
     group: 'output',
     title: zh ? '策略动作' : 'Policy Action',
     subtitle: zh ? 'clip 后' : 'after clip',
-    lines: jointLines(jointNames, runner.lastActions),
+    lines: jointLines(jointNames),
     scrollable: true
   });
 
@@ -348,7 +339,7 @@ export function buildAtomicNodes(runner, state, obsVector, obsLayout, lang = 'zh
     group: 'output',
     title: zh ? '关节目标' : 'Joint Target',
     subtitle: zh ? '下发目标角' : 'commanded q',
-    lines: jointLines(jointNames, runner.target),
+    lines: jointLines(jointNames),
     scrollable: true
   });
 
@@ -360,8 +351,7 @@ export function buildAtomicNodes(runner, state, obsVector, obsLayout, lang = 'zh
       title: zh ? '电机力矩' : 'Motor Torque',
       subtitle: 'τ → ctrl',
       lines: motorJoints.map((j) => ({
-        k: shortJointName(j.name),
-        v: formatFloat(j.ctrl)
+        k: shortJointName(j.name)
       })),
       scrollable: true
     });

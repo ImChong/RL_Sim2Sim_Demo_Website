@@ -223,19 +223,51 @@ export function createSignalScope(options = {}) {
   };
 }
 
-export function listNodeProbes(node, lang = 'zh') {
+export function isProbeableLine(line) {
+  return Boolean(
+    line?.k
+    && line.k !== '…'
+    && line.k !== 'in'
+    && line.k !== 'out'
+    && line.k !== 'act'
+  );
+}
+
+export function listNodeProbes(node) {
   if (!node?.lines?.length) {
     return [];
   }
   const title = node.title ?? node.id;
   return node.lines
-    .filter((line) => line.k !== '…')
+    .filter((line) => isProbeableLine(line))
     .map((line) => ({
       id: buildProbeId(node.id, line.k),
       nodeId: node.id,
       lineKey: line.k,
       label: `${title} · ${line.k}`
     }));
+}
+
+export function setScopeProbes(scope, probes) {
+  if (!scope) {
+    return null;
+  }
+  const limited = (probes ?? []).slice(0, scope.maxChannels);
+  if (limited.length === 0) {
+    scope.channels = [];
+    clearScopeBuffer(scope);
+    return [];
+  }
+  scope.channels = limited.map((probe, index) => ({
+    id: probe.id,
+    nodeId: probe.nodeId,
+    lineKey: probe.lineKey,
+    label: probe.label,
+    color: SCOPE_CHANNEL_COLORS[index % SCOPE_CHANNEL_COLORS.length],
+    values: new Float32Array(scope.capacity)
+  }));
+  clearScopeBuffer(scope);
+  return scope.channels;
 }
 
 export function toggleScopeProbe(scope, probe) {

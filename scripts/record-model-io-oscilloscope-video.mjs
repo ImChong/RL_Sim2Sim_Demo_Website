@@ -84,22 +84,18 @@ async function expandPipelinePanel(page) {
   await sleep(1200);
 }
 
-async function clickProbe(page, nodeId, lineKey) {
-  const clicked = await page.evaluate(({ nodeId: id, lineKey: key }) => {
+async function clickNode(page, nodeId) {
+  const clicked = await page.evaluate((id) => {
     const node = document.querySelector(`[data-node-id="${id}"]`);
     if (!node) {
       return false;
     }
-    const lines = [...node.querySelectorAll('.pipeline-node-line-probeable')];
-    const line = lines.find((el) => el.querySelector('.pipeline-node-key')?.textContent?.trim() === key);
-    if (!line) {
-      return false;
-    }
-    line.click();
-    return true;
-  }, { nodeId, lineKey });
+    const card = node.querySelector('.pipeline-node-card-clickable') ?? node.querySelector('.pipeline-node-card');
+    card?.click();
+    return Boolean(card);
+  }, nodeId);
   if (!clicked) {
-    throw new Error(`Probe line not found: ${nodeId}:${lineKey}`);
+    throw new Error(`Pipeline node not found: ${nodeId}`);
   }
   await sleep(350);
 }
@@ -126,7 +122,7 @@ async function readScopeState(page) {
     const channelMatch = statsText.match(/(?:通道|Channels)\s*:\s*(\d+)/i);
     const sampleMatch = statsText.match(/(?:采样|Samples)\s*:\s*(\d+)/i);
     const scopeNode = document.querySelector('[data-node-id="out-scope"]');
-    const probedLines = document.querySelectorAll('.pipeline-node-line-probed').length;
+    const probedNodes = document.querySelectorAll('.pipeline-node-probed').length;
     const canvas = document.querySelector('.scope-canvas');
     const legendItems = document.querySelectorAll('.scope-legend-item').length;
     const scopeVisible = Boolean(canvas && canvas.offsetParent !== null);
@@ -134,7 +130,7 @@ async function readScopeState(page) {
       channels: channelMatch ? Number(channelMatch[1]) : 0,
       samples: sampleMatch ? Number(sampleMatch[1]) : 0,
       hasScopeNode: Boolean(scopeNode),
-      probedLines,
+      probedNodes,
       legendItems,
       scopeVisible,
       statsText: statsText.replace(/\s+/g, ' ').trim()
@@ -180,16 +176,14 @@ async function main() {
 
   await expandPipelinePanel(page);
 
-  // Add probes while on graph tab (auto-switches to scope on first probe).
+  // Click a multi-signal node on the graph tab (auto-switches to scope).
   await switchPanelTab(page, 'graph');
-  await clickProbe(page, 'sim-cmd-vx', 'vx');
-  await clickProbe(page, 'sim-cmd-vy', 'vy');
-  await clickProbe(page, 'sim-cmd-yaw', 'yaw');
+  await clickNode(page, 'sim-root-angvel');
 
   const graphState = await readScopeState(page);
-  console.log('After probes (graph tab):', graphState);
-  if (graphState.probedLines < 3) {
-    throw new Error(`Expected >= 3 probed lines, got ${graphState.probedLines}`);
+  console.log('After node click (graph tab):', graphState);
+  if (graphState.probedNodes < 1) {
+    throw new Error(`Expected >= 1 probed node, got ${graphState.probedNodes}`);
   }
   if (!graphState.hasScopeNode) {
     throw new Error('out-scope node missing from pipeline graph');

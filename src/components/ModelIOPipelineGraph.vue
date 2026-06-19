@@ -88,7 +88,9 @@
               {
                 'pipeline-node-live': live,
                 'pipeline-node-active': activeNodeId === node.id,
-                'pipeline-node-scope': node.kind === 'scope'
+                'pipeline-node-scope': node.kind === 'scope',
+                'pipeline-node-clickable': isNodeClickable(node),
+                'pipeline-node-probed': isNodeProbed(node)
               }
             ]"
             :style="{
@@ -107,7 +109,6 @@
                   class="pipeline-node-head"
                   @mousedown.stop="onNodeMoveStart(node.id, $event)"
                   @touchstart.stop="onNodeMoveStart(node.id, $event)"
-                  @dblclick.stop="onNodeProbeAll(node)"
                 >
                   <div class="pipeline-node-title" :title="node.title">{{ node.title }}</div>
                   <div
@@ -116,7 +117,11 @@
                     :title="node.subtitle"
                   >{{ node.subtitle }}</div>
                 </div>
-                <div class="pipeline-node-card">
+                <div
+                  class="pipeline-node-card"
+                  :class="{ 'pipeline-node-card-clickable': isNodeClickable(node) }"
+                  @click.stop="onNodeClick(node)"
+                >
                   <NetworkDiagram
                     v-if="node.kind === 'network'"
                     :columns="node.networkColumns"
@@ -129,22 +134,22 @@
                       :key="idx"
                       class="pipeline-node-line"
                       :class="{
-                        'pipeline-node-line-probed': isLineProbed(node.id, line.k),
-                        'pipeline-node-line-probeable': isLineProbeable(line)
+                        'pipeline-node-line-probed': isLineProbed(node.id, line.k)
                       }"
-                      @click.stop="onLineProbe(node, line)"
                     >
                       <span class="pipeline-node-key" :title="line.k">{{ line.k }}</span>
-                      <span class="pipeline-node-val" :title="line.v">
-                        <v-icon
-                          v-if="isLineProbeable(line)"
-                          icon="mdi-chart-line-variant"
-                          size="10"
-                          class="pipeline-probe-icon"
-                        />
-                        {{ line.v }}
-                      </span>
+                      <span
+                        v-if="line.v"
+                        class="pipeline-node-val pipeline-node-meta"
+                        :title="line.v"
+                      >{{ line.v }}</span>
                     </div>
+                    <v-icon
+                      v-if="isNodeClickable(node)"
+                      icon="mdi-chart-line-variant"
+                      size="12"
+                      class="pipeline-node-scope-hint"
+                    />
                   </template>
                 </div>
               </div>
@@ -163,6 +168,7 @@
 <script>
 import { buildPipelineGraph } from '@/simulation/pipelineGraphLayout.js';
 import { portPointFromLayoutNode } from '@/simulation/pipelineGraphEdgeCoords.js';
+import { isProbeableLine } from '@/simulation/signalScope.js';
 import NetworkDiagram from '@/components/NetworkDiagram.vue';
 import {
   computeGraphBounds,
@@ -222,7 +228,7 @@ export default {
       default: () => []
     }
   },
-  emits: ['toggle-probe', 'open-scope'],
+  emits: ['probe-node', 'open-scope'],
   data: () => ({
     resizeObserver: null,
     arrowMarkerId: `pipeline-arrow-${++graphInstanceCounter}`,
@@ -251,12 +257,12 @@ export default {
     scrollHint() {
       if (this.isMobile) {
         return this.language === 'en'
-          ? 'Drag title to move node · Drag canvas to pan · Pinch to zoom'
-          : '拖标题移动节点 · 拖空白平移画布 · 双指缩放';
+          ? 'Drag title to move node · Click node body to open scope · Drag canvas to pan · Pinch to zoom'
+          : '拖标题移动节点 · 点击节点查看示波器 · 拖空白平移画布 · 双指缩放';
       }
       return this.language === 'en'
-        ? 'Drag title to move node · Drag canvas to pan · Wheel to zoom'
-        : '拖标题移动节点 · 拖空白平移画布 · 滚轮缩放';
+        ? 'Drag title to move node · Click node body to open scope · Drag canvas to pan · Wheel to zoom'
+        : '拖标题移动节点 · 点击节点查看示波器 · 拖空白平移画布 · 滚轮缩放';
     },
     viewportStyle() {
       if (this.isMobile) {
@@ -663,47 +669,38 @@ export default {
       return `M ${from.x} ${from.y} C ${c1x} ${from.y}, ${c2x} ${to.y}, ${to.x} ${to.y}`;
     },
     isLineProbeable(line) {
-      return Boolean(line?.k && line.k !== '…' && line.k !== 'in' && line.k !== 'out' && line.k !== 'act');
+      return isProbeableLine(line);
+    },
+    isNodeClickable(node) {
+      if (!node) {
+        return false;
+      }
+      if (node.kind === 'scope') {
+        return true;
+      }
+      if (node.kind === 'network') {
+        return false;
+      }
+      return node.lines?.some((line) => this.isLineProbeable(line));
+    },
+    isNodeProbed(node) {
+      if (!node?.lines?.length) {
+        return false;
+      }
+      return node.lines.some((line) => this.isLineProbed(node.id, line.k));
     },
     isLineProbed(nodeId, lineKey) {
       return this.activeProbeIds.has(`${nodeId}:${lineKey}`);
     },
-    onLineProbe(node, line) {
-      if (!this.isLineProbeable(line)) {
-        return;
-      }
-      const title = node.title ?? node.id;
-      this.$emit('toggle-probe', {
-        id: `${node.id}:${line.k}`,
-        nodeId: node.id,
-        lineKey: line.k,
-        label: `${title} · ${line.k}`
-      });
-    },
-    onNodeProbeAll(node) {
+    onNodeClick(node) {
       if (node.kind === 'scope') {
         this.$emit('open-scope');
         return;
       }
-      if (!node.lines?.length) {
+      if (!this.isNodeClickable(node)) {
         return;
       }
-      for (const line of node.lines) {
-        if (!this.isLineProbeable(line)) {
-          continue;
-        }
-        const probeId = `${node.id}:${line.k}`;
-        if (this.activeProbeIds.has(probeId)) {
-          continue;
-        }
-        const title = node.title ?? node.id;
-        this.$emit('toggle-probe', {
-          id: probeId,
-          nodeId: node.id,
-          lineKey: line.k,
-          label: `${title} · ${line.k}`
-        });
-      }
+      this.$emit('probe-node', node);
     }
   }
 };
@@ -917,6 +914,29 @@ export default {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
   cursor: default;
   user-select: text;
+  position: relative;
+}
+
+.pipeline-node-card-clickable {
+  cursor: pointer;
+}
+
+.pipeline-node-card-clickable:hover {
+  border-color: rgba(var(--v-theme-primary), 0.55);
+  background: linear-gradient(180deg, rgba(35, 48, 68, 0.96) 0%, rgba(18, 28, 44, 0.99) 100%);
+}
+
+.pipeline-node-probed .pipeline-node-card {
+  border-color: rgba(76, 179, 212, 0.55);
+  box-shadow: 0 0 0 1px rgba(76, 179, 212, 0.2), 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+.pipeline-node-scope-hint {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  opacity: 0.55;
+  pointer-events: none;
 }
 
 .pipeline-node-live .pipeline-node-card {
@@ -981,25 +1001,8 @@ export default {
   line-height: 1.3;
 }
 
-.pipeline-node-line-probeable {
-  cursor: pointer;
-  border-radius: 4px;
-  padding: 1px 2px;
-}
-
-.pipeline-node-line-probeable:hover {
-  background: rgba(var(--v-theme-primary), 0.12);
-}
-
-.pipeline-node-line-probed {
-  background: rgba(76, 179, 212, 0.14);
-  box-shadow: inset 0 0 0 1px rgba(76, 179, 212, 0.35);
-}
-
-.pipeline-probe-icon {
-  margin-right: 2px;
-  opacity: 0.65;
-  vertical-align: -1px;
+.pipeline-node-line-probed .pipeline-node-key {
+  color: rgba(76, 179, 212, 0.95);
 }
 
 .pipeline-shell-mobile .pipeline-node-title {
@@ -1018,11 +1021,15 @@ export default {
 }
 
 .pipeline-node-val {
-  color: rgba(var(--v-theme-primary), 0.95);
+  color: #94a3b8;
   white-space: nowrap;
   flex-shrink: 0;
   margin-left: auto;
   padding-left: 8px;
+}
+
+.pipeline-node-meta {
+  color: #94a3b8;
 }
 
 .pipeline-port {
