@@ -433,10 +433,7 @@ export class MuJoCoDemo {
     this.camera.position.add(this.followDelta);
   }
 
-  applyJointPositionControl() {
-    const simQpos = this.simulation.qpos;
-    const simQvel = this.simulation.qvel;
-    const simCtrl = this.simulation.ctrl;
+  applyJointPositionControl(simQpos, simQvel, simCtrl) {
     const ctrlRange = this.model?.actuator_ctrlrange;
 
     for (let i = 0; i < this.numActions; i++) {
@@ -461,10 +458,7 @@ export class MuJoCoDemo {
     }
   }
 
-  applyUnitreePositionControl() {
-    const simQpos = this.simulation.qpos;
-    const simQvel = this.simulation.qvel;
-    const simCtrl = this.simulation.ctrl;
+  applyUnitreePositionControl(simQpos, simQvel, simCtrl) {
     const ctrlRange = this.model?.actuator_ctrlrange;
 
     for (let i = 0; i < this.numActions; i++) {
@@ -531,22 +525,29 @@ export class MuJoCoDemo {
           break;
         }
 
+        const simQpos = this.simulation.qpos;
+        const simQvel = this.simulation.qvel;
+        const simCtrl = this.simulation.ctrl;
+        const simQfrcApplied = this.simulation.qfrc_applied;
+        const simXpos = this.simulation.xpos;
+        const simXquat = this.simulation.xquat;
+
         for (let substep = 0; substep < this.decimation; substep++) {
           if (!this.alive || !this.simulation) {
             break;
           }
           if (this.control_type === 'joint_position') {
-            this.applyJointPositionControl();
+            this.applyJointPositionControl(simQpos, simQvel, simCtrl);
           } else if (this.control_type === 'unitree_position') {
-            this.applyUnitreePositionControl();
+            this.applyUnitreePositionControl(simQpos, simQvel, simCtrl);
           } else if (this.control_type === 'torque') {
             console.error('Torque control not implemented yet.');
           }
 
-          this.simulation.qfrc_applied.fill(0.0);
+          simQfrcApplied.fill(0.0);
 
           if (this._knockdownSubstepsRemaining > 0) {
-            this.applyPelvisKnockdownForceXYPlane();
+            this.applyPelvisKnockdownForceXYPlane(simXpos);
             this._knockdownSubstepsRemaining -= 1;
           }
 
@@ -555,8 +556,8 @@ export class MuJoCoDemo {
             const bodyID = dragged.bodyID;
             const bodyGroup = this.bodies[bodyID];
             if (bodyGroup) {
-              getPosition(this.simulation.xpos, bodyID, bodyGroup.position);
-              getQuaternion(this.simulation.xquat, bodyID, bodyGroup.quaternion);
+              getPosition(simXpos, bodyID, bodyGroup.position);
+              getQuaternion(simXquat, bodyID, bodyGroup.quaternion);
             }
             if (this.mujocoRoot) {
               this.mujocoRoot.updateWorldMatrix(true, true);
@@ -584,8 +585,6 @@ export class MuJoCoDemo {
           this.simulation.step();
         }
 
-        const simXpos = this.simulation.xpos;
-        const simXquat = this.simulation.xquat;
         for (let b = 0; b < this.model.nbody; b++) {
           if (!this.bodies[b]) {
             continue;
@@ -724,12 +723,12 @@ export class MuJoCoDemo {
    * Applies a horizontal-only force on the pelvis at its current body origin (world xpos).
    * Does not modify qpos — disturbance is purely physical (mj_applyFT).
    */
-  applyPelvisKnockdownForceXYPlane() {
+  applyPelvisKnockdownForceXYPlane(simXpos = null) {
     const bodyId = this.resolvePelvisBodyId();
     if (!Number.isInteger(bodyId) || bodyId < 1) {
       return;
     }
-    const xp = this.simulation.xpos;
+    const xp = simXpos || this.simulation.xpos;
     const idx = bodyId * 3;
     const px = xp[idx];
     const py = xp[idx + 1];
