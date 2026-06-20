@@ -14,6 +14,7 @@
     "test": "node --test tests/*.test.mjs",
     "verify:record-model-io-panel": "node scripts/record-model-io-panel-video.mjs",
     "verify:record-model-io-scope": "node scripts/record-model-io-oscilloscope-video.mjs",
+    "verify:record-model-io-flowchart-ops": "node scripts/record-model-io-flowchart-ops-video.mjs",
     "verify:e2e-knockdown": "node scripts/verify-knockdown-button.mjs",
     "verify:e2e-parkour-cross": "node scripts/verify-parkour-cross-obstacle.mjs",
     "verify:e2e-parkour-depth": "node scripts/verify-parkour-depth.mjs",
