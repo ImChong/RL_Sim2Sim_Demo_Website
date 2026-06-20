@@ -118,6 +118,10 @@
             :channels-label="t.scopeChannels"
             :samples-label="t.scopeSamples"
             :window-label="t.scopeWindow"
+            :window-seconds="scopeWindowSeconds"
+            :window-min-seconds="scopeWindowMinSeconds"
+            :window-max-seconds="scopeWindowMaxSeconds"
+            :window-input-aria-label="t.scopeWindowInput"
             :reset-zoom-label="t.scopeResetZoom"
             :clear-label="t.scopeClear"
             :pause-label="t.scopePause"
@@ -130,6 +134,7 @@
             @reset-zoom="resetScopeZoom"
             @clear="clearScope"
             @remove-probe="onRemoveProbe"
+            @update-window-seconds="onScopeWindowChange"
           />
         </template>
       </v-card-text>
@@ -170,13 +175,20 @@ import {
   listNodeProbes,
   pushScopeSample,
   removeScopeProbe,
-  setScopeProbes
+  setScopeProbes,
+  setScopeWindowSeconds
 } from '@/simulation/signalScope.js';
 import {
   clampPanelSize,
   loadPanelSize,
   savePanelSize
 } from '@/utils/modelIoPanelSize.js';
+import {
+  loadScopeWindowSeconds,
+  MAX_SCOPE_WINDOW_SECONDS,
+  MIN_SCOPE_WINDOW_SECONDS,
+  saveScopeWindowSeconds
+} from '@/utils/scopeWindowPreference.js';
 
 const translations = {
   en: {
@@ -197,6 +209,7 @@ const translations = {
     scopeChannels: 'Channels',
     scopeSamples: 'Samples',
     scopeWindow: 'Window',
+    scopeWindowInput: 'Oscilloscope window (seconds)',
     scopeResetZoom: 'Reset zoom',
     scopeClear: 'Clear',
     scopePause: 'Pause',
@@ -223,6 +236,7 @@ const translations = {
     scopeChannels: '通道',
     scopeSamples: '采样',
     scopeWindow: '窗口',
+    scopeWindowInput: '示波器显示时长（秒）',
     scopeResetZoom: '重置缩放',
     scopeClear: '清空',
     scopePause: '暂停',
@@ -264,12 +278,15 @@ export default {
   },
   data: () => {
     const panelSize = loadPanelSize();
+    const scopeWindowSeconds = loadScopeWindowSeconds();
+    const signalScope = createSignalScope({ windowSeconds: scopeWindowSeconds });
     return {
       expanded: false,
       viewTab: 'graph',
       telemetry: { ready: false },
-      signalScope: createSignalScope(),
-      scopeSnapshot: getScopeSnapshot(createSignalScope()),
+      signalScope,
+      scopeSnapshot: getScopeSnapshot(signalScope),
+      scopeWindowSeconds,
       scopeZoom: null,
       panelWidth: panelSize.width,
       panelHeight: panelSize.height,
@@ -300,6 +317,12 @@ export default {
     },
     t() {
       return translations[this.language === 'en' ? 'en' : 'zh'];
+    },
+    scopeWindowMinSeconds() {
+      return MIN_SCOPE_WINDOW_SECONDS;
+    },
+    scopeWindowMaxSeconds() {
+      return MAX_SCOPE_WINDOW_SECONDS;
     },
     pollIntervalMs() {
       return this.isSmallScreen ? 100 : 50;
@@ -475,6 +498,12 @@ export default {
     },
     onRemoveProbe(probeId) {
       removeScopeProbe(this.signalScope, probeId);
+      this.scopeSnapshot = getScopeSnapshot(this.signalScope);
+    },
+    onScopeWindowChange(seconds) {
+      const next = saveScopeWindowSeconds(seconds);
+      this.scopeWindowSeconds = setScopeWindowSeconds(this.signalScope, next);
+      this.scopeZoom = null;
       this.scopeSnapshot = getScopeSnapshot(this.signalScope);
     },
     openScopeTab() {

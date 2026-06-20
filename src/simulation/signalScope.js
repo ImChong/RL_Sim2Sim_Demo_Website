@@ -1,6 +1,9 @@
-const DEFAULT_CAPACITY = 600;
+import { clampScopeWindowSeconds } from '../utils/scopeWindowPreference.js';
+
+const DEFAULT_CAPACITY = 3000;
 const DEFAULT_MAX_CHANNELS = 8;
 export const DEFAULT_WINDOW_SECONDS = 20;
+export const MIN_WINDOW_SECONDS = 10;
 
 export const SCOPE_CHANNEL_COLORS = [
   '#00d992',
@@ -207,6 +210,15 @@ function buildObsOffsetLookup(runner) {
     offset += size;
   }
   return map;
+}
+
+export function setScopeWindowSeconds(scope, seconds) {
+  if (!scope) {
+    return DEFAULT_WINDOW_SECONDS;
+  }
+  const clamped = clampScopeWindowSeconds(seconds);
+  scope.windowSeconds = clamped;
+  return clamped;
 }
 
 export function createSignalScope(options = {}) {

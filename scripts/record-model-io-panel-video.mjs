@@ -150,7 +150,8 @@ async function readScopeState(page) {
     const statsText = document.querySelector('.scope-stats')?.textContent ?? '';
     const channelMatch = statsText.match(/(?:通道|Channels)\s*:\s*(\d+)/i);
     const sampleMatch = statsText.match(/(?:采样|Samples)\s*:\s*(\d+)/i);
-    const windowMatch = statsText.match(/(?:窗口|Window)\s*:\s*(\d+)/i);
+    const windowInput = document.querySelector('.scope-window-input');
+    const windowSeconds = windowInput ? Number(windowInput.value) : 0;
     const probedNodes = [...document.querySelectorAll('.pipeline-node-probed')].map(
       (el) => el.getAttribute('data-node-id')
     );
@@ -163,7 +164,7 @@ async function readScopeState(page) {
     return {
       channels: channelMatch ? Number(channelMatch[1]) : 0,
       samples: sampleMatch ? Number(sampleMatch[1]) : 0,
-      windowSeconds: windowMatch ? Number(windowMatch[1]) : 0,
+      windowSeconds,
       probedNodes,
       legendLabels,
       scopeVisible: Boolean(canvas && canvas.offsetParent !== null),

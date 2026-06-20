@@ -6,7 +6,21 @@
         <span class="scope-stat-sep">/</span>
         <span>{{ samplesLabel }}: {{ snapshot.sampleCount }}</span>
         <span class="scope-stat-sep">/</span>
-        <span>{{ windowLabel }}: {{ snapshot.windowSeconds ?? 20 }}s</span>
+        <label class="scope-window-control">
+          <span class="scope-window-label">{{ windowLabel }}</span>
+          <input
+            class="scope-window-input"
+            type="number"
+            :min="windowMinSeconds"
+            :max="windowMaxSeconds"
+            step="1"
+            :value="windowInput"
+            :aria-label="windowInputAriaLabel"
+            @change="onWindowInputChange"
+            @keydown.enter.prevent="onWindowInputChange"
+          />
+          <span class="scope-window-unit">s</span>
+        </label>
       </div>
       <div class="scope-actions">
         <v-btn
@@ -97,6 +111,22 @@ export default {
       type: String,
       default: 'Window'
     },
+    windowSeconds: {
+      type: Number,
+      default: 20
+    },
+    windowMinSeconds: {
+      type: Number,
+      default: 10
+    },
+    windowMaxSeconds: {
+      type: Number,
+      default: 120
+    },
+    windowInputAriaLabel: {
+      type: String,
+      default: 'Oscilloscope window seconds'
+    },
     resetZoomLabel: {
       type: String,
       default: 'Reset zoom'
@@ -130,12 +160,19 @@ export default {
       default: null
     }
   },
-  emits: ['toggle-pause', 'reset-zoom', 'clear', 'remove-probe'],
+  emits: ['toggle-pause', 'reset-zoom', 'clear', 'remove-probe', 'update-window-seconds'],
   data: () => ({
     resizeObserver: null,
-    drawRaf: null
+    drawRaf: null,
+    windowInput: 20
   }),
   watch: {
+    windowSeconds: {
+      immediate: true,
+      handler(value) {
+        this.windowInput = value;
+      }
+    },
     snapshot: {
       handler() {
         this.scheduleDraw();
@@ -163,6 +200,25 @@ export default {
     }
   },
   methods: {
+    onWindowInputChange(event) {
+      const raw = event?.target?.value ?? this.windowInput;
+      const parsed = Number(raw);
+      if (!Number.isFinite(parsed)) {
+        this.windowInput = this.windowSeconds;
+        return;
+      }
+      const clamped = Math.min(
+        this.windowMaxSeconds,
+        Math.max(this.windowMinSeconds, Math.round(parsed))
+      );
+      this.windowInput = clamped;
+      if (event?.target) {
+        event.target.value = String(clamped);
+      }
+      if (clamped !== this.windowSeconds) {
+        this.$emit('update-window-seconds', clamped);
+      }
+    },
     scheduleDraw() {
       if (this.drawRaf) {
         return;
@@ -317,6 +373,37 @@ export default {
 
 .scope-stat-sep {
   opacity: 0.45;
+}
+
+.scope-window-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.scope-window-label {
+  white-space: nowrap;
+}
+
+.scope-window-input {
+  width: 42px;
+  padding: 1px 4px;
+  border-radius: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.75);
+  color: rgba(226, 232, 240, 0.92);
+  font: inherit;
+  font-size: 0.72rem;
+  text-align: center;
+}
+
+.scope-window-input:focus {
+  outline: none;
+  border-color: rgba(var(--v-theme-primary), 0.65);
+}
+
+.scope-window-unit {
+  opacity: 0.8;
 }
 
 .scope-actions {
