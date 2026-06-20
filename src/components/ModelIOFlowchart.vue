@@ -106,7 +106,7 @@
             @open-scope="openScopeTab"
           />
           <OnnxNetronViewer
-            v-show="viewTab === 'architecture'"
+            v-if="viewTab === 'architecture'"
             :model-path="telemetry.model.path"
             :language="language"
           />
@@ -621,6 +621,11 @@ export default {
   padding-top: 0;
   padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   -webkit-overflow-scrolling: touch;
+}
+
+.model-io-body > .onnx-netron-viewer {
+  flex: 1 1 auto;
+  min-height: 280px;
 }
 
 .pipeline-hint {

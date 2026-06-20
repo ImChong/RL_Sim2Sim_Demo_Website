@@ -118,6 +118,33 @@ async function clickNode(page, nodeId) {
   await sleep(400);
 }
 
+async function waitForNetronReady(page, timeoutMs = 45000) {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const frame = page.frames().find((f) => f.url().includes('/netron/'));
+    if (frame) {
+      try {
+        const ready = await frame.evaluate(() => {
+          if (!document.body) {
+            return false;
+          }
+          if (document.body.classList.contains('default')) {
+            return true;
+          }
+          return document.querySelectorAll('.node').length > 0;
+        });
+        if (ready) {
+          return;
+        }
+      } catch {
+        // frame still loading
+      }
+    }
+    await sleep(250);
+  }
+  throw new Error(`Netron graph did not become ready within ${timeoutMs}ms`);
+}
+
 async function readScopeState(page) {
   return page.evaluate(() => {
     const statsText = document.querySelector('.scope-stats')?.textContent ?? '';
@@ -220,7 +247,10 @@ async function main() {
   if (!/netron\/index\.html\?url=/.test(archState.netronSrc)) {
     throw new Error(`Unexpected Netron iframe src: ${archState.netronSrc}`);
   }
-  await sleep(2500);
+  await waitForNetronReady(page);
+  const archReady = await readScopeState(page);
+  console.log('Architecture ready:', archReady);
+  await sleep(800);
   await page.screenshot({ path: OUT_ARCH_SHOT, fullPage: false });
 
   await switchPanelTab(page, 'graph');
@@ -281,6 +311,7 @@ async function main() {
   for (let i = 0; i < targetFrames; i += 1) {
     if (i === Math.floor(targetFrames * 0.35)) {
       await switchPanelTab(page, 'architecture');
+      await waitForNetronReady(page, 30000);
     } else if (i === Math.floor(targetFrames * 0.55)) {
       await switchPanelTab(page, 'graph');
     } else if (i === Math.floor(targetFrames * 0.7)) {
