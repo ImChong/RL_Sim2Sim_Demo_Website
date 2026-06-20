@@ -1,5 +1,6 @@
 import { clampScopeWindowSeconds } from '../utils/scopeWindowPreference.js';
 import { registerObsNodeOffsets } from './pipelineObsNodes.js';
+import { buildParkourObsLayout } from './parkourPolicyConfig.js';
 
 const DEFAULT_CAPACITY = 3000;
 const DEFAULT_MAX_CHANNELS = 8;
@@ -165,6 +166,101 @@ export function resolveSignalValue(runner, demo, probe) {
   return NaN;
 }
 
+function buildParkourObsOffsetLookup(snapshot) {
+  const map = new Map();
+  const jointCount = snapshot?.jointNames?.length ?? 0;
+  const obsLayout = snapshot?.obsLayout ?? buildParkourObsLayout(undefined, jointCount);
+  for (const block of obsLayout) {
+    registerObsNodeOffsets(map, block, jointCount);
+  }
+  return map;
+}
+
+function readParkourObsScalar(snapshot, offset) {
+  const data = snapshot?.obsVector;
+  if (!data || !Number.isInteger(offset) || offset < 0 || offset >= data.length) {
+    return NaN;
+  }
+  return Number(data[offset]);
+}
+
+function readParkourObsSlice(snapshot, offset, size) {
+  const data = snapshot?.obsVector;
+  if (!data) {
+    return [];
+  }
+  return Array.from(data.slice(offset, offset + size));
+}
+
+/**
+ * @param {object | null} snapshot
+ * @param {{ nodeId: string, lineKey: string }} probe
+ */
+export function resolveParkourSignalValue(snapshot, probe) {
+  if (!snapshot?.ready || !probe?.nodeId) {
+    return NaN;
+  }
+  const { nodeId, lineKey } = probe;
+  const state = snapshot.state ?? null;
+  const jointNames = snapshot.jointNames ?? [];
+
+  if (nodeId === 'sim-root-pos') return vecComponent(state?.rootPos, lineKey);
+  if (nodeId === 'sim-root-angvel') return vecComponent(state?.rootAngVel, lineKey);
+  if (nodeId === 'sim-root-quat') return vecComponent(state?.rootQuat, lineKey);
+
+  if (nodeId === 'sim-joint-pos') {
+    const idx = findJointIndex(jointNames, lineKey);
+    return idx >= 0 ? Number(state?.jointPos?.[idx] ?? NaN) : NaN;
+  }
+  if (nodeId === 'sim-joint-vel') {
+    const idx = findJointIndex(jointNames, lineKey);
+    return idx >= 0 ? Number(state?.jointVel?.[idx] ?? NaN) : NaN;
+  }
+
+  if (nodeId === 'out-action') {
+    const idx = findJointIndex(jointNames, lineKey);
+    return idx >= 0 ? Number(snapshot.latestAction?.[idx] ?? NaN) : NaN;
+  }
+  if (nodeId === 'out-target') {
+    const idx = findJointIndex(jointNames, lineKey);
+    return idx >= 0 ? Number(snapshot.latestTarget?.[idx] ?? NaN) : NaN;
+  }
+
+  if (nodeId === 'motor-torque') {
+    const idx = findJointIndex(jointNames, lineKey);
+    if (idx < 0) {
+      return NaN;
+    }
+    const motor = snapshot.motorJoints?.[idx];
+    return Number(motor?.torque ?? motor?.ctrl ?? NaN);
+  }
+
+  if (nodeId.startsWith('obs-')) {
+    const obsLayout = buildParkourObsOffsetLookup(snapshot);
+    const entry = obsLayout.get(nodeId);
+    if (!entry) {
+      return NaN;
+    }
+    if (entry.kind === 'vec3') {
+      return vecComponent(readParkourObsSlice(snapshot, entry.offset, entry.size), lineKey);
+    }
+    if (entry.kind === 'joint') {
+      const idx = findJointIndex(jointNames, lineKey);
+      return idx >= 0 ? readParkourObsScalar(snapshot, entry.offset + idx) : NaN;
+    }
+    if (entry.kind === 'scalar') {
+      const idx = entry.keys?.indexOf(lineKey) ?? 0;
+      return readParkourObsScalar(snapshot, entry.offset + Math.max(0, idx));
+    }
+    const idx = Number.parseInt(lineKey.replace(/^\[/, '').replace(/\]$/, ''), 10);
+    if (Number.isInteger(idx)) {
+      return readParkourObsScalar(snapshot, entry.offset + idx);
+    }
+  }
+
+  return NaN;
+}
+
 function readObsSlice(runner, offset, size) {
   const data = runner.historyLength > 1 ? runner.fullObs : runner.obsForPolicy;
   if (!data) {
@@ -308,7 +404,7 @@ export function clearScopeBuffer(scope) {
 /**
  * Push one sample for all active scope channels.
  */
-export function pushScopeSample(scope, runner, demo, timeMs = performance.now()) {
+export function pushScopeSample(scope, runner, demo, timeMs = performance.now(), options = {}) {
   if (!scope || scope.paused || scope.channels.length === 0) {
     return;
   }
@@ -318,8 +414,11 @@ export function pushScopeSample(scope, runner, demo, timeMs = performance.now())
   const t = (timeMs - scope.timeOrigin) / 1000;
   const idx = scope.head;
   scope.times[idx] = t;
+  const parkourSnapshot = options.parkourSnapshot ?? null;
   for (const ch of scope.channels) {
-    const value = resolveSignalValue(runner, demo, ch);
+    const value = parkourSnapshot
+      ? resolveParkourSignalValue(parkourSnapshot, ch)
+      : resolveSignalValue(runner, demo, ch);
     ch.values[idx] = Number.isFinite(value) ? value : 0;
   }
   scope.head = (scope.head + 1) % scope.capacity;

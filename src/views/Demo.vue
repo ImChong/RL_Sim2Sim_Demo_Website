@@ -615,12 +615,14 @@
     </v-card>
   </v-dialog>
   <ModelIOFlowchart
-    v-if="!isExternalDemoPolicy"
+    v-if="showModelIOFlowchart"
     :demo="demo"
-    :ready="state === 1"
+    :ready="modelIoFlowchartReady"
     :language="language"
     :is-small-screen="isSmallScreen"
     :mobile-controls-collapsed="isMobileControlsCollapsed"
+    :parkour-telemetry-snapshot="parkourTelemetrySnapshot"
+    :parkour-mode="isParkourPolicy"
   />
   <v-dialog :model-value="state < 0" persistent max-width="600px" scrollable>
     <v-card :title="t.loadingErrorTitle">
@@ -1102,6 +1104,8 @@ export default {
     parkourDepthDiagnosticText: '',
     parkourDepthDiagnosticCopied: false,
     parkourFrameMounted: false,
+    parkourTelemetrySnapshot: null,
+    parkourTelemetryTimer: null,
     bfmFps: null,
     bfmSimTime: null,
     bfmModel: 'pmt',
@@ -1259,6 +1263,15 @@ export default {
     },
     isParkourPolicy() {
       return this.currentPolicy === 'g1-parkour';
+    },
+    showModelIOFlowchart() {
+      return !this.isExternalDemoPolicy || this.isParkourPolicy;
+    },
+    modelIoFlowchartReady() {
+      if (this.isParkourPolicy) {
+        return this.parkourFrameMounted && !this.parkourLoading;
+      }
+      return this.state === 1;
     },
     isBfmPolicy() {
       return this.currentPolicy === 'g1-perceptive-bfm';
@@ -1540,6 +1553,7 @@ export default {
       }
     },
     async mountParkourFrameAfterTeardown(generation) {
+      this.stopParkourTelemetryPoll();
       this.parkourFrameMounted = false;
       const teardown = this.teardownHostDemoForParkour();
       this.pendingHostTeardown = teardown;
@@ -1757,6 +1771,46 @@ export default {
       } catch (error) {
         /* iframe may not be ready */
       }
+    },
+    postParkourHostMessage(partial) {
+      const win = this.$refs.parkourFrame?.contentWindow;
+      if (!win) {
+        return;
+      }
+      try {
+        win.postMessage(
+          {
+            source: 'parkour-host-control',
+            ...partial
+          },
+          window.location.origin
+        );
+      } catch (error) {
+        /* iframe may not be ready */
+      }
+    },
+    requestParkourTelemetry() {
+      if (!this.isParkourPolicy) {
+        return;
+      }
+      this.postParkourHostMessage({ type: 'getPolicyTelemetry' });
+    },
+    startParkourTelemetryPoll() {
+      this.stopParkourTelemetryPoll();
+      if (!this.isParkourPolicy) {
+        return;
+      }
+      this.requestParkourTelemetry();
+      this.parkourTelemetryTimer = setInterval(() => {
+        this.requestParkourTelemetry();
+      }, 100);
+    },
+    stopParkourTelemetryPoll() {
+      if (this.parkourTelemetryTimer) {
+        clearInterval(this.parkourTelemetryTimer);
+        this.parkourTelemetryTimer = null;
+      }
+      this.parkourTelemetrySnapshot = null;
     },
     postBfmHostControl(partial) {
       const win = this.$refs.parkourFrame?.contentWindow;
@@ -2483,6 +2537,8 @@ export default {
         this.syncParkourHostControls();
         if (this.isBfmPolicy) {
           this.postBfmHostControl({ type: 'getStats' });
+        } else if (this.isParkourPolicy) {
+          this.startParkourTelemetryPoll();
         }
         this.focusParkourFrame();
       });
@@ -2505,6 +2561,8 @@ export default {
           if (Number.isFinite(hz)) {
             this.simStepHz = hz;
           }
+        } else if (data.type === 'policyTelemetry') {
+          this.parkourTelemetrySnapshot = data.snapshot ?? null;
         }
         return;
       }
@@ -2793,6 +2851,7 @@ export default {
   beforeUnmount() {
     this.endControlPanelResize();
     this.stopTrackingPoll();
+    this.stopParkourTelemetryPoll();
     if (this.demo) {
       this.demo.dispose?.();
       this.demo = null;

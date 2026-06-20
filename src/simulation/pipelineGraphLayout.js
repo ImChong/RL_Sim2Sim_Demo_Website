@@ -37,16 +37,16 @@ function laneRange(startCol, endCol, colWidths) {
 
 function obsSourceId(obsNode, hasPrepRel) {
   const id = obsNode.id ?? '';
-  if (id.includes('JointPos')) {
+  if (id.includes('JointPos') || id.includes('joint_pos')) {
     return hasPrepRel ? 'prep-joint-rel' : 'sim-joint-pos';
   }
-  if (id.includes('JointVel')) {
+  if (id.includes('JointVel') || id.includes('joint_vel')) {
     return 'sim-joint-vel';
   }
-  if (id.includes('RootAngVel')) {
+  if (id.includes('RootAngVel') || id.includes('base_ang_vel')) {
     return 'sim-root-angvel';
   }
-  if (id.includes('ProjectedGravity')) {
+  if (id.includes('ProjectedGravity') || id.includes('projected_gravity') || id.includes('robot_anchor_projected_gravity')) {
     return 'sim-root-quat';
   }
   if (id.includes('Command-vx')) {
@@ -66,6 +66,9 @@ function obsSourceId(obsNode, hasPrepRel) {
   }
   if (id.includes('TargetJointPosObs')) {
     return hasPrepRel ? 'prep-joint-rel' : 'sim-joint-pos';
+  }
+  if (id.includes('placeholder')) {
+    return 'prep-virtual-input';
   }
   if (isPrevActionObsNodeId(id)) {
     return null;
@@ -199,6 +202,7 @@ function buildHorizontalAtomicGraph(telemetry, zh, atomic) {
   const outputNodes = cloneNodes(atomic.filter((n) => n.group === 'output'));
   const motorNodes = cloneNodes(atomic.filter((n) => n.group === 'motor'));
   const hasPrepRel = prepNodes.some((n) => n.id === 'prep-joint-rel');
+  const isParkour = telemetry.policyFamily === 'parkour';
   const hasHistory = (telemetry.concat?.historyLength ?? 1) > 1;
   const onnxColWidth = 220;
 
@@ -244,6 +248,11 @@ function buildHorizontalAtomicGraph(telemetry, zh, atomic) {
     nodes.push(...prepNodes);
     if (hasPrepRel) {
       edges.push({ id: 'e-sim-prep-joint', from: 'sim-joint-pos', to: 'prep-joint-rel' });
+    }
+    if (isParkour) {
+      edges.push({ id: 'e-sim-prep-depth', from: 'sim-root-pos', to: 'prep-depth-capture' });
+      edges.push({ id: 'e-prep-depth-backbone', from: 'prep-depth-capture', to: 'prep-depth-backbone' });
+      edges.push({ id: 'e-prep-virtual-input', from: 'prep-virtual-input', to: 'obs-placeholder' });
     }
     lanes.push({
       id: 'prep',
@@ -344,6 +353,9 @@ function buildHorizontalAtomicGraph(telemetry, zh, atomic) {
     lines: onnxLines
   });
   edges.push({ id: `e-${onnxFrom}-onnx`, from: onnxFrom, to: 'onnx' });
+  if (isParkour && nodes.some((node) => node.id === 'prep-depth-backbone')) {
+    edges.push({ id: 'e-prep-depth-onnx', from: 'prep-depth-backbone', to: 'onnx', kind: 'depth' });
+  }
   lanes.push({
     id: 'policy',
     label: zh ? '策略推理' : 'Policy',

@@ -84,6 +84,11 @@ function createParkourBridgeContext(demo, options = {}) {
   let messageHandler;
 
   const context = {
+    performance: {
+      now() {
+        return 0;
+      }
+    },
     window: {
       __parkourDemo: demo,
       location: { origin: 'http://localhost' },
@@ -131,9 +136,9 @@ function createParkourBridgeContext(demo, options = {}) {
   return { context, getMessageHandler: () => messageHandler };
 }
 
-function runBridgeInVm(demo) {
+function runBridgeInVm(demo, options = {}) {
   const bridgeSource = readFileSync(bridgePath, 'utf8');
-  const { context, getMessageHandler } = createParkourBridgeContext(demo);
+  const { context, getMessageHandler } = createParkourBridgeContext(demo, options);
   vm.runInNewContext(bridgeSource, context);
   return getMessageHandler();
 }
@@ -198,6 +203,68 @@ test('host bridge shrinks depth preview layout for mobile host controls', () => 
   assert.equal(demo.depthInset.leftOffset, 12);
   assert.equal(demo.depthInset.bottomOffset, 96);
   assert.equal(demo.depthProcessedInset.scale, 2);
+});
+
+test('host bridge returns policy telemetry snapshot for flowchart', () => {
+  const parentMessages = [];
+  const demo = {
+    reflectors: [],
+    render() {},
+    getSimStepHz() {
+      return 50;
+    },
+    simulation: {
+      qpos: new Float32Array(40).fill(0),
+      qvel: new Float32Array(35).fill(0),
+      ctrl: new Float32Array(29).fill(0)
+    },
+    policyController: {
+      observationNames: [
+        'robot_anchor_projected_gravity',
+        'base_ang_vel',
+        'joint_pos',
+        'joint_vel',
+        'actions',
+        'placeholder'
+      ],
+      jointNames: ['left_hip_pitch_joint', 'right_hip_pitch_joint'],
+      obsBuffer: new Float32Array(6 + 6 + 2 + 2 + 2 + 15),
+      prevActions: new Float32Array(2),
+      latestAction: new Float32Array(2),
+      latestTarget: new Float32Array(2),
+      actionScale: new Float32Array(2).fill(1),
+      defaultJointPos: new Float32Array(2),
+      joystickState: new Float32Array(15),
+      pressedKeys: new Set(),
+      highSpeedMode: false,
+      _updateCommandState() {},
+      rootQposAdr: 0,
+      rootDofAdr: 0,
+      jointInfo: [
+        { name: 'left_hip_pitch_joint', qposAdr: 7, qvelAdr: 6, ctrlIndex: 0 },
+        { name: 'right_hip_pitch_joint', qposAdr: 8, qvelAdr: 7, ctrlIndex: 1 }
+      ],
+      kp: new Float32Array(2).fill(100),
+      kd: new Float32Array(2).fill(2),
+      latestDepth: { data: new Float32Array(4), width: 2, height: 2 }
+    }
+  };
+  const messageHandler = runBridgeInVm(demo, { parentMessages });
+
+  messageHandler({
+    data: {
+      source: 'parkour-host-control',
+      type: 'getPolicyTelemetry'
+    }
+  });
+
+  assert.equal(parentMessages.length, 1);
+  assert.equal(parentMessages[0].source, 'parkour-host');
+  assert.equal(parentMessages[0].type, 'policyTelemetry');
+  assert.equal(parentMessages[0].snapshot.ready, true);
+  assert.equal(parentMessages[0].snapshot.jointNames.length, 2);
+  assert.equal(parentMessages[0].snapshot.obsVector.length, 33);
+  assert.equal(parentMessages[0].snapshot.depthReady, true);
 });
 
 test('host bridge toggles pause and resets parkour run', () => {

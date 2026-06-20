@@ -348,6 +348,124 @@
     );
   }
 
+  function parkourObsBlockSize(name, jointCount) {
+    switch (name) {
+      case 'base_lin_vel':
+      case 'base_ang_vel':
+      case 'projected_gravity':
+      case 'robot_anchor_projected_gravity':
+      case 'command':
+        return 3;
+      case 'placeholder':
+        return 15;
+      case 'joint_pos':
+      case 'joint_vel':
+      case 'actions':
+        return jointCount;
+      default:
+        return 0;
+    }
+  }
+
+  function buildParkourObsLayout(observationNames, jointCount) {
+    const blocks = [];
+    let offset = 0;
+    for (const name of observationNames ?? []) {
+      const size = parkourObsBlockSize(name, jointCount);
+      blocks.push({ name, offset, size });
+      offset += size;
+    }
+    return blocks;
+  }
+
+  function buildPolicyTelemetrySnapshot(demo) {
+    const pc = demo?.policyController;
+    const sim = demo?.simulation;
+    if (!pc || !pc.obsBuffer || !sim) {
+      return { ready: false };
+    }
+
+    const jointNames = Array.from(pc.jointNames ?? []);
+    const observationNames = Array.from(pc.observationNames ?? []);
+    const obsLayout = buildParkourObsLayout(observationNames, jointNames.length);
+    const rootQposAdr = pc.rootQposAdr ?? 0;
+    const rootDofAdr = pc.rootDofAdr ?? 0;
+    const rootPos = [
+      sim.qpos[rootQposAdr],
+      sim.qpos[rootQposAdr + 1],
+      sim.qpos[rootQposAdr + 2]
+    ];
+    const rootQuat = [
+      sim.qpos[rootQposAdr + 3],
+      sim.qpos[rootQposAdr + 4],
+      sim.qpos[rootQposAdr + 5],
+      sim.qpos[rootQposAdr + 6]
+    ];
+    const rootLinVel = [
+      sim.qvel[rootDofAdr],
+      sim.qvel[rootDofAdr + 1],
+      sim.qvel[rootDofAdr + 2]
+    ];
+    const rootAngVel = [
+      sim.qvel[rootDofAdr + 3],
+      sim.qvel[rootDofAdr + 4],
+      sim.qvel[rootDofAdr + 5]
+    ];
+
+    const jointPos = [];
+    const jointVel = [];
+    const motorJoints = [];
+    for (let i = 0; i < (pc.jointInfo ?? []).length; i += 1) {
+      const joint = pc.jointInfo[i];
+      const qpos = Number.isInteger(joint.qposAdr) ? sim.qpos[joint.qposAdr] : 0;
+      const qvel = Number.isInteger(joint.qvelAdr) ? sim.qvel[joint.qvelAdr] : 0;
+      const target = pc.latestTarget?.[i] ?? 0;
+      const kp = pc.kp?.[i] ?? 0;
+      const kd = pc.kd?.[i] ?? 0;
+      const torque = kp * (target - qpos) + kd * (0 - qvel);
+      const ctrl = Number.isInteger(joint.ctrlIndex) ? sim.ctrl[joint.ctrlIndex] : torque;
+      jointPos.push(qpos);
+      jointVel.push(qvel);
+      motorJoints.push({
+        name: joint.name,
+        qpos,
+        qvel,
+        target,
+        kp,
+        kd,
+        torque,
+        ctrl
+      });
+    }
+
+    return {
+      ready: true,
+      timestamp: performance.now(),
+      stepCount: demo.stepCount ?? 0,
+      simStepHz: demo.getSimStepHz?.() ?? demo.simStepHz ?? 0,
+      obsVector: Array.from(pc.obsBuffer),
+      prevActions: Array.from(pc.prevActions ?? []),
+      latestAction: Array.from(pc.latestAction ?? []),
+      latestTarget: Array.from(pc.latestTarget ?? []),
+      actionScale: Array.from(pc.actionScale ?? []),
+      defaultJointPos: Array.from(pc.defaultJointPos ?? []),
+      jointNames,
+      observationNames,
+      obsLayout,
+      depthReady: Boolean(pc.latestDepth),
+      state: {
+        rootPos,
+        rootQuat,
+        rootAngVel,
+        rootLinVel,
+        jointPos,
+        jointVel,
+        virtualInput: Array.from(pc.joystickState ?? [])
+      },
+      motorJoints
+    };
+  }
+
   function attachHostApi(demo) {
     if (!demo || demo.__hostBridgeAttached) {
       patchPolicyVirtualInput(demo);
@@ -406,6 +524,10 @@
 
     demo.getSimStepHz = function () {
       return this.simStepHz || 0;
+    };
+
+    demo.getPolicyTelemetrySnapshot = function () {
+      return buildPolicyTelemetrySnapshot(this);
     };
 
     demo.setVisualTheme = function (name) {
@@ -489,6 +611,8 @@
       demo.applyHostControlState(data);
     } else if (data.type === 'getStats') {
       post('stats', { simStepHz: demo.getSimStepHz() });
+    } else if (data.type === 'getPolicyTelemetry') {
+      post('policyTelemetry', { snapshot: buildPolicyTelemetrySnapshot(demo) });
     }
   }
 
