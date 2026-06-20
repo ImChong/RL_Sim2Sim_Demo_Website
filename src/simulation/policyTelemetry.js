@@ -134,6 +134,7 @@ export function buildObsLayout(runner) {
 }
 
 import { buildAtomicNodes } from './pipelineAtomicNodes.js';
+import { inferPolicyFamily } from './pipelineObsNodes.js';
 
 function buildMotorSample(demo, jointCount = 3) {
   if (!demo?.simulation || !demo.policyRunner) {
@@ -224,6 +225,7 @@ export function buildPolicyTelemetry(runner, demo, options = {}) {
   }
 
   const motorJoints = buildMotorSample(demo, runner.numActions);
+  const policyFamily = inferPolicyFamily(runner);
   const atomicNodes = buildAtomicNodes(runner, state, obsVector, obsLayout, lang, motorJoints);
 
   const onnx = {
@@ -275,6 +277,7 @@ export function buildPolicyTelemetry(runner, demo, options = {}) {
     preprocessing,
     obsBlocks,
     atomicNodes,
+    policyFamily,
     jointNames: runner.policyJointNames.slice(),
     concat: {
       currentFrameSize: runner.numObs,

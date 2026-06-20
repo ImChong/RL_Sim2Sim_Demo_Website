@@ -72,9 +72,10 @@
               class="pipeline-edge"
               :class="{
                 'pipeline-edge-active': live,
-                'pipeline-edge-scope': edge.kind === 'scope'
+                'pipeline-edge-scope': edge.kind === 'scope',
+                'pipeline-edge-loopback': edge.kind === 'loopback'
               }"
-              :marker-end="edge.kind === 'scope' ? undefined : `url(#${arrowMarkerId})`"
+              :marker-end="edge.kind === 'scope' || edge.kind === 'loopback' ? undefined : `url(#${arrowMarkerId})`"
             />
           </svg>
 
@@ -271,7 +272,9 @@ export default {
           }
           return {
             id: edge.id,
-            d: this.horizontalBezierPath(from, to),
+            d: edge.kind === 'loopback'
+              ? this.loopbackBezierPath(from, to)
+              : this.horizontalBezierPath(from, to),
             kind: edge.kind
           };
         })
@@ -533,6 +536,13 @@ export default {
       const c2x = to.x - dx;
       return `M ${from.x} ${from.y} C ${c1x} ${from.y}, ${c2x} ${to.y}, ${to.x} ${to.y}`;
     },
+    loopbackBezierPath(from, to) {
+      const dropY = Math.max(from.y, to.y) + 72;
+      const bend = Math.max(48, Math.abs(from.x - to.x) * 0.18);
+      const c1x = from.x + bend;
+      const c2x = to.x - bend;
+      return `M ${from.x} ${from.y} C ${c1x} ${from.y}, ${c1x} ${dropY}, ${(from.x + to.x) / 2} ${dropY} C ${c2x} ${dropY}, ${c2x} ${to.y}, ${to.x} ${to.y}`;
+    },
     isLineProbeable(line) {
       return isProbeableLine(line);
     },
@@ -714,6 +724,12 @@ export default {
   stroke: rgba(76, 179, 212, 0.75);
   stroke-width: 1.5;
   stroke-dasharray: 6 4;
+}
+
+.pipeline-edge-loopback {
+  stroke: rgba(148, 163, 184, 0.72);
+  stroke-width: 1.5;
+  stroke-dasharray: 8 5;
 }
 
 .pipeline-node-scope .pipeline-node-card {

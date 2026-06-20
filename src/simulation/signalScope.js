@@ -1,4 +1,5 @@
 import { clampScopeWindowSeconds } from '../utils/scopeWindowPreference.js';
+import { registerObsNodeOffsets } from './pipelineObsNodes.js';
 
 const DEFAULT_CAPACITY = 3000;
 const DEFAULT_MAX_CHANNELS = 8;
@@ -181,32 +182,8 @@ function buildObsOffsetLookup(runner) {
     const cfg = obsConfig[i] ?? {};
     const name = cfg.name ?? 'Unknown';
     const size = obs.size ?? 0;
-    const idBase = `obs-${name}`;
-
-    switch (name) {
-      case 'RootAngVelB':
-      case 'ProjectedGravityB':
-        map.set(idBase, { offset, size, kind: 'vec3' });
-        break;
-      case 'Command':
-        map.set(`${idBase}-vx`, { offset, size: 1, kind: 'scalar', keys: ['vx'] });
-        map.set(`${idBase}-vy`, { offset: offset + 1, size: 1, kind: 'scalar', keys: ['vy'] });
-        map.set(`${idBase}-yaw`, { offset: offset + 2, size: 1, kind: 'scalar', keys: ['yaw'] });
-        break;
-      case 'JointPos':
-      case 'JointVel':
-      case 'PrevActions':
-        map.set(idBase, { offset, size, kind: 'joint' });
-        break;
-      case 'ComplianceFlagObs':
-        map.set(`${idBase}-en`, { offset, size: 1, kind: 'scalar', keys: ['on'] });
-        map.set(`${idBase}-th`, { offset: offset + 1, size: 1, kind: 'scalar', keys: ['thr'] });
-        map.set(`${idBase}-kp`, { offset: offset + 2, size: 1, kind: 'scalar', keys: ['kp'] });
-        break;
-      default:
-        map.set(idBase, { offset, size, kind: 'indexed' });
-        break;
-    }
+    const block = { name, offset, size, kwargs: cfg };
+    registerObsNodeOffsets(map, block, runner.numActions);
     offset += size;
   }
   return map;

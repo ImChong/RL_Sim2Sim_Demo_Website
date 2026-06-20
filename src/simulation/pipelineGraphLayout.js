@@ -1,4 +1,5 @@
 import { formatFloat, sampleArray } from './policyTelemetry.js';
+import { inferPolicyFamily, policyFamilyLabel, findLoopbackPrevActionNode, isPrevActionObsNodeId } from './pipelineObsNodes.js';
 
 const COL_GAP = 96;
 const ROW_GAP = 16;
@@ -56,6 +57,18 @@ function obsSourceId(obsNode, hasPrepRel) {
   }
   if (id.includes('Command-yaw')) {
     return 'sim-cmd-yaw';
+  }
+  if (id.includes('TrackingCommandObsRaw')) {
+    return 'sim-root-quat';
+  }
+  if (id.includes('TargetRootZObs') || id.includes('TargetProjectedGravityBObs')) {
+    return 'sim-root-quat';
+  }
+  if (id.includes('TargetJointPosObs')) {
+    return hasPrepRel ? 'prep-joint-rel' : 'sim-joint-pos';
+  }
+  if (isPrevActionObsNodeId(id)) {
+    return null;
   }
   return 'prep-action-clip';
 }
@@ -166,6 +179,19 @@ function appendScopeSink(graph, activeProbes, zh) {
   return graph;
 }
 
+function appendActionLoopbackEdges(graph) {
+  const prevNode = findLoopbackPrevActionNode(graph.nodes);
+  if (!prevNode || !graph.nodes.some((node) => node.id === 'out-action')) {
+    return;
+  }
+  graph.edges.push({
+    id: `e-out-action-${prevNode.id}-loop`,
+    from: 'out-action',
+    to: prevNode.id,
+    kind: 'loopback'
+  });
+}
+
 function buildHorizontalAtomicGraph(telemetry, zh, atomic) {
   const simNodes = cloneNodes(atomic.filter((n) => n.group === 'sim'));
   const prepNodes = cloneNodes(atomic.filter((n) => n.group === 'preprocess'));
@@ -233,7 +259,9 @@ function buildHorizontalAtomicGraph(telemetry, zh, atomic) {
   nodes.push(...obsNodes);
   for (const obs of obsNodes) {
     const src = obsSourceId(obs, hasPrepRel);
-    edges.push({ id: `e-${src}-${obs.id}`, from: src, to: obs.id });
+    if (src) {
+      edges.push({ id: `e-${src}-${obs.id}`, from: src, to: obs.id });
+    }
     edges.push({ id: `e-${obs.id}-wh`, from: obs.id, to: 'warehouse' });
   }
   lanes.push({
@@ -295,6 +323,8 @@ function buildHorizontalAtomicGraph(telemetry, zh, atomic) {
   }
 
   const modelName = telemetry.model.path?.split('/').pop() ?? 'ONNX';
+  const family = telemetry.policyFamily ?? 'generic';
+  const familyLabel = policyFamilyLabel(family, zh);
   const xOnnx = colX(col, colWidths);
   const onnxWidth = onnxColWidth;
   const onnxLines = [
@@ -306,7 +336,7 @@ function buildHorizontalAtomicGraph(telemetry, zh, atomic) {
     id: 'onnx',
     kind: 'model',
     title: zh ? '策略网络' : 'Policy net',
-    subtitle: modelName,
+    subtitle: `${familyLabel} · ${modelName}`,
     width: onnxWidth,
     height: onnxHeight,
     x: xOnnx,
@@ -352,7 +382,9 @@ function buildHorizontalAtomicGraph(telemetry, zh, atomic) {
   const width = colX(col, colWidths) + (colWidths[col - 1] ?? 140) + MARGIN_X;
   const height = Math.max(simStack.height, obsStack.height, 300) + MARGIN_Y;
 
-  return { nodes, edges, lanes, width, height, layout: 'horizontal' };
+  const graph = { nodes, edges, lanes, width, height, layout: 'horizontal' };
+  appendActionLoopbackEdges(graph);
+  return graph;
 }
 
 function buildVerticalAtomicGraph(telemetry, zh, atomic) {
@@ -429,7 +461,9 @@ function buildVerticalAtomicGraph(telemetry, zh, atomic) {
   }
   for (const obs of atomic.filter((n) => n.group === 'obs')) {
     const src = obsSourceId(obs, hasPrepRel);
-    edges.push({ id: `e-${src}-${obs.id}`, from: src, to: obs.id });
+    if (src) {
+      edges.push({ id: `e-${src}-${obs.id}`, from: src, to: obs.id });
+    }
     edges.push({ id: `e-${obs.id}-wh`, from: obs.id, to: 'warehouse' });
   }
 
@@ -448,7 +482,7 @@ function buildVerticalAtomicGraph(telemetry, zh, atomic) {
     prev = motor.id;
   }
 
-  return {
+  const graph = {
     nodes,
     edges,
     lanes: [],
@@ -456,6 +490,8 @@ function buildVerticalAtomicGraph(telemetry, zh, atomic) {
     height: y + 8,
     layout: 'vertical'
   };
+  appendActionLoopbackEdges(graph);
+  return graph;
 }
 
 function formatVec(values, max = 3) {
