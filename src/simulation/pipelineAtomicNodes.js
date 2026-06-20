@@ -1,3 +1,5 @@
+import { decomposeObsBlockNodes } from './pipelineObsNodes.js';
+
 function shortJointName(name) {
   if (!name) {
     return 'j';
@@ -45,158 +47,7 @@ function nodeHeight(lineCount) {
 }
 
 function decomposeObsBlock(block, slice, jointNames, lang) {
-  const zh = lang === 'zh';
-  const data = slice ?? [];
-  const idBase = `obs-${block.name}`;
-
-  switch (block.name) {
-    case 'RootAngVelB':
-      return [{
-        id: idBase,
-        kind: 'signal',
-        group: 'obs',
-        title: zh ? '根角速度' : 'Root AngVel',
-        subtitle: zh ? '机体系 ω' : 'body ω',
-        lines: vec3Lines(''),
-        concatOffset: block.offset,
-        concatSize: block.size
-      }];
-    case 'ProjectedGravityB':
-      return [{
-        id: idBase,
-        kind: 'signal',
-        group: 'obs',
-        title: zh ? '投影重力' : 'Proj Gravity',
-        subtitle: zh ? '机体系' : 'body frame',
-        lines: vec3Lines(''),
-        concatOffset: block.offset,
-        concatSize: block.size
-      }];
-    case 'Command':
-      return [
-        {
-          id: `${idBase}-vx`,
-          kind: 'signal',
-          group: 'obs',
-          title: zh ? '指令 vx' : 'Cmd vx',
-          lines: [{ k: 'vx' }],
-          concatOffset: block.offset,
-          concatSize: 1
-        },
-        {
-          id: `${idBase}-vy`,
-          kind: 'signal',
-          group: 'obs',
-          title: zh ? '指令 vy' : 'Cmd vy',
-          lines: [{ k: 'vy' }],
-          concatOffset: block.offset + 1,
-          concatSize: 1
-        },
-        {
-          id: `${idBase}-yaw`,
-          kind: 'signal',
-          group: 'obs',
-          title: zh ? '指令 yaw' : 'Cmd yaw',
-          lines: [{ k: 'yaw' }],
-          concatOffset: block.offset + 2,
-          concatSize: 1
-        }
-      ];
-    case 'JointPos':
-      return [{
-        id: idBase,
-        kind: 'joints',
-        group: 'obs',
-        title: zh ? '关节位置' : 'Joint Position',
-        subtitle: block.kwargs?.pos_steps
-          ? `step ${JSON.stringify(block.kwargs.pos_steps)}`
-          : undefined,
-        lines: jointDimLines(block.size, zh),
-        concatOffset: block.offset,
-        concatSize: block.size
-      }];
-    case 'JointVel':
-      return [{
-        id: idBase,
-        kind: 'joints',
-        group: 'obs',
-        title: zh ? '关节速度' : 'Joint Velocity',
-        subtitle: block.kwargs?.vel_steps
-          ? `step ${JSON.stringify(block.kwargs.vel_steps)}`
-          : undefined,
-        lines: jointDimLines(block.size, zh),
-        concatOffset: block.offset,
-        concatSize: block.size
-      }];
-    case 'PrevActions':
-      return [{
-        id: idBase,
-        kind: 'joints',
-        group: 'obs',
-        title: zh ? '上一动作' : 'Prev Action',
-        subtitle: block.kwargs?.history_steps
-          ? `×${block.kwargs.history_steps}`
-          : undefined,
-        lines: jointLines(jointNames),
-        concatOffset: block.offset,
-        concatSize: block.size,
-        scrollable: true
-      }];
-    case 'BootIndicator':
-      return [{
-        id: idBase,
-        kind: 'signal',
-        group: 'obs',
-        title: 'Boot',
-        lines: [{ k: 'val' }],
-        concatOffset: block.offset,
-        concatSize: block.size
-      }];
-    case 'ComplianceFlagObs':
-      return [
-        {
-          id: `${idBase}-en`,
-          kind: 'signal',
-          group: 'obs',
-          title: zh ? '顺应 开关' : 'Compliance on',
-          lines: [{ k: 'on' }],
-          concatOffset: block.offset,
-          concatSize: 1
-        },
-        {
-          id: `${idBase}-th`,
-          kind: 'signal',
-          group: 'obs',
-          title: zh ? '顺应 阈值' : 'Compliance thr',
-          lines: [{ k: 'thr' }],
-          concatOffset: block.offset + 1,
-          concatSize: 1
-        },
-        {
-          id: `${idBase}-kp`,
-          kind: 'signal',
-          group: 'obs',
-          title: zh ? '顺应 kp' : 'Compliance kp',
-          lines: [{ k: 'kp' }],
-          concatOffset: block.offset + 2,
-          concatSize: 1
-        }
-      ];
-    default:
-      return [{
-        id: idBase,
-        kind: 'signal',
-        group: 'obs',
-        title: block.name,
-        subtitle: `${block.size}D`,
-        lines: data.slice(0, 6).map((_, i) => ({
-          k: `[${block.offset + i}]`
-        })),
-        concatOffset: block.offset,
-        concatSize: block.size,
-        scrollable: data.length > 4
-      }];
-  }
+  return decomposeObsBlockNodes(block, slice, jointNames, lang, jointNames.length);
 }
 
 /**
@@ -327,7 +178,7 @@ export function buildAtomicNodes(runner, state, obsVector, obsLayout, lang = 'zh
     id: 'out-action',
     kind: 'joints',
     group: 'output',
-    title: zh ? '策略动作' : 'Policy Action',
+    title: zh ? '动作' : 'Action',
     subtitle: zh ? 'clip 后' : 'after clip',
     lines: jointLines(jointNames),
     scrollable: true

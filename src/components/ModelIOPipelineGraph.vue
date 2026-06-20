@@ -5,17 +5,17 @@
     </p>
     <div
       ref="viewport"
-      class="pipeline-viewport pipeline-viewport-panzoom"
+      class="pipeline-viewport pipeline-viewport-zoom"
       :class="{ 'pipeline-viewport-dragging': isDragging }"
       :style="viewportStyle"
     >
       <div
-        v-if="displayLayout.lanes && displayLayout.lanes.length"
+        v-if="layout.lanes && layout.lanes.length"
         class="pipeline-lane-headers"
         aria-hidden="true"
       >
         <div
-          v-for="lane in displayLayout.lanes"
+          v-for="lane in layout.lanes"
           :key="`lane-header-${lane.id}`"
           class="pipeline-lane-header"
           :style="{
@@ -32,25 +32,25 @@
       >
         <div
           class="pipeline-canvas"
-          :style="{ width: `${displayLayout.width}px`, height: `${displayLayout.height}px` }"
+          :style="{ width: `${layout.width}px`, height: `${layout.height}px` }"
         >
           <div class="pipeline-grid" aria-hidden="true" />
           <div
-            v-for="(lane, idx) in displayLayout.lanes"
+            v-for="(lane, idx) in layout.lanes"
             :key="`lane-${lane.id}`"
             class="pipeline-lane"
             :class="[`pipeline-lane-${lane.id}`, { 'pipeline-lane-alt': idx % 2 === 1 }]"
             :style="{
               transform: `translate(${lane.x}px, 0)`,
               width: `${lane.width}px`,
-              height: `${displayLayout.height}px`
+              height: `${layout.height}px`
             }"
             aria-hidden="true"
           />
           <svg
             class="pipeline-edges"
-            :width="displayLayout.width"
-            :height="displayLayout.height"
+            :width="layout.width"
+            :height="layout.height"
             aria-hidden="true"
           >
             <defs>
@@ -72,14 +72,15 @@
               class="pipeline-edge"
               :class="{
                 'pipeline-edge-active': live,
-                'pipeline-edge-scope': edge.kind === 'scope'
+                'pipeline-edge-scope': edge.kind === 'scope',
+                'pipeline-edge-loopback': edge.kind === 'loopback'
               }"
-              :marker-end="edge.kind === 'scope' ? undefined : `url(#${arrowMarkerId})`"
+              :marker-end="edge.kind === 'scope' || edge.kind === 'loopback' ? undefined : `url(#${arrowMarkerId})`"
             />
           </svg>
 
           <div
-            v-for="node in displayLayout.nodes"
+            v-for="node in layout.nodes"
             :key="node.id"
             :data-node-id="node.id"
             class="pipeline-node"
@@ -87,7 +88,6 @@
               `pipeline-node-${node.kind}`,
               {
                 'pipeline-node-live': live,
-                'pipeline-node-active': activeNodeId === node.id,
                 'pipeline-node-scope': node.kind === 'scope',
                 'pipeline-node-clickable': isNodeClickable(node),
                 'pipeline-node-probed': isNodeProbed(node)
@@ -105,11 +105,7 @@
                 aria-hidden="true"
               />
               <div class="pipeline-node-inner">
-                <div
-                  class="pipeline-node-head"
-                  @mousedown.stop="onNodeMoveStart(node.id, $event)"
-                  @touchstart.stop="onNodeMoveStart(node.id, $event)"
-                >
+                <div class="pipeline-node-head">
                   <div class="pipeline-node-title" :title="node.title">{{ node.title }}</div>
                   <div
                     v-if="node.subtitle"
@@ -161,20 +157,12 @@
 import { buildPipelineGraph } from '@/simulation/pipelineGraphLayout.js';
 import { portPointFromLayoutNode } from '@/simulation/pipelineGraphEdgeCoords.js';
 import { isProbeableLine } from '@/simulation/signalScope.js';
-import {
-  computeGraphBounds,
-  graphLayoutKey,
-  loadNodeOverrides,
-  mergeNodeLayout,
-  pruneNodeOverrides,
-  saveNodeOverrides
-} from '@/utils/pipelineGraphNodeLayout.js';
 
 let graphInstanceCounter = 0;
 
+const FIT_MIN_SCALE = 0.12;
 const MIN_SCALE = 0.25;
 const MAX_SCALE = 3;
-const FIT_MIN_SCALE = 0.12;
 const WHEEL_ZOOM_FACTOR = 1.1;
 
 function touchDistance(touches) {
@@ -228,11 +216,7 @@ export default {
     scale: 1,
     gesture: null,
     isDragging: false,
-    userHasGestured: false,
-    layoutKey: '',
-    nodeOverrides: {},
-    activeNodeId: null,
-    nodeGesture: null
+    userHasGestured: false
   }),
   computed: {
     layout() {
@@ -248,12 +232,12 @@ export default {
     scrollHint() {
       if (this.isMobile) {
         return this.language === 'en'
-          ? 'Drag title to move node · Click node body to open scope · Drag canvas to pan · Pinch to zoom'
-          : '拖标题移动节点 · 点击节点查看示波器 · 拖空白平移画布 · 双指缩放';
+          ? 'Click a node to view its signals in the scope · Drag canvas to pan · Pinch to zoom'
+          : '点击节点在示波器查看信号曲线 · 拖空白平移画布 · 双指缩放';
       }
       return this.language === 'en'
-        ? 'Drag title to move node · Click node body to open scope · Drag canvas to pan · Wheel to zoom'
-        : '拖标题移动节点 · 点击节点查看示波器 · 拖空白平移画布 · 滚轮缩放';
+        ? 'Click a node to view its signals in the scope · Drag canvas to pan · Wheel to zoom'
+        : '点击节点在示波器查看信号曲线 · 拖空白平移画布 · 滚轮缩放';
     },
     viewportStyle() {
       if (this.isMobile) {
@@ -268,26 +252,12 @@ export default {
       return {
         transform: `translate(${this.panX}px, ${this.panY}px) scale(${this.scale})`,
         transformOrigin: '0 0',
-        width: `${this.displayLayout.width}px`,
-        height: `${this.displayLayout.height}px`
-      };
-    },
-    displayLayout() {
-      const base = this.layout;
-      const nodes = mergeNodeLayout(base.nodes, this.nodeOverrides);
-      const bounds = computeGraphBounds(nodes, {
-        width: base.width,
-        height: base.height
-      });
-      return {
-        ...base,
-        nodes,
-        width: bounds.width,
-        height: bounds.height
+        width: `${this.layout.width}px`,
+        height: `${this.layout.height}px`
       };
     },
     nodeById() {
-      return new Map(this.displayLayout.nodes.map((node) => [node.id, node]));
+      return new Map(this.layout.nodes.map((node) => [node.id, node]));
     },
     renderedEdges() {
       const portPoint = (nodeId, side) =>
@@ -302,7 +272,9 @@ export default {
           }
           return {
             id: edge.id,
-            d: this.horizontalBezierPath(from, to),
+            d: edge.kind === 'loopback'
+              ? this.loopbackBezierPath(from, to)
+              : this.horizontalBezierPath(from, to),
             kind: edge.kind
           };
         })
@@ -311,8 +283,7 @@ export default {
   },
   watch: {
     layout: {
-      handler(layout) {
-        this.syncNodeOverrides(layout);
+      handler() {
         this.scheduleViewportFit();
       },
       deep: true
@@ -329,15 +300,11 @@ export default {
     if (this.$refs.viewport) {
       this.resizeObserver.observe(this.$refs.viewport);
     }
-    this.setupInteractionHandlers();
-    this.syncNodeOverrides(this.layout);
-    this._onNodeGestureMove = (e) => this.onNodeGestureMove(e);
-    this._onNodeGestureEnd = () => this.endNodeGesture();
+    this.setupViewportHandlers();
     this.scheduleViewportFit();
   },
   beforeUnmount() {
-    this.endNodeGesture();
-    this.teardownInteractionHandlers();
+    this.teardownViewportHandlers();
     this.resizeObserver?.disconnect();
     if (this._fitRaf) {
       cancelAnimationFrame(this._fitRaf);
@@ -345,128 +312,44 @@ export default {
   },
   methods: {
     shouldIgnorePanStart(target) {
-      return Boolean(target?.closest?.('.pipeline-node-head'));
-    },
-    clientPoint(event) {
-      if (event.touches?.length) {
-        return { x: event.touches[0].clientX, y: event.touches[0].clientY };
-      }
-      return { x: event.clientX, y: event.clientY };
-    },
-    syncNodeOverrides(layout) {
-      const nodes = layout?.nodes ?? [];
-      const key = graphLayoutKey(nodes);
-      const ids = nodes.map((n) => n.id);
-      if (key !== this.layoutKey) {
-        this.layoutKey = key;
-        this.nodeOverrides = pruneNodeOverrides(loadNodeOverrides(key), ids);
-      } else {
-        this.nodeOverrides = pruneNodeOverrides(this.nodeOverrides, ids);
-      }
-    },
-    setNodeOverride(nodeId, patch) {
-      const prev = this.nodeOverrides[nodeId] ?? {};
-      this.nodeOverrides = {
-        ...this.nodeOverrides,
-        [nodeId]: { ...prev, ...patch }
-      };
-    },
-    attachNodeGestureListeners() {
-      document.addEventListener('mousemove', this._onNodeGestureMove);
-      document.addEventListener('mouseup', this._onNodeGestureEnd);
-      document.addEventListener('touchmove', this._onNodeGestureMove, { passive: false });
-      document.addEventListener('touchend', this._onNodeGestureEnd);
-      document.addEventListener('touchcancel', this._onNodeGestureEnd);
-      document.body.classList.add('pipeline-node-gesturing');
-    },
-    detachNodeGestureListeners() {
-      document.removeEventListener('mousemove', this._onNodeGestureMove);
-      document.removeEventListener('mouseup', this._onNodeGestureEnd);
-      document.removeEventListener('touchmove', this._onNodeGestureMove);
-      document.removeEventListener('touchend', this._onNodeGestureEnd);
-      document.removeEventListener('touchcancel', this._onNodeGestureEnd);
-      document.body.classList.remove('pipeline-node-gesturing');
-    },
-    onNodeMoveStart(nodeId, event) {
-      const node = this.nodeById.get(nodeId);
-      if (!node) {
-        return;
-      }
-      const point = this.clientPoint(event);
-      this.activeNodeId = nodeId;
-      this.nodeGesture = {
-        mode: 'move',
-        nodeId,
-        startClientX: point.x,
-        startClientY: point.y,
-        startX: node.x,
-        startY: node.y
-      };
-      this.attachNodeGestureListeners();
-      event.preventDefault();
-    },
-    onNodeGestureMove(event) {
-      if (!this.nodeGesture) {
-        return;
-      }
-      const point = this.clientPoint(event);
-      const dx = (point.x - this.nodeGesture.startClientX) / this.scale;
-      const dy = (point.y - this.nodeGesture.startClientY) / this.scale;
-      const { nodeId } = this.nodeGesture;
-
-      this.setNodeOverride(nodeId, {
-        x: Math.round(this.nodeGesture.startX + dx),
-        y: Math.round(this.nodeGesture.startY + dy)
-      });
-
-      this.markUserGestured();
-      event.preventDefault();
-    },
-    endNodeGesture() {
-      if (!this.nodeGesture) {
-        return;
-      }
-      saveNodeOverrides(this.layoutKey, this.nodeOverrides);
-      this.nodeGesture = null;
-      this.detachNodeGestureListeners();
+      return Boolean(target?.closest?.('.pipeline-node'));
     },
     markUserGestured() {
       this.userHasGestured = true;
     },
-    setupInteractionHandlers() {
+    setupViewportHandlers() {
       const viewport = this.$refs.viewport;
       if (!viewport || this._interactionViewport === viewport) {
         return;
       }
-      this.teardownInteractionHandlers();
+      this.teardownViewportHandlers();
       this._interactionViewport = viewport;
 
+      this._onWheel = (e) => this.handleWheel(e);
+      this._onMouseDown = (e) => this.handleMouseDown(e);
+      this._onMouseMove = (e) => this.handleMouseMove(e);
+      this._onMouseUp = (e) => this.handleMouseUp(e);
       this._onTouchStart = (e) => this.handleTouchStart(e);
       this._onTouchMove = (e) => this.handleTouchMove(e);
       this._onTouchEnd = (e) => this.handleTouchEnd(e);
+      viewport.addEventListener('wheel', this._onWheel, { passive: false });
+      viewport.addEventListener('mousedown', this._onMouseDown);
       viewport.addEventListener('touchstart', this._onTouchStart, { passive: true });
       viewport.addEventListener('touchmove', this._onTouchMove, { passive: false });
       viewport.addEventListener('touchend', this._onTouchEnd, { passive: true });
       viewport.addEventListener('touchcancel', this._onTouchEnd, { passive: true });
-
-      this._onMouseDown = (e) => this.handleMouseDown(e);
-      this._onMouseMove = (e) => this.handleMouseMove(e);
-      this._onMouseUp = (e) => this.handleMouseUp(e);
-      this._onWheel = (e) => this.handleWheel(e);
-      viewport.addEventListener('mousedown', this._onMouseDown);
-      viewport.addEventListener('wheel', this._onWheel, { passive: false });
     },
-    teardownInteractionHandlers() {
+    teardownViewportHandlers() {
       const viewport = this._interactionViewport;
       if (!viewport) {
         return;
       }
+      viewport.removeEventListener('wheel', this._onWheel);
+      viewport.removeEventListener('mousedown', this._onMouseDown);
       viewport.removeEventListener('touchstart', this._onTouchStart);
       viewport.removeEventListener('touchmove', this._onTouchMove);
       viewport.removeEventListener('touchend', this._onTouchEnd);
       viewport.removeEventListener('touchcancel', this._onTouchEnd);
-      viewport.removeEventListener('mousedown', this._onMouseDown);
-      viewport.removeEventListener('wheel', this._onWheel);
       document.removeEventListener('mousemove', this._onMouseMove);
       document.removeEventListener('mouseup', this._onMouseUp);
       this._interactionViewport = null;
@@ -512,9 +395,6 @@ export default {
       document.addEventListener('mouseup', this._onMouseUp);
     },
     handleMouseMove(e) {
-      if (this.nodeGesture) {
-        return;
-      }
       if (!this.gesture || this.gesture.mode !== 'pan' || !this.isDragging) {
         return;
       }
@@ -563,9 +443,6 @@ export default {
       }
     },
     handleTouchMove(e) {
-      if (this.nodeGesture) {
-        return;
-      }
       if (!this.gesture) {
         return;
       }
@@ -635,7 +512,7 @@ export default {
         return;
       }
       const viewport = this.$refs.viewport;
-      if (!viewport || !this.displayLayout.width) {
+      if (!viewport || !this.layout.width) {
         return;
       }
       const pad = 8;
@@ -645,19 +522,26 @@ export default {
         return;
       }
       const fitScale = Math.min(
-        (vw - pad * 2) / this.displayLayout.width,
-        (vh - pad * 2) / this.displayLayout.height,
+        (vw - pad * 2) / this.layout.width,
+        (vh - pad * 2) / this.layout.height,
         1
       );
       this.scale = Math.max(FIT_MIN_SCALE, fitScale);
-      this.panX = pad + (vw - pad * 2 - this.displayLayout.width * this.scale) / 2;
-      this.panY = pad + (vh - pad * 2 - this.displayLayout.height * this.scale) / 2;
+      this.panX = pad + (vw - pad * 2 - this.layout.width * this.scale) / 2;
+      this.panY = pad + (vh - pad * 2 - this.layout.height * this.scale) / 2;
     },
     horizontalBezierPath(from, to) {
       const dx = Math.max(56, Math.abs(to.x - from.x) * 0.5);
       const c1x = from.x + dx;
       const c2x = to.x - dx;
       return `M ${from.x} ${from.y} C ${c1x} ${from.y}, ${c2x} ${to.y}, ${to.x} ${to.y}`;
+    },
+    loopbackBezierPath(from, to) {
+      const dropY = Math.max(from.y, to.y) + 72;
+      const bend = Math.max(48, Math.abs(from.x - to.x) * 0.18);
+      const c1x = from.x + bend;
+      const c2x = to.x - bend;
+      return `M ${from.x} ${from.y} C ${c1x} ${from.y}, ${c1x} ${dropY}, ${(from.x + to.x) / 2} ${dropY} C ${c2x} ${dropY}, ${c2x} ${to.y}, ${to.x} ${to.y}`;
     },
     isLineProbeable(line) {
       return isProbeableLine(line);
@@ -782,7 +666,7 @@ export default {
   text-overflow: ellipsis;
 }
 
-.pipeline-viewport-panzoom {
+.pipeline-viewport-zoom {
   flex: 1 1 auto;
   min-height: 220px;
   overflow: hidden;
@@ -842,6 +726,12 @@ export default {
   stroke-dasharray: 6 4;
 }
 
+.pipeline-edge-loopback {
+  stroke: rgba(148, 163, 184, 0.72);
+  stroke-width: 1.5;
+  stroke-dasharray: 8 5;
+}
+
 .pipeline-node-scope .pipeline-node-card {
   border-color: rgba(76, 179, 212, 0.55);
   background: linear-gradient(180deg, rgba(15, 35, 48, 0.95) 0%, rgba(10, 20, 30, 0.98) 100%);
@@ -852,15 +742,6 @@ export default {
   top: 0;
   left: 0;
   z-index: 2;
-}
-
-.pipeline-node-active {
-  z-index: 5;
-}
-
-.pipeline-node-active .pipeline-node-card {
-  border-color: rgba(var(--v-theme-primary), 0.55);
-  box-shadow: 0 0 0 1px rgba(var(--v-theme-primary), 0.25), 0 6px 16px rgba(0, 0, 0, 0.45);
 }
 
 .pipeline-node-body {
@@ -883,12 +764,7 @@ export default {
 .pipeline-node-head {
   flex-shrink: 0;
   padding: 5px 8px 2px;
-  cursor: grab;
   border-radius: 6px 6px 0 0;
-}
-
-.pipeline-node-head:active {
-  cursor: grabbing;
 }
 
 .pipeline-node-card {
@@ -1036,11 +912,4 @@ export default {
   box-shadow: 0 0 6px rgba(var(--v-theme-primary), 0.5);
 }
 
-</style>
-
-<style>
-body.pipeline-node-gesturing {
-  user-select: none;
-  -webkit-user-select: none;
-}
 </style>
