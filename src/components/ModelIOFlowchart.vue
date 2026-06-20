@@ -117,6 +117,7 @@
             :paused="signalScope.paused"
             :channels-label="t.scopeChannels"
             :samples-label="t.scopeSamples"
+            :window-label="t.scopeWindow"
             :reset-zoom-label="t.scopeResetZoom"
             :clear-label="t.scopeClear"
             :pause-label="t.scopePause"
@@ -195,6 +196,7 @@ const translations = {
     graphHint: 'Click a node to view its signals in the scope · Drag the title bar to reposition nodes',
     scopeChannels: 'Channels',
     scopeSamples: 'Samples',
+    scopeWindow: 'Window',
     scopeResetZoom: 'Reset zoom',
     scopeClear: 'Clear',
     scopePause: 'Pause',
@@ -220,6 +222,7 @@ const translations = {
     graphHint: '点击节点在示波器查看信号曲线 · 拖标题栏可移动节点',
     scopeChannels: '通道',
     scopeSamples: '采样',
+    scopeWindow: '窗口',
     scopeResetZoom: '重置缩放',
     scopeClear: '清空',
     scopePause: '暂停',
@@ -454,6 +457,13 @@ export default {
       const probes = listNodeProbes(node);
       if (!probes.length) {
         return;
+      }
+      const switchingNode = this.signalScope.channels.some(
+        (channel) => channel.nodeId !== node.id
+      );
+      if (switchingNode) {
+        clearScopeBuffer(this.signalScope);
+        this.signalScope.channels = [];
       }
       setScopeProbes(this.signalScope, probes);
       this.scopeZoom = null;

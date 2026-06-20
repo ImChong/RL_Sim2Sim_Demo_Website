@@ -4,6 +4,7 @@ import {
   buildProbeId,
   clearScopeBuffer,
   createSignalScope,
+  DEFAULT_WINDOW_SECONDS,
   getScopeSnapshot,
   pushScopeSample,
   resolveSignalValue,
@@ -132,4 +133,51 @@ test('clearScopeBuffer resets timeline but keeps channels', () => {
   clearScopeBuffer(scope);
   assert.equal(scope.channels.length, 1);
   assert.equal(getScopeSnapshot(scope).sampleCount, 0);
+});
+
+test('getScopeSnapshot keeps only the latest windowSeconds of samples', () => {
+  const scope = createSignalScope({ capacity: 256, windowSeconds: 20 });
+  setScopeProbes(scope, [{
+    id: 'sim-cmd-vx:vx',
+    nodeId: 'sim-cmd-vx',
+    lineKey: 'vx',
+    label: 'Cmd vx'
+  }]);
+
+  for (let t = 0; t <= 30; t += 1) {
+    pushScopeSample(
+      scope,
+      null,
+      { readPolicyState: () => ({ cmd: [t, 0, 0] }) },
+      1000 + t * 1000
+    );
+  }
+
+  const snapshot = getScopeSnapshot(scope);
+  assert.equal(snapshot.windowSeconds, 20);
+  assert.ok(snapshot.sampleCount <= 21);
+  assert.ok(snapshot.times[0] >= 10);
+  assert.equal(snapshot.times[0], 10);
+  assert.equal(snapshot.times[snapshot.times.length - 1], 30);
+});
+
+test('setScopeProbes keeps probes from a single node only', () => {
+  const scope = createSignalScope({ capacity: 8, maxChannels: 8 });
+  setScopeProbes(scope, [
+    {
+      id: buildProbeId('sim-cmd-vx', 'vx'),
+      nodeId: 'sim-cmd-vx',
+      lineKey: 'vx',
+      label: 'Cmd vx'
+    },
+    {
+      id: buildProbeId('sim-root-angvel', 'x'),
+      nodeId: 'sim-root-angvel',
+      lineKey: 'x',
+      label: 'Root AngVel · x'
+    }
+  ]);
+  assert.equal(scope.channels.length, 1);
+  assert.equal(scope.channels[0].nodeId, 'sim-cmd-vx');
+  assert.equal(DEFAULT_WINDOW_SECONDS, 20);
 });

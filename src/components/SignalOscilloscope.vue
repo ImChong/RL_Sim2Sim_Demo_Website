@@ -5,6 +5,8 @@
         <span>{{ channelsLabel }}: {{ snapshot.series.length }}</span>
         <span class="scope-stat-sep">/</span>
         <span>{{ samplesLabel }}: {{ snapshot.sampleCount }}</span>
+        <span class="scope-stat-sep">/</span>
+        <span>{{ windowLabel }}: {{ snapshot.windowSeconds ?? 20 }}s</span>
       </div>
       <div class="scope-actions">
         <v-btn
@@ -90,6 +92,10 @@ export default {
     samplesLabel: {
       type: String,
       default: 'Samples'
+    },
+    windowLabel: {
+      type: String,
+      default: 'Window'
     },
     resetZoomLabel: {
       type: String,
@@ -204,8 +210,8 @@ export default {
         return;
       }
 
-      const fullTMin = snapshot.times[0];
-      const fullTMax = snapshot.times[snapshot.times.length - 1];
+      const fullTMin = snapshot.timeRange?.[0] ?? snapshot.times[0];
+      const fullTMax = snapshot.timeRange?.[1] ?? snapshot.times[snapshot.times.length - 1];
       const fullVMin = snapshot.valueRange?.[0] ?? -1;
       const fullVMax = snapshot.valueRange?.[1] ?? 1;
 

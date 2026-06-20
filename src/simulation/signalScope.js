@@ -1,5 +1,6 @@
 const DEFAULT_CAPACITY = 600;
 const DEFAULT_MAX_CHANNELS = 8;
+export const DEFAULT_WINDOW_SECONDS = 20;
 
 export const SCOPE_CHANNEL_COLORS = [
   '#00d992',
@@ -211,9 +212,11 @@ function buildObsOffsetLookup(runner) {
 export function createSignalScope(options = {}) {
   const capacity = options.capacity ?? DEFAULT_CAPACITY;
   const maxChannels = options.maxChannels ?? DEFAULT_MAX_CHANNELS;
+  const windowSeconds = options.windowSeconds ?? DEFAULT_WINDOW_SECONDS;
   return {
     capacity,
     maxChannels,
+    windowSeconds,
     channels: [],
     times: new Float64Array(capacity),
     head: 0,
@@ -258,7 +261,9 @@ export function setScopeProbes(scope, probes) {
     clearScopeBuffer(scope);
     return [];
   }
-  scope.channels = limited.map((probe, index) => ({
+  const nodeId = limited[0].nodeId;
+  const sameNodeProbes = limited.filter((probe) => probe.nodeId === nodeId);
+  scope.channels = sameNodeProbes.map((probe, index) => ({
     id: probe.id,
     nodeId: probe.nodeId,
     lineKey: probe.lineKey,
@@ -338,6 +343,7 @@ export function getScopeSnapshot(scope) {
   if (length === 0) {
     return {
       sampleCount: 0,
+      windowSeconds: scope.windowSeconds ?? DEFAULT_WINDOW_SECONDS,
       labels: channels.map((ch) => ch.label),
       series: channels.map((ch) => ({
         id: ch.id,
@@ -345,7 +351,7 @@ export function getScopeSnapshot(scope) {
         color: ch.color,
         values: []
       })),
-      timeRange: [0, 1]
+      timeRange: [0, scope.windowSeconds ?? DEFAULT_WINDOW_SECONDS]
     };
   }
 
@@ -366,10 +372,26 @@ export function getScopeSnapshot(scope) {
     }
   }
 
+  const windowSeconds = scope.windowSeconds ?? DEFAULT_WINDOW_SECONDS;
+  let sliceStart = 0;
+  if (length > 0) {
+    const latestTime = orderedTimes[length - 1];
+    const cutoff = latestTime - windowSeconds;
+    while (sliceStart < length && orderedTimes[sliceStart] < cutoff) {
+      sliceStart += 1;
+    }
+  }
+  const visibleLength = length - sliceStart;
+  const visibleTimes = orderedTimes.subarray(sliceStart, length);
+  const visibleSeries = orderedSeries.map((series) => ({
+    ...series,
+    values: series.values.subarray(sliceStart, length)
+  }));
+
   let minY = Infinity;
   let maxY = -Infinity;
-  for (const series of orderedSeries) {
-    for (let i = 0; i < length; i++) {
+  for (const series of visibleSeries) {
+    for (let i = 0; i < visibleLength; i++) {
       const v = series.values[i];
       if (v < minY) minY = v;
       if (v > maxY) maxY = v;
@@ -385,14 +407,17 @@ export function getScopeSnapshot(scope) {
   }
 
   return {
-    sampleCount: length,
+    sampleCount: visibleLength,
+    windowSeconds,
     labels: channels.map((ch) => ch.label),
-    series: orderedSeries.map((s) => ({
+    series: visibleSeries.map((s) => ({
       ...s,
       values: Array.from(s.values)
     })),
-    times: Array.from(orderedTimes),
-    timeRange: [orderedTimes[0], orderedTimes[length - 1]],
+    times: Array.from(visibleTimes),
+    timeRange: visibleLength > 0
+      ? [visibleTimes[0], visibleTimes[visibleLength - 1]]
+      : [0, windowSeconds],
     valueRange: [minY, maxY]
   };
 }
