@@ -225,7 +225,11 @@ export function buildPolicyTelemetry(runner, demo, options = {}) {
   }
 
   const motorJoints = buildMotorSample(demo, runner.numActions);
-  const policyFamily = inferPolicyFamily(runner);
+  const policyFamily = inferPolicyFamily({
+    ...runner,
+    policyId: options.policyId,
+    currentPolicyPath: options.currentPolicyPath ?? demo?.currentPolicyPath
+  });
   const atomicNodes = buildAtomicNodes(runner, state, obsVector, obsLayout, lang, motorJoints);
 
   const onnx = {

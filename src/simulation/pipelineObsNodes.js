@@ -19,11 +19,24 @@ function futureStepLabel(step, zh) {
 }
 
 /**
- * @param {{ config?: object, tracking?: unknown, historyLength?: number, obsModules?: Array<{ size?: number }> }} runner
+ * @param {{ config?: object, tracking?: unknown, historyLength?: number, policyId?: string, currentPolicyPath?: string }} runner
  */
 export function inferPolicyFamily(runner) {
   if (!runner) {
     return 'generic';
+  }
+  const policyId = runner.policyId ?? '';
+  const policyPath = String(
+    runner.currentPolicyPath
+    ?? runner.config?.onnx?.path
+    ?? ''
+  ).toLowerCase();
+  if (
+    policyId === 'g1-parkour'
+    || policyPath.includes('parkour')
+    || runner.config?.policy_kind === 'parkour'
+  ) {
+    return 'parkour';
   }
   if (runner.tracking || runner.config?.tracking) {
     return 'tracking';
@@ -31,10 +44,6 @@ export function inferPolicyFamily(runner) {
   const obsNames = (runner.config?.obs_config?.policy ?? []).map((entry) => entry.name);
   if (obsNames.some((name) => name === 'BootIndicator' || String(name).startsWith('Tracking') || String(name).startsWith('Target'))) {
     return 'tracking';
-  }
-  const outKeys = runner.config?.onnx?.meta?.out_keys ?? [];
-  if (outKeys.includes('loc') && outKeys.includes('scale')) {
-    return 'ppo';
   }
   if ((runner.historyLength ?? runner.config?.obs_config?.history_length ?? 1) > 1) {
     return 'amp';
@@ -49,8 +58,8 @@ export function policyFamilyLabel(family, lang = 'zh') {
       return zh ? 'AMP' : 'AMP';
     case 'tracking':
       return zh ? 'Tracking' : 'Tracking';
-    case 'ppo':
-      return zh ? 'PPO' : 'PPO';
+    case 'parkour':
+      return zh ? '跑酷 (PHP)' : 'Parkour (PHP)';
     default:
       return zh ? '策略' : 'Policy';
   }

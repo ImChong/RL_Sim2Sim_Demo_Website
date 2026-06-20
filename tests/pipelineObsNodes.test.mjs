@@ -4,6 +4,7 @@ import {
   decomposeObsBlockNodes,
   findLoopbackPrevActionNode,
   inferPolicyFamily,
+  policyFamilyLabel,
   registerObsNodeOffsets
 } from '../src/simulation/pipelineObsNodes.js';
 import { buildPipelineGraph } from '../src/simulation/pipelineGraphLayout.js';
@@ -43,7 +44,7 @@ test('decomposeObsBlockNodes splits TrackingCommandObsRaw', () => {
   assert.ok(nodes.find((n) => n.id === 'obs-TrackingCommandObsRaw-r6'));
 });
 
-test('inferPolicyFamily detects tracking and amp', () => {
+test('inferPolicyFamily detects tracking, amp, and parkour', () => {
   assert.equal(inferPolicyFamily({
     config: { obs_config: { policy: [{ name: 'BootIndicator' }] } }
   }), 'tracking');
@@ -52,8 +53,12 @@ test('inferPolicyFamily detects tracking and amp', () => {
     historyLength: 4
   }), 'amp');
   assert.equal(inferPolicyFamily({
-    config: { onnx: { meta: { out_keys: ['loc', 'scale', 'action'] } } }
-  }), 'ppo');
+    policyId: 'g1-parkour'
+  }), 'parkour');
+  assert.equal(inferPolicyFamily({
+    config: { onnx: { path: './examples/parkour/policy.onnx' } }
+  }), 'parkour');
+  assert.equal(policyFamilyLabel('parkour', 'zh'), '跑酷 (PHP)');
 });
 
 test('buildPipelineGraph adds dashed loopback from action to last action', () => {
