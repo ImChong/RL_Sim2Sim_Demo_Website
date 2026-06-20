@@ -7,8 +7,9 @@
     "node": ">=20"
   },
   "scripts": {
+    "postinstall": "node scripts/vendor-netron.mjs",
     "dev": "vite --host",
-    "build": "vite build",
+    "build": "node scripts/vendor-netron.mjs && vite build",
     "preview": "vite preview",
     "test": "node --test tests/*.test.mjs",
     "verify:e2e-knockdown": "node scripts/verify-knockdown-button.mjs",

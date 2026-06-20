@@ -64,86 +64,12 @@ function cloneNodes(list) {
   return list.map((n) => ({ ...n, lines: n.lines ? [...n.lines] : [] }));
 }
 
-const NETWORK_COL_WIDTH = 78;
-const NETWORK_PADDING_X = 32;
-const NETWORK_MIN_WIDTH = 320;
-const NETWORK_MAX_WIDTH = 960;
-
 const NODE_HEAD = 48;
 const NODE_CARD_PAD_V = 22;
 const NODE_LINE = 19;
 
 function nodeHeightForLines(lineCount) {
   return Math.max(72, NODE_HEAD + NODE_CARD_PAD_V + lineCount * NODE_LINE);
-}
-
-function networkNodeWidth(columns) {
-  const desired = NETWORK_PADDING_X * 2 + columns.length * NETWORK_COL_WIDTH;
-  return Math.max(NETWORK_MIN_WIDTH, Math.min(NETWORK_MAX_WIDTH, desired));
-}
-
-/**
- * Fold an ONNX architecture into a list of columns suitable for SVG rendering.
- * Each column carries `dim` (neuron count) and an annotation describing the
- * transform that produced it (Linear N→M + activation, Concat, etc.).
- */
-function buildNetworkColumns(architecture, zh) {
-  if (!architecture?.layers?.length) return null;
-  const columns = [];
-  columns.push({
-    id: 'col-input',
-    kind: 'input',
-    dim: architecture.input?.dim ?? architecture.layers[0]?.inDim ?? 0,
-    label: zh ? '输入' : 'Input',
-    transform: null
-  });
-
-  let pending = null;
-  const flushPending = () => {
-    if (pending) {
-      columns.push(pending);
-      pending = null;
-    }
-  };
-
-  for (const layer of architecture.layers) {
-    if (layer.kind === 'linear') {
-      flushPending();
-      pending = {
-        id: `col-linear-${columns.length}`,
-        kind: 'linear',
-        dim: layer.outDim,
-        label: 'Linear',
-        transform: `${layer.inDim}→${layer.outDim}`,
-        post: []
-      };
-    } else if (layer.kind === 'activation') {
-      if (pending) pending.post.push(layer.op);
-      else columns.push({ id: `col-act-${columns.length}`, kind: 'activation', dim: layer.dim, label: layer.op });
-    } else if (layer.kind === 'layernorm') {
-      if (pending) pending.post.push('LN');
-      else columns.push({ id: `col-ln-${columns.length}`, kind: 'layernorm', dim: layer.dim, label: 'LN' });
-    } else if (layer.kind === 'concat') {
-      flushPending();
-      columns.push({
-        id: `col-concat-${columns.length}`,
-        kind: 'concat',
-        dim: layer.dim,
-        label: zh ? '拼接' : 'Concat',
-        transform: zh ? '与输入拼接' : 'with input'
-      });
-    }
-  }
-  flushPending();
-
-  if (columns.length > 1) {
-    columns[columns.length - 1] = {
-      ...columns[columns.length - 1],
-      label: zh ? '输出' : 'Output',
-      kind: 'output'
-    };
-  }
-  return columns;
 }
 
 /**
@@ -248,8 +174,7 @@ function buildHorizontalAtomicGraph(telemetry, zh, atomic) {
   const motorNodes = cloneNodes(atomic.filter((n) => n.group === 'motor'));
   const hasPrepRel = prepNodes.some((n) => n.id === 'prep-joint-rel');
   const hasHistory = (telemetry.concat?.historyLength ?? 1) > 1;
-  const architectureColumns = buildNetworkColumns(telemetry.onnx.architecture, zh);
-  const onnxColWidth = architectureColumns ? networkNodeWidth(architectureColumns) : 220;
+  const onnxColWidth = 220;
 
   const colWidths = [];
   colWidths.push(Math.max(184, ...simNodes.map((n) => n.width ?? 184)));
@@ -372,22 +297,21 @@ function buildHorizontalAtomicGraph(telemetry, zh, atomic) {
   const modelName = telemetry.model.path?.split('/').pop() ?? 'ONNX';
   const xOnnx = colX(col, colWidths);
   const onnxWidth = onnxColWidth;
-  const onnxHeight = architectureColumns ? 320 : 96;
+  const onnxLines = [
+    { k: 'in', v: `${telemetry.onnx.inKeys.join(',')} ${shapeStr(telemetry.onnx.inputShape)}` },
+    { k: 'out', v: telemetry.onnx.outKeys.join(',') }
+  ];
+  const onnxHeight = nodeHeightForLines(onnxLines.length);
   nodes.push({
     id: 'onnx',
-    kind: architectureColumns ? 'network' : 'model',
+    kind: 'model',
     title: zh ? '策略网络' : 'Policy net',
     subtitle: modelName,
     width: onnxWidth,
     height: onnxHeight,
     x: xOnnx,
     y: coreY - onnxHeight / 2,
-    lines: [
-      { k: 'in', v: `${telemetry.onnx.inKeys.join(',')} ${shapeStr(telemetry.onnx.inputShape)}` },
-      { k: 'out', v: telemetry.onnx.outKeys.join(',') }
-    ],
-    architecture: telemetry.onnx.architecture,
-    networkColumns: architectureColumns
+    lines: onnxLines
   });
   edges.push({ id: `e-${onnxFrom}-onnx`, from: onnxFrom, to: 'onnx' });
   lanes.push({

@@ -67,6 +67,10 @@
             <v-icon icon="mdi-graph-outline" size="small" start />
             {{ t.tabGraph }}
           </v-btn>
+          <v-btn value="architecture" size="x-small" variant="text">
+            <v-icon icon="mdi-sitemap-outline" size="small" start />
+            {{ t.tabArchitecture }}
+          </v-btn>
           <v-btn value="scope" size="x-small" variant="text">
             <v-icon icon="mdi-chart-line-variant" size="small" start />
             {{ t.tabScope }}
@@ -100,6 +104,11 @@
             :active-probes="activeProbes"
             @probe-node="onProbeNode"
             @open-scope="openScopeTab"
+          />
+          <OnnxNetronViewer
+            v-show="viewTab === 'architecture'"
+            :model-path="telemetry.model.path"
+            :language="language"
           />
           <SignalOscilloscope
             v-show="viewTab === 'scope'"
@@ -151,6 +160,7 @@
 <script>
 import { buildPolicyTelemetry } from '@/simulation/policyTelemetry.js';
 import ModelIOPipelineGraph from '@/components/ModelIOPipelineGraph.vue';
+import OnnxNetronViewer from '@/components/OnnxNetronViewer.vue';
 import SignalOscilloscope from '@/components/SignalOscilloscope.vue';
 import {
   clearScopeBuffer,
@@ -180,6 +190,7 @@ const translations = {
     resizeHeight: 'Resize panel height (top edge)',
     resizeBoth: 'Resize panel (top-right corner)',
     tabGraph: 'Graph',
+    tabArchitecture: 'Architecture',
     tabScope: 'Scope',
     graphHint: 'Click a node to view its signals in the scope · Drag the title bar to reposition nodes',
     scopeChannels: 'Channels',
@@ -204,6 +215,7 @@ const translations = {
     resizeHeight: '拖拽上边框调整高度',
     resizeBoth: '拖拽右上角同时调整',
     tabGraph: '流程图',
+    tabArchitecture: '模型架构',
     tabScope: '示波器',
     graphHint: '点击节点在示波器查看信号曲线 · 拖标题栏可移动节点',
     scopeChannels: '通道',
@@ -222,6 +234,7 @@ export default {
   name: 'ModelIOFlowchart',
   components: {
     ModelIOPipelineGraph,
+    OnnxNetronViewer,
     SignalOscilloscope
   },
   props: {
