@@ -36,8 +36,12 @@ test('buildAtomicNodes splits command and root signals', () => {
   assert.ok(nodes.find((n) => n.id === 'sim-cmd-vx'));
   assert.ok(nodes.find((n) => n.id === 'obs-Command-vx'));
   const jointPos = nodes.find((n) => n.id === 'sim-joint-pos');
-  assert.equal(jointPos.lines.length, 2);
-  assert.equal(jointPos.lines[0].k, 'hip');
+  assert.equal(jointPos.lines.length, 1);
+  assert.equal(jointPos.lines[0].k, 'dim');
+  assert.equal(jointPos.lines[0].v, '2D');
+  const obsJointPos = nodes.find((n) => n.id === 'obs-JointPos');
+  assert.equal(obsJointPos.lines[0].k, 'dim');
+  assert.equal(obsJointPos.lines[0].v, '2D');
 });
 
 test('buildAtomicNodes includes per-joint policy output', () => {

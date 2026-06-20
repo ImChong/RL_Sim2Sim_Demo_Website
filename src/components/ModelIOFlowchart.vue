@@ -67,6 +67,10 @@
             <v-icon icon="mdi-graph-outline" size="small" start />
             {{ t.tabGraph }}
           </v-btn>
+          <v-btn value="architecture" size="x-small" variant="text">
+            <v-icon icon="mdi-sitemap-outline" size="small" start />
+            {{ t.tabArchitecture }}
+          </v-btn>
           <v-btn value="scope" size="x-small" variant="text">
             <v-icon icon="mdi-chart-line-variant" size="small" start />
             {{ t.tabScope }}
@@ -101,6 +105,11 @@
             @probe-node="onProbeNode"
             @open-scope="openScopeTab"
           />
+          <OnnxNetronViewer
+            v-if="viewTab === 'architecture'"
+            :model-path="telemetry.model.path"
+            :language="language"
+          />
           <SignalOscilloscope
             v-show="viewTab === 'scope'"
             :snapshot="scopeSnapshot"
@@ -108,6 +117,11 @@
             :paused="signalScope.paused"
             :channels-label="t.scopeChannels"
             :samples-label="t.scopeSamples"
+            :window-label="t.scopeWindow"
+            :window-seconds="scopeWindowSeconds"
+            :window-min-seconds="scopeWindowMinSeconds"
+            :window-max-seconds="scopeWindowMaxSeconds"
+            :window-input-aria-label="t.scopeWindowInput"
             :reset-zoom-label="t.scopeResetZoom"
             :clear-label="t.scopeClear"
             :pause-label="t.scopePause"
@@ -120,6 +134,7 @@
             @reset-zoom="resetScopeZoom"
             @clear="clearScope"
             @remove-probe="onRemoveProbe"
+            @update-window-seconds="onScopeWindowChange"
           />
         </template>
       </v-card-text>
@@ -151,6 +166,7 @@
 <script>
 import { buildPolicyTelemetry } from '@/simulation/policyTelemetry.js';
 import ModelIOPipelineGraph from '@/components/ModelIOPipelineGraph.vue';
+import OnnxNetronViewer from '@/components/OnnxNetronViewer.vue';
 import SignalOscilloscope from '@/components/SignalOscilloscope.vue';
 import {
   clearScopeBuffer,
@@ -159,13 +175,20 @@ import {
   listNodeProbes,
   pushScopeSample,
   removeScopeProbe,
-  setScopeProbes
+  setScopeProbes,
+  setScopeWindowSeconds
 } from '@/simulation/signalScope.js';
 import {
   clampPanelSize,
   loadPanelSize,
   savePanelSize
 } from '@/utils/modelIoPanelSize.js';
+import {
+  loadScopeWindowSeconds,
+  MAX_SCOPE_WINDOW_SECONDS,
+  MIN_SCOPE_WINDOW_SECONDS,
+  saveScopeWindowSeconds
+} from '@/utils/scopeWindowPreference.js';
 
 const translations = {
   en: {
@@ -180,10 +203,13 @@ const translations = {
     resizeHeight: 'Resize panel height (top edge)',
     resizeBoth: 'Resize panel (top-right corner)',
     tabGraph: 'Graph',
+    tabArchitecture: 'Architecture',
     tabScope: 'Scope',
     graphHint: 'Click a node to view its signals in the scope · Drag the title bar to reposition nodes',
     scopeChannels: 'Channels',
     scopeSamples: 'Samples',
+    scopeWindow: 'Window',
+    scopeWindowInput: 'Oscilloscope window (seconds)',
     scopeResetZoom: 'Reset zoom',
     scopeClear: 'Clear',
     scopePause: 'Pause',
@@ -204,10 +230,13 @@ const translations = {
     resizeHeight: '拖拽上边框调整高度',
     resizeBoth: '拖拽右上角同时调整',
     tabGraph: '流程图',
+    tabArchitecture: '模型架构',
     tabScope: '示波器',
     graphHint: '点击节点在示波器查看信号曲线 · 拖标题栏可移动节点',
     scopeChannels: '通道',
     scopeSamples: '采样',
+    scopeWindow: '窗口',
+    scopeWindowInput: '示波器显示时长（秒）',
     scopeResetZoom: '重置缩放',
     scopeClear: '清空',
     scopePause: '暂停',
@@ -222,6 +251,7 @@ export default {
   name: 'ModelIOFlowchart',
   components: {
     ModelIOPipelineGraph,
+    OnnxNetronViewer,
     SignalOscilloscope
   },
   props: {
@@ -248,12 +278,15 @@ export default {
   },
   data: () => {
     const panelSize = loadPanelSize();
+    const scopeWindowSeconds = loadScopeWindowSeconds();
+    const signalScope = createSignalScope({ windowSeconds: scopeWindowSeconds });
     return {
       expanded: false,
       viewTab: 'graph',
       telemetry: { ready: false },
-      signalScope: createSignalScope(),
-      scopeSnapshot: getScopeSnapshot(createSignalScope()),
+      signalScope,
+      scopeSnapshot: getScopeSnapshot(signalScope),
+      scopeWindowSeconds,
       scopeZoom: null,
       panelWidth: panelSize.width,
       panelHeight: panelSize.height,
@@ -284,6 +317,12 @@ export default {
     },
     t() {
       return translations[this.language === 'en' ? 'en' : 'zh'];
+    },
+    scopeWindowMinSeconds() {
+      return MIN_SCOPE_WINDOW_SECONDS;
+    },
+    scopeWindowMaxSeconds() {
+      return MAX_SCOPE_WINDOW_SECONDS;
     },
     pollIntervalMs() {
       return this.isSmallScreen ? 100 : 50;
@@ -442,6 +481,13 @@ export default {
       if (!probes.length) {
         return;
       }
+      const switchingNode = this.signalScope.channels.some(
+        (channel) => channel.nodeId !== node.id
+      );
+      if (switchingNode) {
+        clearScopeBuffer(this.signalScope);
+        this.signalScope.channels = [];
+      }
       setScopeProbes(this.signalScope, probes);
       this.scopeZoom = null;
       this.viewTab = 'scope';
@@ -452,6 +498,12 @@ export default {
     },
     onRemoveProbe(probeId) {
       removeScopeProbe(this.signalScope, probeId);
+      this.scopeSnapshot = getScopeSnapshot(this.signalScope);
+    },
+    onScopeWindowChange(seconds) {
+      const next = saveScopeWindowSeconds(seconds);
+      this.scopeWindowSeconds = setScopeWindowSeconds(this.signalScope, next);
+      this.scopeZoom = null;
       this.scopeSnapshot = getScopeSnapshot(this.signalScope);
     },
     openScopeTab() {
@@ -598,6 +650,11 @@ export default {
   padding-top: 0;
   padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   -webkit-overflow-scrolling: touch;
+}
+
+.model-io-body > .onnx-netron-viewer {
+  flex: 1 1 auto;
+  min-height: 280px;
 }
 
 .pipeline-hint {

@@ -16,6 +16,10 @@ function vec3Lines(prefix) {
   ];
 }
 
+function jointDimLines(count, zh) {
+  return [{ k: zh ? '维度' : 'dim', v: `${count}D` }];
+}
+
 function jointLines(jointNames, max = Infinity) {
   const lines = [];
   const n = Math.min(jointNames.length, max);
@@ -107,10 +111,9 @@ function decomposeObsBlock(block, slice, jointNames, lang) {
         subtitle: block.kwargs?.pos_steps
           ? `step ${JSON.stringify(block.kwargs.pos_steps)}`
           : undefined,
-        lines: jointLines(jointNames),
+        lines: jointDimLines(block.size, zh),
         concatOffset: block.offset,
-        concatSize: block.size,
-        scrollable: true
+        concatSize: block.size
       }];
     case 'JointVel':
       return [{
@@ -121,10 +124,9 @@ function decomposeObsBlock(block, slice, jointNames, lang) {
         subtitle: block.kwargs?.vel_steps
           ? `step ${JSON.stringify(block.kwargs.vel_steps)}`
           : undefined,
-        lines: jointLines(jointNames),
+        lines: jointDimLines(block.size, zh),
         concatOffset: block.offset,
-        concatSize: block.size,
-        scrollable: true
+        concatSize: block.size
       }];
     case 'PrevActions':
       return [{
@@ -259,8 +261,7 @@ export function buildAtomicNodes(runner, state, obsVector, obsLayout, lang = 'zh
     group: 'sim',
     title: zh ? '关节位置' : 'Joint Position',
     subtitle: zh ? 'MuJoCo qpos' : 'MuJoCo qpos',
-    lines: jointLines(jointNames),
-    scrollable: true
+    lines: jointDimLines(jointNames.length, zh)
   });
 
   push({
@@ -269,8 +270,7 @@ export function buildAtomicNodes(runner, state, obsVector, obsLayout, lang = 'zh
     group: 'sim',
     title: zh ? '关节速度' : 'Joint Velocity',
     subtitle: zh ? 'MuJoCo qvel' : 'MuJoCo qvel',
-    lines: jointLines(jointNames),
-    scrollable: true
+    lines: jointDimLines(jointNames.length, zh)
   });
 
   push({

@@ -122,35 +122,27 @@
                   :class="{ 'pipeline-node-card-clickable': isNodeClickable(node) }"
                   @click.stop="onNodeClick(node)"
                 >
-                  <NetworkDiagram
-                    v-if="node.kind === 'network'"
-                    :columns="node.networkColumns"
-                    :architecture="node.architecture"
-                    :live="live"
+                  <div
+                    v-for="(line, idx) in node.lines"
+                    :key="idx"
+                    class="pipeline-node-line"
+                    :class="{
+                      'pipeline-node-line-probed': isLineProbed(node.id, line.k)
+                    }"
+                  >
+                    <span class="pipeline-node-key" :title="line.k">{{ line.k }}</span>
+                    <span
+                      v-if="line.v"
+                      class="pipeline-node-val pipeline-node-meta"
+                      :title="line.v"
+                    >{{ line.v }}</span>
+                  </div>
+                  <v-icon
+                    v-if="isNodeClickable(node)"
+                    icon="mdi-chart-line-variant"
+                    size="12"
+                    class="pipeline-node-scope-hint"
                   />
-                  <template v-else>
-                    <div
-                      v-for="(line, idx) in node.lines"
-                      :key="idx"
-                      class="pipeline-node-line"
-                      :class="{
-                        'pipeline-node-line-probed': isLineProbed(node.id, line.k)
-                      }"
-                    >
-                      <span class="pipeline-node-key" :title="line.k">{{ line.k }}</span>
-                      <span
-                        v-if="line.v"
-                        class="pipeline-node-val pipeline-node-meta"
-                        :title="line.v"
-                      >{{ line.v }}</span>
-                    </div>
-                    <v-icon
-                      v-if="isNodeClickable(node)"
-                      icon="mdi-chart-line-variant"
-                      size="12"
-                      class="pipeline-node-scope-hint"
-                    />
-                  </template>
                 </div>
               </div>
               <span
@@ -169,7 +161,6 @@
 import { buildPipelineGraph } from '@/simulation/pipelineGraphLayout.js';
 import { portPointFromLayoutNode } from '@/simulation/pipelineGraphEdgeCoords.js';
 import { isProbeableLine } from '@/simulation/signalScope.js';
-import NetworkDiagram from '@/components/NetworkDiagram.vue';
 import {
   computeGraphBounds,
   graphLayoutKey,
@@ -205,7 +196,7 @@ function clampScale(scale) {
 
 export default {
   name: 'ModelIOPipelineGraph',
-  components: { NetworkDiagram },
+  components: {},
   props: {
     telemetry: {
       type: Object,
@@ -247,7 +238,7 @@ export default {
     layout() {
       const lang = this.language === 'en' ? 'en' : 'zh';
       return buildPipelineGraph(this.telemetry, lang, {
-        layout: this.isMobile ? 'vertical' : 'horizontal',
+        layout: 'horizontal',
         activeProbes: this.activeProbes
       });
     },
@@ -677,9 +668,6 @@ export default {
       }
       if (node.kind === 'scope') {
         return true;
-      }
-      if (node.kind === 'network') {
-        return false;
       }
       return node.lines?.some((line) => this.isLineProbeable(line));
     },
