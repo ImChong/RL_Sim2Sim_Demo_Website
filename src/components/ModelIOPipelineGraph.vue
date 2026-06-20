@@ -5,7 +5,7 @@
     </p>
     <div
       ref="viewport"
-      class="pipeline-viewport pipeline-viewport-fit"
+      class="pipeline-viewport pipeline-viewport-zoom"
       :style="viewportStyle"
     >
       <div
@@ -159,6 +159,26 @@ import { isProbeableLine } from '@/simulation/signalScope.js';
 let graphInstanceCounter = 0;
 
 const FIT_MIN_SCALE = 0.12;
+const MIN_SCALE = 0.25;
+const MAX_SCALE = 3;
+const WHEEL_ZOOM_FACTOR = 1.1;
+
+function touchDistance(touches) {
+  const dx = touches[0].clientX - touches[1].clientX;
+  const dy = touches[0].clientY - touches[1].clientY;
+  return Math.hypot(dx, dy);
+}
+
+function touchCenter(touches) {
+  return {
+    x: (touches[0].clientX + touches[1].clientX) / 2,
+    y: (touches[0].clientY + touches[1].clientY) / 2
+  };
+}
+
+function clampScale(scale) {
+  return Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
+}
 
 export default {
   name: 'ModelIOPipelineGraph',
@@ -191,7 +211,9 @@ export default {
     arrowMarkerId: `pipeline-arrow-${++graphInstanceCounter}`,
     panX: 0,
     panY: 0,
-    scale: 1
+    scale: 1,
+    gesture: null,
+    userHasGestured: false
   }),
   computed: {
     layout() {
@@ -205,9 +227,14 @@ export default {
       return new Set(this.activeProbes.map((probe) => probe.id));
     },
     scrollHint() {
+      if (this.isMobile) {
+        return this.language === 'en'
+          ? 'Click a node to view its signals in the scope · Pinch to zoom'
+          : '点击节点在示波器查看信号曲线 · 双指缩放';
+      }
       return this.language === 'en'
-        ? 'Click a node to view its signals in the scope'
-        : '点击节点在示波器查看信号曲线';
+        ? 'Click a node to view its signals in the scope · Wheel to zoom'
+        : '点击节点在示波器查看信号曲线 · 滚轮缩放';
     },
     viewportStyle() {
       if (this.isMobile) {
@@ -257,6 +284,7 @@ export default {
       deep: true
     },
     isMobile() {
+      this.userHasGestured = false;
       this.scheduleViewportFit();
     }
   },
@@ -267,15 +295,111 @@ export default {
     if (this.$refs.viewport) {
       this.resizeObserver.observe(this.$refs.viewport);
     }
+    this.setupZoomHandlers();
     this.scheduleViewportFit();
   },
   beforeUnmount() {
+    this.teardownZoomHandlers();
     this.resizeObserver?.disconnect();
     if (this._fitRaf) {
       cancelAnimationFrame(this._fitRaf);
     }
   },
   methods: {
+    markUserGestured() {
+      this.userHasGestured = true;
+    },
+    setupZoomHandlers() {
+      const viewport = this.$refs.viewport;
+      if (!viewport || this._zoomViewport === viewport) {
+        return;
+      }
+      this.teardownZoomHandlers();
+      this._zoomViewport = viewport;
+
+      this._onWheel = (e) => this.handleWheel(e);
+      this._onTouchStart = (e) => this.handleTouchStart(e);
+      this._onTouchMove = (e) => this.handleTouchMove(e);
+      this._onTouchEnd = (e) => this.handleTouchEnd(e);
+      viewport.addEventListener('wheel', this._onWheel, { passive: false });
+      viewport.addEventListener('touchstart', this._onTouchStart, { passive: true });
+      viewport.addEventListener('touchmove', this._onTouchMove, { passive: false });
+      viewport.addEventListener('touchend', this._onTouchEnd, { passive: true });
+      viewport.addEventListener('touchcancel', this._onTouchEnd, { passive: true });
+    },
+    teardownZoomHandlers() {
+      const viewport = this._zoomViewport;
+      if (!viewport) {
+        return;
+      }
+      viewport.removeEventListener('wheel', this._onWheel);
+      viewport.removeEventListener('touchstart', this._onTouchStart);
+      viewport.removeEventListener('touchmove', this._onTouchMove);
+      viewport.removeEventListener('touchend', this._onTouchEnd);
+      viewport.removeEventListener('touchcancel', this._onTouchEnd);
+      this._zoomViewport = null;
+      this.gesture = null;
+    },
+    zoomAt(clientX, clientY, nextScale) {
+      const viewport = this.$refs.viewport;
+      if (!viewport) {
+        return;
+      }
+      const rect = viewport.getBoundingClientRect();
+      const focalX = (clientX - rect.left - this.panX) / this.scale;
+      const focalY = (clientY - rect.top - this.panY) / this.scale;
+      const clamped = clampScale(nextScale);
+      this.scale = clamped;
+      this.panX = clientX - rect.left - focalX * clamped;
+      this.panY = clientY - rect.top - focalY * clamped;
+      this.markUserGestured();
+    },
+    handleWheel(e) {
+      if (!this.$refs.viewport?.contains(e.target)) {
+        return;
+      }
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? WHEEL_ZOOM_FACTOR : 1 / WHEEL_ZOOM_FACTOR;
+      this.zoomAt(e.clientX, e.clientY, this.scale * factor);
+    },
+    handleTouchStart(e) {
+      if (e.touches.length < 2) {
+        return;
+      }
+      const rect = this.$refs.viewport.getBoundingClientRect();
+      const center = touchCenter(e.touches);
+      const focalX = (center.x - rect.left - this.panX) / this.scale;
+      const focalY = (center.y - rect.top - this.panY) / this.scale;
+      this.gesture = {
+        mode: 'pinch',
+        startDistance: touchDistance(e.touches),
+        startScale: this.scale,
+        focalX,
+        focalY,
+        rectLeft: rect.left,
+        rectTop: rect.top
+      };
+    },
+    handleTouchMove(e) {
+      if (!this.gesture || e.touches.length < 2) {
+        return;
+      }
+      e.preventDefault();
+      const center = touchCenter(e.touches);
+      const distance = touchDistance(e.touches);
+      const ratio = distance / this.gesture.startDistance;
+      const nextScale = clampScale(this.gesture.startScale * ratio);
+      this.scale = nextScale;
+      this.panX = center.x - this.gesture.rectLeft - this.gesture.focalX * nextScale;
+      this.panY = center.y - this.gesture.rectTop - this.gesture.focalY * nextScale;
+      this.markUserGestured();
+    },
+    handleTouchEnd(e) {
+      if (!this.gesture || e.touches.length >= 2) {
+        return;
+      }
+      this.gesture = null;
+    },
     scheduleViewportFit() {
       if (this._fitRaf) {
         cancelAnimationFrame(this._fitRaf);
@@ -286,6 +410,9 @@ export default {
       });
     },
     fitViewport() {
+      if (this.userHasGestured) {
+        return;
+      }
       const viewport = this.$refs.viewport;
       if (!viewport || !this.layout.width) {
         return;
@@ -434,10 +561,11 @@ export default {
   text-overflow: ellipsis;
 }
 
-.pipeline-viewport-fit {
+.pipeline-viewport-zoom {
   flex: 1 1 auto;
   min-height: 220px;
   overflow: hidden;
+  touch-action: none;
 }
 
 .pipeline-transform {

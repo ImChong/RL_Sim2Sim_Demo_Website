@@ -147,6 +147,16 @@ async function clickNode(page, nodeId) {
   await sleep(400);
 }
 
+async function wheelZoomViewport(page, deltaY) {
+  const box = await page.$eval('.pipeline-viewport', (el) => {
+    const r = el.getBoundingClientRect();
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+  });
+  await page.mouse.move(box.x, box.y);
+  await page.mouse.wheel({ deltaY });
+  await sleep(250);
+}
+
 async function resizePanel(page, edge, dx, dy) {
   const selector = edge === 'e'
     ? '.model-io-resize-e'
@@ -253,28 +263,35 @@ async function main() {
     await sleep(600);
   }, 2400);
 
-  await record('③ 点击节点接入示波器（根角速度）', async () => {
+  await record('③ 滚轮缩放画布', async () => {
+    await wheelZoomViewport(page, -200);
+    await wheelZoomViewport(page, -200);
+    await wheelZoomViewport(page, 320);
+    await wheelZoomViewport(page, 320);
+  }, 2600);
+
+  await record('④ 点击节点接入示波器（根角速度）', async () => {
     await switchPanelTab(page, 'graph');
     await clickNode(page, 'sim-root-angvel');
   }, 2400);
 
-  await record('④ 示波器实时波形（按住 W 驱动）', async () => {
+  await record('⑤ 示波器实时波形（按住 W 驱动）', async () => {
     await page.keyboard.down('KeyW');
     await sleep(1800);
     await page.keyboard.up('KeyW');
   }, 2600);
 
-  await record('⑤ 切换探测节点（速度指令 vx，清空旧通道）', async () => {
+  await record('⑥ 切换探测节点（速度指令 vx，清空旧通道）', async () => {
     await switchPanelTab(page, 'graph');
     await clickNode(page, 'sim-cmd-vx');
   }, 2400);
 
-  await record('⑥ 点击流程图「示波器」汇聚节点', async () => {
+  await record('⑦ 点击流程图「示波器」汇聚节点', async () => {
     await switchPanelTab(page, 'graph');
     await clickNode(page, 'out-scope');
   }, 2400);
 
-  await record('⑦ 示波器：暂停 · 修改窗口 30s · 继续', async () => {
+  await record('⑧ 示波器：暂停 · 修改窗口 30s · 继续', async () => {
     await page.waitForSelector('.scope-window-input', { visible: true, timeout: 10000 });
     await page.click('.scope-actions .v-btn');
     await sleep(500);
@@ -286,18 +303,18 @@ async function main() {
     await page.click('.scope-actions .v-btn');
   }, 3000);
 
-  await record('⑧ 拖拽面板右边框 / 上边框调整大小', async () => {
+  await record('⑨ 拖拽面板右边框 / 上边框调整大小', async () => {
     await switchPanelTab(page, 'graph');
     await resizePanel(page, 'e', 120, 0);
     await resizePanel(page, 'n', 0, -80);
   }, 2800);
 
-  await record('⑨ 切换到「模型架构」标签（Netron）', async () => {
+  await record('⑩ 切换到「模型架构」标签（Netron）', async () => {
     await switchPanelTab(page, 'architecture');
     await waitForNetronReady(page);
   }, 3200);
 
-  await record('⑩ 收起模型流程面板', async () => {
+  await record('⑪ 收起模型流程面板', async () => {
     await page.click('.model-io-toggle');
     await sleep(600);
   }, 2000);
