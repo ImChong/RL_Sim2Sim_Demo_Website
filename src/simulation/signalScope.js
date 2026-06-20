@@ -244,7 +244,8 @@ export function isProbeableLine(line) {
     && line.k !== '…'
     && line.k !== 'in'
     && line.k !== 'out'
-    && line.k !== 'act'
+    && line.k !== 'dim'
+    && line.k !== '维度'
   );
 }
 
