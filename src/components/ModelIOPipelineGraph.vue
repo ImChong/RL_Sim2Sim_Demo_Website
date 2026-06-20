@@ -6,6 +6,7 @@
     <div
       ref="viewport"
       class="pipeline-viewport pipeline-viewport-zoom"
+      :class="{ 'pipeline-viewport-dragging': isDragging }"
       :style="viewportStyle"
     >
       <div
@@ -213,6 +214,7 @@ export default {
     panY: 0,
     scale: 1,
     gesture: null,
+    isDragging: false,
     userHasGestured: false
   }),
   computed: {
@@ -229,12 +231,12 @@ export default {
     scrollHint() {
       if (this.isMobile) {
         return this.language === 'en'
-          ? 'Click a node to view its signals in the scope · Pinch to zoom'
-          : '点击节点在示波器查看信号曲线 · 双指缩放';
+          ? 'Click a node to view its signals in the scope · Drag canvas to pan · Pinch to zoom'
+          : '点击节点在示波器查看信号曲线 · 拖空白平移画布 · 双指缩放';
       }
       return this.language === 'en'
-        ? 'Click a node to view its signals in the scope · Wheel to zoom'
-        : '点击节点在示波器查看信号曲线 · 滚轮缩放';
+        ? 'Click a node to view its signals in the scope · Drag canvas to pan · Wheel to zoom'
+        : '点击节点在示波器查看信号曲线 · 拖空白平移画布 · 滚轮缩放';
     },
     viewportStyle() {
       if (this.isMobile) {
@@ -295,50 +297,61 @@ export default {
     if (this.$refs.viewport) {
       this.resizeObserver.observe(this.$refs.viewport);
     }
-    this.setupZoomHandlers();
+    this.setupViewportHandlers();
     this.scheduleViewportFit();
   },
   beforeUnmount() {
-    this.teardownZoomHandlers();
+    this.teardownViewportHandlers();
     this.resizeObserver?.disconnect();
     if (this._fitRaf) {
       cancelAnimationFrame(this._fitRaf);
     }
   },
   methods: {
+    shouldIgnorePanStart(target) {
+      return Boolean(target?.closest?.('.pipeline-node'));
+    },
     markUserGestured() {
       this.userHasGestured = true;
     },
-    setupZoomHandlers() {
+    setupViewportHandlers() {
       const viewport = this.$refs.viewport;
-      if (!viewport || this._zoomViewport === viewport) {
+      if (!viewport || this._interactionViewport === viewport) {
         return;
       }
-      this.teardownZoomHandlers();
-      this._zoomViewport = viewport;
+      this.teardownViewportHandlers();
+      this._interactionViewport = viewport;
 
       this._onWheel = (e) => this.handleWheel(e);
+      this._onMouseDown = (e) => this.handleMouseDown(e);
+      this._onMouseMove = (e) => this.handleMouseMove(e);
+      this._onMouseUp = (e) => this.handleMouseUp(e);
       this._onTouchStart = (e) => this.handleTouchStart(e);
       this._onTouchMove = (e) => this.handleTouchMove(e);
       this._onTouchEnd = (e) => this.handleTouchEnd(e);
       viewport.addEventListener('wheel', this._onWheel, { passive: false });
+      viewport.addEventListener('mousedown', this._onMouseDown);
       viewport.addEventListener('touchstart', this._onTouchStart, { passive: true });
       viewport.addEventListener('touchmove', this._onTouchMove, { passive: false });
       viewport.addEventListener('touchend', this._onTouchEnd, { passive: true });
       viewport.addEventListener('touchcancel', this._onTouchEnd, { passive: true });
     },
-    teardownZoomHandlers() {
-      const viewport = this._zoomViewport;
+    teardownViewportHandlers() {
+      const viewport = this._interactionViewport;
       if (!viewport) {
         return;
       }
       viewport.removeEventListener('wheel', this._onWheel);
+      viewport.removeEventListener('mousedown', this._onMouseDown);
       viewport.removeEventListener('touchstart', this._onTouchStart);
       viewport.removeEventListener('touchmove', this._onTouchMove);
       viewport.removeEventListener('touchend', this._onTouchEnd);
       viewport.removeEventListener('touchcancel', this._onTouchEnd);
-      this._zoomViewport = null;
+      document.removeEventListener('mousemove', this._onMouseMove);
+      document.removeEventListener('mouseup', this._onMouseUp);
+      this._interactionViewport = null;
       this.gesture = null;
+      this.isDragging = false;
     },
     zoomAt(clientX, clientY, nextScale) {
       const viewport = this.$refs.viewport;
@@ -362,43 +375,125 @@ export default {
       const factor = e.deltaY < 0 ? WHEEL_ZOOM_FACTOR : 1 / WHEEL_ZOOM_FACTOR;
       this.zoomAt(e.clientX, e.clientY, this.scale * factor);
     },
-    handleTouchStart(e) {
-      if (e.touches.length < 2) {
-        return;
-      }
-      const rect = this.$refs.viewport.getBoundingClientRect();
-      const center = touchCenter(e.touches);
-      const focalX = (center.x - rect.left - this.panX) / this.scale;
-      const focalY = (center.y - rect.top - this.panY) / this.scale;
-      this.gesture = {
-        mode: 'pinch',
-        startDistance: touchDistance(e.touches),
-        startScale: this.scale,
-        focalX,
-        focalY,
-        rectLeft: rect.left,
-        rectTop: rect.top
-      };
-    },
-    handleTouchMove(e) {
-      if (!this.gesture || e.touches.length < 2) {
+    handleMouseDown(e) {
+      if (e.button !== 0 || this.shouldIgnorePanStart(e.target)) {
         return;
       }
       e.preventDefault();
-      const center = touchCenter(e.touches);
-      const distance = touchDistance(e.touches);
-      const ratio = distance / this.gesture.startDistance;
-      const nextScale = clampScale(this.gesture.startScale * ratio);
-      this.scale = nextScale;
-      this.panX = center.x - this.gesture.rectLeft - this.gesture.focalX * nextScale;
-      this.panY = center.y - this.gesture.rectTop - this.gesture.focalY * nextScale;
-      this.markUserGestured();
+      this.isDragging = true;
+      this.gesture = {
+        mode: 'pan',
+        startX: e.clientX,
+        startY: e.clientY,
+        startPanX: this.panX,
+        startPanY: this.panY
+      };
+      document.addEventListener('mousemove', this._onMouseMove);
+      document.addEventListener('mouseup', this._onMouseUp);
     },
-    handleTouchEnd(e) {
-      if (!this.gesture || e.touches.length >= 2) {
+    handleMouseMove(e) {
+      if (!this.gesture || this.gesture.mode !== 'pan' || !this.isDragging) {
         return;
       }
+      this.panX = this.gesture.startPanX + (e.clientX - this.gesture.startX);
+      this.panY = this.gesture.startPanY + (e.clientY - this.gesture.startY);
+      this.markUserGestured();
+    },
+    handleMouseUp() {
+      if (!this.isDragging) {
+        return;
+      }
+      this.isDragging = false;
       this.gesture = null;
+      document.removeEventListener('mousemove', this._onMouseMove);
+      document.removeEventListener('mouseup', this._onMouseUp);
+    },
+    handleTouchStart(e) {
+      const touches = e.touches;
+      const rect = this.$refs.viewport.getBoundingClientRect();
+      if (touches.length === 1) {
+        if (this.shouldIgnorePanStart(e.target)) {
+          return;
+        }
+        this.gesture = {
+          mode: 'pan',
+          startX: touches[0].clientX,
+          startY: touches[0].clientY,
+          startPanX: this.panX,
+          startPanY: this.panY
+        };
+        return;
+      }
+      if (touches.length >= 2) {
+        const center = touchCenter(touches);
+        const focalX = (center.x - rect.left - this.panX) / this.scale;
+        const focalY = (center.y - rect.top - this.panY) / this.scale;
+        this.gesture = {
+          mode: 'pinch',
+          startDistance: touchDistance(touches),
+          startScale: this.scale,
+          focalX,
+          focalY,
+          rectLeft: rect.left,
+          rectTop: rect.top
+        };
+      }
+    },
+    handleTouchMove(e) {
+      if (!this.gesture) {
+        return;
+      }
+      const touches = e.touches;
+      if (this.gesture.mode === 'pan' && touches.length === 1) {
+        e.preventDefault();
+        this.panX = this.gesture.startPanX + (touches[0].clientX - this.gesture.startX);
+        this.panY = this.gesture.startPanY + (touches[0].clientY - this.gesture.startY);
+        this.markUserGestured();
+        return;
+      }
+      if (touches.length >= 2) {
+        e.preventDefault();
+        const center = touchCenter(touches);
+        const distance = touchDistance(touches);
+        if (this.gesture.mode === 'pan') {
+          const rect = this.$refs.viewport.getBoundingClientRect();
+          const focalX = (center.x - rect.left - this.panX) / this.scale;
+          const focalY = (center.y - rect.top - this.panY) / this.scale;
+          this.gesture = {
+            mode: 'pinch',
+            startDistance: distance,
+            startScale: this.scale,
+            focalX,
+            focalY,
+            rectLeft: rect.left,
+            rectTop: rect.top
+          };
+        }
+        const ratio = distance / this.gesture.startDistance;
+        const nextScale = clampScale(this.gesture.startScale * ratio);
+        this.scale = nextScale;
+        this.panX = center.x - this.gesture.rectLeft - this.gesture.focalX * nextScale;
+        this.panY = center.y - this.gesture.rectTop - this.gesture.focalY * nextScale;
+        this.markUserGestured();
+      }
+    },
+    handleTouchEnd(e) {
+      if (!this.gesture) {
+        return;
+      }
+      if (e.touches.length === 0) {
+        this.gesture = null;
+        return;
+      }
+      if (e.touches.length === 1 && this.gesture.mode === 'pinch') {
+        this.gesture = {
+          mode: 'pan',
+          startX: e.touches[0].clientX,
+          startY: e.touches[0].clientY,
+          startPanX: this.panX,
+          startPanY: this.panY
+        };
+      }
     },
     scheduleViewportFit() {
       if (this._fitRaf) {
@@ -566,6 +661,12 @@ export default {
   min-height: 220px;
   overflow: hidden;
   touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+
+.pipeline-viewport-dragging {
+  cursor: grabbing;
 }
 
 .pipeline-transform {

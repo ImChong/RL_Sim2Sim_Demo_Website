@@ -147,6 +147,18 @@ async function clickNode(page, nodeId) {
   await sleep(400);
 }
 
+async function panViewport(page, dx, dy) {
+  const box = await page.$eval('.pipeline-viewport', (el) => {
+    const r = el.getBoundingClientRect();
+    return { x: r.x + r.width * 0.55, y: r.y + r.height * 0.45 };
+  });
+  await page.mouse.move(box.x, box.y);
+  await page.mouse.down();
+  await page.mouse.move(box.x + dx, box.y + dy, { steps: 18 });
+  await page.mouse.up();
+  await sleep(300);
+}
+
 async function wheelZoomViewport(page, deltaY) {
   const box = await page.$eval('.pipeline-viewport', (el) => {
     const r = el.getBoundingClientRect();
@@ -258,10 +270,11 @@ async function main() {
     await switchPanelTab(page, 'graph');
   }, 2600);
 
-  await record('② 横向泳道总览', async () => {
+  await record('② 横向泳道总览（拖动画布平移）', async () => {
     await switchPanelTab(page, 'graph');
-    await sleep(600);
-  }, 2400);
+    await panViewport(page, -140, 24);
+    await panViewport(page, 100, -16);
+  }, 2600);
 
   await record('③ 滚轮缩放画布', async () => {
     await wheelZoomViewport(page, -200);
