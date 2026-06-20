@@ -121,7 +121,7 @@ async function captureMobile(page, outDir, docsDir, pageErrors, consoleErrors) {
     await sheet.screenshot({ path: sheetPath });
   }
 
-  const graph = await page.$('.pipeline-viewport-panzoom, .pipeline-viewport');
+  const graph = await page.$('.pipeline-viewport-fit, .pipeline-viewport');
   const graphPath = join(outDir, 'model-io-panel-mobile-graph.png');
   if (graph) {
     await graph.screenshot({ path: graphPath });

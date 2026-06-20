@@ -131,42 +131,7 @@ async function switchPanelTab(page, tab) {
   await sleep(450);
 }
 
-async function ensureNodeInView(page, nodeId, maxAttempts = 10) {
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const info = await page.evaluate((id) => {
-      const node = document.querySelector(`[data-node-id="${id}"]`);
-      const head = node?.querySelector('.pipeline-node-head');
-      const viewport = document.querySelector('.pipeline-viewport');
-      if (!head || !viewport) {
-        return { visible: false };
-      }
-      const r = head.getBoundingClientRect();
-      const vp = viewport.getBoundingClientRect();
-      const visible = r.width > 4 && r.height > 4
-        && r.right > vp.left + 8
-        && r.left < vp.right - 8
-        && r.bottom > vp.top + 8
-        && r.top < vp.bottom - 8;
-      return {
-        visible,
-        dx: (vp.left + vp.width / 2) - (r.left + r.width / 2),
-        dy: (vp.top + vp.height / 2) - (r.top + r.height / 2)
-      };
-    }, nodeId);
-    if (info.visible) {
-      return;
-    }
-    if (!Number.isFinite(info.dx) || !Number.isFinite(info.dy)) {
-      await panViewport(page, 120, 0);
-      continue;
-    }
-    await panViewport(page, info.dx * 0.55, info.dy * 0.55);
-  }
-  throw new Error(`Node not visible in viewport: ${nodeId}`);
-}
-
 async function clickNode(page, nodeId) {
-  await ensureNodeInView(page, nodeId);
   const clicked = await page.evaluate((id) => {
     const node = document.querySelector(`[data-node-id="${id}"]`);
     if (!node) {
@@ -180,54 +145,6 @@ async function clickNode(page, nodeId) {
     throw new Error(`Pipeline node not found: ${nodeId}`);
   }
   await sleep(400);
-}
-
-async function getViewportBox(page) {
-  return page.$eval('.pipeline-viewport', (el) => {
-    const r = el.getBoundingClientRect();
-    return { x: r.x, y: r.y, width: r.width, height: r.height };
-  });
-}
-
-async function panViewport(page, dx, dy) {
-  const box = await getViewportBox(page);
-  const startX = box.x + box.width * 0.55;
-  const startY = box.y + box.height * 0.45;
-  await page.mouse.move(startX, startY);
-  await page.mouse.down();
-  await page.mouse.move(startX + dx, startY + dy, { steps: 18 });
-  await page.mouse.up();
-  await sleep(300);
-}
-
-async function wheelZoomViewport(page, deltaY) {
-  const box = await getViewportBox(page);
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.wheel({ deltaY });
-  await sleep(250);
-}
-
-async function dragNodeTitle(page, nodeId, dx, dy) {
-  await ensureNodeInView(page, nodeId);
-  const head = await page.$(`[data-node-id="${nodeId}"] .pipeline-node-head`);
-  if (!head) {
-    throw new Error(`Node head not found: ${nodeId}`);
-  }
-  let box = await head.boundingBox();
-  for (let attempt = 0; !box && attempt < 5; attempt += 1) {
-    await sleep(200);
-    box = await head.boundingBox();
-  }
-  if (!box) {
-    throw new Error(`Node head box missing: ${nodeId}`);
-  }
-  const startX = box.x + box.width / 2;
-  const startY = box.y + box.height / 2;
-  await page.mouse.move(startX, startY);
-  await page.mouse.down();
-  await page.mouse.move(startX + dx, startY + dy, { steps: 16 });
-  await page.mouse.up();
-  await sleep(350);
 }
 
 async function resizePanel(page, edge, dx, dy) {
@@ -331,47 +248,33 @@ async function main() {
     await switchPanelTab(page, 'graph');
   }, 2600);
 
-  await record('② 横向泳道总览（拖动画布平移）', async () => {
-    await panViewport(page, -140, 24);
-    await panViewport(page, 100, -16);
-  }, 2600);
+  await record('② 横向泳道总览', async () => {
+    await switchPanelTab(page, 'graph');
+    await sleep(600);
+  }, 2400);
 
-  await record('③ 拖拽节点标题栏移动节点', async () => {
-    await dragNodeTitle(page, 'sim-root-angvel', 0, 64);
-    await dragNodeTitle(page, 'warehouse', 40, -28);
-  }, 2800);
-
-  await record('④ 滚轮缩放画布', async () => {
-    await wheelZoomViewport(page, -200);
-    await wheelZoomViewport(page, -200);
-    await wheelZoomViewport(page, 320);
-    await wheelZoomViewport(page, 320);
-    await ensureNodeInView(page, 'sim-cmd-vx');
-  }, 2800);
-
-  await record('⑤ 点击节点接入示波器（根角速度）', async () => {
+  await record('③ 点击节点接入示波器（根角速度）', async () => {
     await switchPanelTab(page, 'graph');
     await clickNode(page, 'sim-root-angvel');
   }, 2400);
 
-  await record('⑥ 示波器实时波形（按住 W 驱动）', async () => {
+  await record('④ 示波器实时波形（按住 W 驱动）', async () => {
     await page.keyboard.down('KeyW');
     await sleep(1800);
     await page.keyboard.up('KeyW');
   }, 2600);
 
-  await record('⑦ 切换探测节点（速度指令 vx，清空旧通道）', async () => {
+  await record('⑤ 切换探测节点（速度指令 vx，清空旧通道）', async () => {
     await switchPanelTab(page, 'graph');
     await clickNode(page, 'sim-cmd-vx');
   }, 2400);
 
-  await record('⑧ 点击流程图「示波器」汇聚节点', async () => {
+  await record('⑥ 点击流程图「示波器」汇聚节点', async () => {
     await switchPanelTab(page, 'graph');
-    await ensureNodeInView(page, 'out-scope');
     await clickNode(page, 'out-scope');
   }, 2400);
 
-  await record('⑨ 示波器：暂停 · 修改窗口 30s · 继续', async () => {
+  await record('⑦ 示波器：暂停 · 修改窗口 30s · 继续', async () => {
     await page.waitForSelector('.scope-window-input', { visible: true, timeout: 10000 });
     await page.click('.scope-actions .v-btn');
     await sleep(500);
@@ -383,18 +286,18 @@ async function main() {
     await page.click('.scope-actions .v-btn');
   }, 3000);
 
-  await record('⑩ 拖拽面板右边框 / 上边框调整大小', async () => {
+  await record('⑧ 拖拽面板右边框 / 上边框调整大小', async () => {
     await switchPanelTab(page, 'graph');
     await resizePanel(page, 'e', 120, 0);
     await resizePanel(page, 'n', 0, -80);
   }, 2800);
 
-  await record('⑪ 切换到「模型架构」标签（Netron）', async () => {
+  await record('⑨ 切换到「模型架构」标签（Netron）', async () => {
     await switchPanelTab(page, 'architecture');
     await waitForNetronReady(page);
   }, 3200);
 
-  await record('⑫ 收起模型流程面板', async () => {
+  await record('⑩ 收起模型流程面板', async () => {
     await page.click('.model-io-toggle');
     await sleep(600);
   }, 2000);

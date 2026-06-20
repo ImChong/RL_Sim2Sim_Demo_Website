@@ -5,17 +5,16 @@
     </p>
     <div
       ref="viewport"
-      class="pipeline-viewport pipeline-viewport-panzoom"
-      :class="{ 'pipeline-viewport-dragging': isDragging }"
+      class="pipeline-viewport pipeline-viewport-fit"
       :style="viewportStyle"
     >
       <div
-        v-if="displayLayout.lanes && displayLayout.lanes.length"
+        v-if="layout.lanes && layout.lanes.length"
         class="pipeline-lane-headers"
         aria-hidden="true"
       >
         <div
-          v-for="lane in displayLayout.lanes"
+          v-for="lane in layout.lanes"
           :key="`lane-header-${lane.id}`"
           class="pipeline-lane-header"
           :style="{
@@ -32,25 +31,25 @@
       >
         <div
           class="pipeline-canvas"
-          :style="{ width: `${displayLayout.width}px`, height: `${displayLayout.height}px` }"
+          :style="{ width: `${layout.width}px`, height: `${layout.height}px` }"
         >
           <div class="pipeline-grid" aria-hidden="true" />
           <div
-            v-for="(lane, idx) in displayLayout.lanes"
+            v-for="(lane, idx) in layout.lanes"
             :key="`lane-${lane.id}`"
             class="pipeline-lane"
             :class="[`pipeline-lane-${lane.id}`, { 'pipeline-lane-alt': idx % 2 === 1 }]"
             :style="{
               transform: `translate(${lane.x}px, 0)`,
               width: `${lane.width}px`,
-              height: `${displayLayout.height}px`
+              height: `${layout.height}px`
             }"
             aria-hidden="true"
           />
           <svg
             class="pipeline-edges"
-            :width="displayLayout.width"
-            :height="displayLayout.height"
+            :width="layout.width"
+            :height="layout.height"
             aria-hidden="true"
           >
             <defs>
@@ -79,7 +78,7 @@
           </svg>
 
           <div
-            v-for="node in displayLayout.nodes"
+            v-for="node in layout.nodes"
             :key="node.id"
             :data-node-id="node.id"
             class="pipeline-node"
@@ -87,7 +86,6 @@
               `pipeline-node-${node.kind}`,
               {
                 'pipeline-node-live': live,
-                'pipeline-node-active': activeNodeId === node.id,
                 'pipeline-node-scope': node.kind === 'scope',
                 'pipeline-node-clickable': isNodeClickable(node),
                 'pipeline-node-probed': isNodeProbed(node)
@@ -105,11 +103,7 @@
                 aria-hidden="true"
               />
               <div class="pipeline-node-inner">
-                <div
-                  class="pipeline-node-head"
-                  @mousedown.stop="onNodeMoveStart(node.id, $event)"
-                  @touchstart.stop="onNodeMoveStart(node.id, $event)"
-                >
+                <div class="pipeline-node-head">
                   <div class="pipeline-node-title" :title="node.title">{{ node.title }}</div>
                   <div
                     v-if="node.subtitle"
@@ -161,38 +155,10 @@
 import { buildPipelineGraph } from '@/simulation/pipelineGraphLayout.js';
 import { portPointFromLayoutNode } from '@/simulation/pipelineGraphEdgeCoords.js';
 import { isProbeableLine } from '@/simulation/signalScope.js';
-import {
-  computeGraphBounds,
-  graphLayoutKey,
-  loadNodeOverrides,
-  mergeNodeLayout,
-  pruneNodeOverrides,
-  saveNodeOverrides
-} from '@/utils/pipelineGraphNodeLayout.js';
 
 let graphInstanceCounter = 0;
 
-const MIN_SCALE = 0.25;
-const MAX_SCALE = 3;
 const FIT_MIN_SCALE = 0.12;
-const WHEEL_ZOOM_FACTOR = 1.1;
-
-function touchDistance(touches) {
-  const dx = touches[0].clientX - touches[1].clientX;
-  const dy = touches[0].clientY - touches[1].clientY;
-  return Math.hypot(dx, dy);
-}
-
-function touchCenter(touches) {
-  return {
-    x: (touches[0].clientX + touches[1].clientX) / 2,
-    y: (touches[0].clientY + touches[1].clientY) / 2
-  };
-}
-
-function clampScale(scale) {
-  return Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
-}
 
 export default {
   name: 'ModelIOPipelineGraph',
@@ -225,14 +191,7 @@ export default {
     arrowMarkerId: `pipeline-arrow-${++graphInstanceCounter}`,
     panX: 0,
     panY: 0,
-    scale: 1,
-    gesture: null,
-    isDragging: false,
-    userHasGestured: false,
-    layoutKey: '',
-    nodeOverrides: {},
-    activeNodeId: null,
-    nodeGesture: null
+    scale: 1
   }),
   computed: {
     layout() {
@@ -246,14 +205,9 @@ export default {
       return new Set(this.activeProbes.map((probe) => probe.id));
     },
     scrollHint() {
-      if (this.isMobile) {
-        return this.language === 'en'
-          ? 'Drag title to move node · Click node body to open scope · Drag canvas to pan · Pinch to zoom'
-          : '拖标题移动节点 · 点击节点查看示波器 · 拖空白平移画布 · 双指缩放';
-      }
       return this.language === 'en'
-        ? 'Drag title to move node · Click node body to open scope · Drag canvas to pan · Wheel to zoom'
-        : '拖标题移动节点 · 点击节点查看示波器 · 拖空白平移画布 · 滚轮缩放';
+        ? 'Click a node to view its signals in the scope'
+        : '点击节点在示波器查看信号曲线';
     },
     viewportStyle() {
       if (this.isMobile) {
@@ -268,26 +222,12 @@ export default {
       return {
         transform: `translate(${this.panX}px, ${this.panY}px) scale(${this.scale})`,
         transformOrigin: '0 0',
-        width: `${this.displayLayout.width}px`,
-        height: `${this.displayLayout.height}px`
-      };
-    },
-    displayLayout() {
-      const base = this.layout;
-      const nodes = mergeNodeLayout(base.nodes, this.nodeOverrides);
-      const bounds = computeGraphBounds(nodes, {
-        width: base.width,
-        height: base.height
-      });
-      return {
-        ...base,
-        nodes,
-        width: bounds.width,
-        height: bounds.height
+        width: `${this.layout.width}px`,
+        height: `${this.layout.height}px`
       };
     },
     nodeById() {
-      return new Map(this.displayLayout.nodes.map((node) => [node.id, node]));
+      return new Map(this.layout.nodes.map((node) => [node.id, node]));
     },
     renderedEdges() {
       const portPoint = (nodeId, side) =>
@@ -311,14 +251,12 @@ export default {
   },
   watch: {
     layout: {
-      handler(layout) {
-        this.syncNodeOverrides(layout);
+      handler() {
         this.scheduleViewportFit();
       },
       deep: true
     },
     isMobile() {
-      this.userHasGestured = false;
       this.scheduleViewportFit();
     }
   },
@@ -329,298 +267,15 @@ export default {
     if (this.$refs.viewport) {
       this.resizeObserver.observe(this.$refs.viewport);
     }
-    this.setupInteractionHandlers();
-    this.syncNodeOverrides(this.layout);
-    this._onNodeGestureMove = (e) => this.onNodeGestureMove(e);
-    this._onNodeGestureEnd = () => this.endNodeGesture();
     this.scheduleViewportFit();
   },
   beforeUnmount() {
-    this.endNodeGesture();
-    this.teardownInteractionHandlers();
     this.resizeObserver?.disconnect();
     if (this._fitRaf) {
       cancelAnimationFrame(this._fitRaf);
     }
   },
   methods: {
-    shouldIgnorePanStart(target) {
-      return Boolean(target?.closest?.('.pipeline-node-head'));
-    },
-    clientPoint(event) {
-      if (event.touches?.length) {
-        return { x: event.touches[0].clientX, y: event.touches[0].clientY };
-      }
-      return { x: event.clientX, y: event.clientY };
-    },
-    syncNodeOverrides(layout) {
-      const nodes = layout?.nodes ?? [];
-      const key = graphLayoutKey(nodes);
-      const ids = nodes.map((n) => n.id);
-      if (key !== this.layoutKey) {
-        this.layoutKey = key;
-        this.nodeOverrides = pruneNodeOverrides(loadNodeOverrides(key), ids);
-      } else {
-        this.nodeOverrides = pruneNodeOverrides(this.nodeOverrides, ids);
-      }
-    },
-    setNodeOverride(nodeId, patch) {
-      const prev = this.nodeOverrides[nodeId] ?? {};
-      this.nodeOverrides = {
-        ...this.nodeOverrides,
-        [nodeId]: { ...prev, ...patch }
-      };
-    },
-    attachNodeGestureListeners() {
-      document.addEventListener('mousemove', this._onNodeGestureMove);
-      document.addEventListener('mouseup', this._onNodeGestureEnd);
-      document.addEventListener('touchmove', this._onNodeGestureMove, { passive: false });
-      document.addEventListener('touchend', this._onNodeGestureEnd);
-      document.addEventListener('touchcancel', this._onNodeGestureEnd);
-      document.body.classList.add('pipeline-node-gesturing');
-    },
-    detachNodeGestureListeners() {
-      document.removeEventListener('mousemove', this._onNodeGestureMove);
-      document.removeEventListener('mouseup', this._onNodeGestureEnd);
-      document.removeEventListener('touchmove', this._onNodeGestureMove);
-      document.removeEventListener('touchend', this._onNodeGestureEnd);
-      document.removeEventListener('touchcancel', this._onNodeGestureEnd);
-      document.body.classList.remove('pipeline-node-gesturing');
-    },
-    onNodeMoveStart(nodeId, event) {
-      const node = this.nodeById.get(nodeId);
-      if (!node) {
-        return;
-      }
-      const point = this.clientPoint(event);
-      this.activeNodeId = nodeId;
-      this.nodeGesture = {
-        mode: 'move',
-        nodeId,
-        startClientX: point.x,
-        startClientY: point.y,
-        startX: node.x,
-        startY: node.y
-      };
-      this.attachNodeGestureListeners();
-      event.preventDefault();
-    },
-    onNodeGestureMove(event) {
-      if (!this.nodeGesture) {
-        return;
-      }
-      const point = this.clientPoint(event);
-      const dx = (point.x - this.nodeGesture.startClientX) / this.scale;
-      const dy = (point.y - this.nodeGesture.startClientY) / this.scale;
-      const { nodeId } = this.nodeGesture;
-
-      this.setNodeOverride(nodeId, {
-        x: Math.round(this.nodeGesture.startX + dx),
-        y: Math.round(this.nodeGesture.startY + dy)
-      });
-
-      this.markUserGestured();
-      event.preventDefault();
-    },
-    endNodeGesture() {
-      if (!this.nodeGesture) {
-        return;
-      }
-      saveNodeOverrides(this.layoutKey, this.nodeOverrides);
-      this.nodeGesture = null;
-      this.detachNodeGestureListeners();
-    },
-    markUserGestured() {
-      this.userHasGestured = true;
-    },
-    setupInteractionHandlers() {
-      const viewport = this.$refs.viewport;
-      if (!viewport || this._interactionViewport === viewport) {
-        return;
-      }
-      this.teardownInteractionHandlers();
-      this._interactionViewport = viewport;
-
-      this._onTouchStart = (e) => this.handleTouchStart(e);
-      this._onTouchMove = (e) => this.handleTouchMove(e);
-      this._onTouchEnd = (e) => this.handleTouchEnd(e);
-      viewport.addEventListener('touchstart', this._onTouchStart, { passive: true });
-      viewport.addEventListener('touchmove', this._onTouchMove, { passive: false });
-      viewport.addEventListener('touchend', this._onTouchEnd, { passive: true });
-      viewport.addEventListener('touchcancel', this._onTouchEnd, { passive: true });
-
-      this._onMouseDown = (e) => this.handleMouseDown(e);
-      this._onMouseMove = (e) => this.handleMouseMove(e);
-      this._onMouseUp = (e) => this.handleMouseUp(e);
-      this._onWheel = (e) => this.handleWheel(e);
-      viewport.addEventListener('mousedown', this._onMouseDown);
-      viewport.addEventListener('wheel', this._onWheel, { passive: false });
-    },
-    teardownInteractionHandlers() {
-      const viewport = this._interactionViewport;
-      if (!viewport) {
-        return;
-      }
-      viewport.removeEventListener('touchstart', this._onTouchStart);
-      viewport.removeEventListener('touchmove', this._onTouchMove);
-      viewport.removeEventListener('touchend', this._onTouchEnd);
-      viewport.removeEventListener('touchcancel', this._onTouchEnd);
-      viewport.removeEventListener('mousedown', this._onMouseDown);
-      viewport.removeEventListener('wheel', this._onWheel);
-      document.removeEventListener('mousemove', this._onMouseMove);
-      document.removeEventListener('mouseup', this._onMouseUp);
-      this._interactionViewport = null;
-      this.gesture = null;
-      this.isDragging = false;
-    },
-    zoomAt(clientX, clientY, nextScale) {
-      const viewport = this.$refs.viewport;
-      if (!viewport) {
-        return;
-      }
-      const rect = viewport.getBoundingClientRect();
-      const focalX = (clientX - rect.left - this.panX) / this.scale;
-      const focalY = (clientY - rect.top - this.panY) / this.scale;
-      const clamped = clampScale(nextScale);
-      this.scale = clamped;
-      this.panX = clientX - rect.left - focalX * clamped;
-      this.panY = clientY - rect.top - focalY * clamped;
-      this.markUserGestured();
-    },
-    handleWheel(e) {
-      if (!this.$refs.viewport?.contains(e.target)) {
-        return;
-      }
-      e.preventDefault();
-      const factor = e.deltaY < 0 ? WHEEL_ZOOM_FACTOR : 1 / WHEEL_ZOOM_FACTOR;
-      this.zoomAt(e.clientX, e.clientY, this.scale * factor);
-    },
-    handleMouseDown(e) {
-      if (e.button !== 0 || this.shouldIgnorePanStart(e.target)) {
-        return;
-      }
-      e.preventDefault();
-      this.isDragging = true;
-      this.gesture = {
-        mode: 'pan',
-        startX: e.clientX,
-        startY: e.clientY,
-        startPanX: this.panX,
-        startPanY: this.panY
-      };
-      document.addEventListener('mousemove', this._onMouseMove);
-      document.addEventListener('mouseup', this._onMouseUp);
-    },
-    handleMouseMove(e) {
-      if (this.nodeGesture) {
-        return;
-      }
-      if (!this.gesture || this.gesture.mode !== 'pan' || !this.isDragging) {
-        return;
-      }
-      this.panX = this.gesture.startPanX + (e.clientX - this.gesture.startX);
-      this.panY = this.gesture.startPanY + (e.clientY - this.gesture.startY);
-      this.markUserGestured();
-    },
-    handleMouseUp() {
-      if (!this.isDragging) {
-        return;
-      }
-      this.isDragging = false;
-      this.gesture = null;
-      document.removeEventListener('mousemove', this._onMouseMove);
-      document.removeEventListener('mouseup', this._onMouseUp);
-    },
-    handleTouchStart(e) {
-      const touches = e.touches;
-      const rect = this.$refs.viewport.getBoundingClientRect();
-      if (touches.length === 1) {
-        if (this.shouldIgnorePanStart(e.target)) {
-          return;
-        }
-        this.gesture = {
-          mode: 'pan',
-          startX: touches[0].clientX,
-          startY: touches[0].clientY,
-          startPanX: this.panX,
-          startPanY: this.panY
-        };
-        return;
-      }
-      if (touches.length >= 2) {
-        const center = touchCenter(touches);
-        const focalX = (center.x - rect.left - this.panX) / this.scale;
-        const focalY = (center.y - rect.top - this.panY) / this.scale;
-        this.gesture = {
-          mode: 'pinch',
-          startDistance: touchDistance(touches),
-          startScale: this.scale,
-          focalX,
-          focalY,
-          rectLeft: rect.left,
-          rectTop: rect.top
-        };
-      }
-    },
-    handleTouchMove(e) {
-      if (this.nodeGesture) {
-        return;
-      }
-      if (!this.gesture) {
-        return;
-      }
-      const touches = e.touches;
-      if (this.gesture.mode === 'pan' && touches.length === 1) {
-        e.preventDefault();
-        this.panX = this.gesture.startPanX + (touches[0].clientX - this.gesture.startX);
-        this.panY = this.gesture.startPanY + (touches[0].clientY - this.gesture.startY);
-        this.markUserGestured();
-        return;
-      }
-      if (touches.length >= 2) {
-        e.preventDefault();
-        const center = touchCenter(touches);
-        const distance = touchDistance(touches);
-        if (this.gesture.mode === 'pan') {
-          const rect = this.$refs.viewport.getBoundingClientRect();
-          const focalX = (center.x - rect.left - this.panX) / this.scale;
-          const focalY = (center.y - rect.top - this.panY) / this.scale;
-          this.gesture = {
-            mode: 'pinch',
-            startDistance: distance,
-            startScale: this.scale,
-            focalX,
-            focalY,
-            rectLeft: rect.left,
-            rectTop: rect.top
-          };
-        }
-        const ratio = distance / this.gesture.startDistance;
-        const nextScale = clampScale(this.gesture.startScale * ratio);
-        this.scale = nextScale;
-        this.panX = center.x - this.gesture.rectLeft - this.gesture.focalX * nextScale;
-        this.panY = center.y - this.gesture.rectTop - this.gesture.focalY * nextScale;
-        this.markUserGestured();
-      }
-    },
-    handleTouchEnd(e) {
-      if (!this.gesture) {
-        return;
-      }
-      if (e.touches.length === 0) {
-        this.gesture = null;
-        return;
-      }
-      if (e.touches.length === 1 && this.gesture.mode === 'pinch') {
-        this.gesture = {
-          mode: 'pan',
-          startX: e.touches[0].clientX,
-          startY: e.touches[0].clientY,
-          startPanX: this.panX,
-          startPanY: this.panY
-        };
-      }
-    },
     scheduleViewportFit() {
       if (this._fitRaf) {
         cancelAnimationFrame(this._fitRaf);
@@ -631,11 +286,8 @@ export default {
       });
     },
     fitViewport() {
-      if (this.userHasGestured) {
-        return;
-      }
       const viewport = this.$refs.viewport;
-      if (!viewport || !this.displayLayout.width) {
+      if (!viewport || !this.layout.width) {
         return;
       }
       const pad = 8;
@@ -645,13 +297,13 @@ export default {
         return;
       }
       const fitScale = Math.min(
-        (vw - pad * 2) / this.displayLayout.width,
-        (vh - pad * 2) / this.displayLayout.height,
+        (vw - pad * 2) / this.layout.width,
+        (vh - pad * 2) / this.layout.height,
         1
       );
       this.scale = Math.max(FIT_MIN_SCALE, fitScale);
-      this.panX = pad + (vw - pad * 2 - this.displayLayout.width * this.scale) / 2;
-      this.panY = pad + (vh - pad * 2 - this.displayLayout.height * this.scale) / 2;
+      this.panX = pad + (vw - pad * 2 - this.layout.width * this.scale) / 2;
+      this.panY = pad + (vh - pad * 2 - this.layout.height * this.scale) / 2;
     },
     horizontalBezierPath(from, to) {
       const dx = Math.max(56, Math.abs(to.x - from.x) * 0.5);
@@ -782,17 +434,10 @@ export default {
   text-overflow: ellipsis;
 }
 
-.pipeline-viewport-panzoom {
+.pipeline-viewport-fit {
   flex: 1 1 auto;
   min-height: 220px;
   overflow: hidden;
-  touch-action: none;
-  user-select: none;
-  cursor: grab;
-}
-
-.pipeline-viewport-dragging {
-  cursor: grabbing;
 }
 
 .pipeline-transform {
@@ -854,15 +499,6 @@ export default {
   z-index: 2;
 }
 
-.pipeline-node-active {
-  z-index: 5;
-}
-
-.pipeline-node-active .pipeline-node-card {
-  border-color: rgba(var(--v-theme-primary), 0.55);
-  box-shadow: 0 0 0 1px rgba(var(--v-theme-primary), 0.25), 0 6px 16px rgba(0, 0, 0, 0.45);
-}
-
 .pipeline-node-body {
   display: flex;
   align-items: stretch;
@@ -883,12 +519,7 @@ export default {
 .pipeline-node-head {
   flex-shrink: 0;
   padding: 5px 8px 2px;
-  cursor: grab;
   border-radius: 6px 6px 0 0;
-}
-
-.pipeline-node-head:active {
-  cursor: grabbing;
 }
 
 .pipeline-node-card {
@@ -1036,11 +667,4 @@ export default {
   box-shadow: 0 0 6px rgba(var(--v-theme-primary), 0.5);
 }
 
-</style>
-
-<style>
-body.pipeline-node-gesturing {
-  user-select: none;
-  -webkit-user-select: none;
-}
 </style>
