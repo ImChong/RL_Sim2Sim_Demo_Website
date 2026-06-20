@@ -131,7 +131,42 @@ async function switchPanelTab(page, tab) {
   await sleep(450);
 }
 
+async function ensureNodeInView(page, nodeId, maxAttempts = 10) {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const info = await page.evaluate((id) => {
+      const node = document.querySelector(`[data-node-id="${id}"]`);
+      const head = node?.querySelector('.pipeline-node-head');
+      const viewport = document.querySelector('.pipeline-viewport');
+      if (!head || !viewport) {
+        return { visible: false };
+      }
+      const r = head.getBoundingClientRect();
+      const vp = viewport.getBoundingClientRect();
+      const visible = r.width > 4 && r.height > 4
+        && r.right > vp.left + 8
+        && r.left < vp.right - 8
+        && r.bottom > vp.top + 8
+        && r.top < vp.bottom - 8;
+      return {
+        visible,
+        dx: (vp.left + vp.width / 2) - (r.left + r.width / 2),
+        dy: (vp.top + vp.height / 2) - (r.top + r.height / 2)
+      };
+    }, nodeId);
+    if (info.visible) {
+      return;
+    }
+    if (!Number.isFinite(info.dx) || !Number.isFinite(info.dy)) {
+      await panViewport(page, 120, 0);
+      continue;
+    }
+    await panViewport(page, info.dx * 0.55, info.dy * 0.55);
+  }
+  throw new Error(`Node not visible in viewport: ${nodeId}`);
+}
+
 async function clickNode(page, nodeId) {
+  await ensureNodeInView(page, nodeId);
   const clicked = await page.evaluate((id) => {
     const node = document.querySelector(`[data-node-id="${id}"]`);
     if (!node) {
@@ -173,11 +208,16 @@ async function wheelZoomViewport(page, deltaY) {
 }
 
 async function dragNodeTitle(page, nodeId, dx, dy) {
+  await ensureNodeInView(page, nodeId);
   const head = await page.$(`[data-node-id="${nodeId}"] .pipeline-node-head`);
   if (!head) {
     throw new Error(`Node head not found: ${nodeId}`);
   }
-  const box = await head.boundingBox();
+  let box = await head.boundingBox();
+  for (let attempt = 0; !box && attempt < 5; attempt += 1) {
+    await sleep(200);
+    box = await head.boundingBox();
+  }
   if (!box) {
     throw new Error(`Node head box missing: ${nodeId}`);
   }
@@ -292,20 +332,21 @@ async function main() {
   }, 2600);
 
   await record('② 横向泳道总览（拖动画布平移）', async () => {
-    await panViewport(page, -180, 40);
-    await panViewport(page, 120, -20);
+    await panViewport(page, -140, 24);
+    await panViewport(page, 100, -16);
+  }, 2600);
+
+  await record('③ 拖拽节点标题栏移动节点', async () => {
+    await dragNodeTitle(page, 'sim-root-angvel', 0, 64);
+    await dragNodeTitle(page, 'warehouse', 40, -28);
   }, 2800);
 
-  await record('③ 滚轮缩放画布', async () => {
-    await wheelZoomViewport(page, -240);
-    await wheelZoomViewport(page, -240);
-    await wheelZoomViewport(page, 360);
-    await wheelZoomViewport(page, 360);
-  }, 2800);
-
-  await record('④ 拖拽节点标题栏移动节点', async () => {
-    await dragNodeTitle(page, 'sim-root-angvel', 0, 72);
-    await dragNodeTitle(page, 'warehouse', 48, -36);
+  await record('④ 滚轮缩放画布', async () => {
+    await wheelZoomViewport(page, -200);
+    await wheelZoomViewport(page, -200);
+    await wheelZoomViewport(page, 320);
+    await wheelZoomViewport(page, 320);
+    await ensureNodeInView(page, 'sim-cmd-vx');
   }, 2800);
 
   await record('⑤ 点击节点接入示波器（根角速度）', async () => {
@@ -326,20 +367,20 @@ async function main() {
 
   await record('⑧ 点击流程图「示波器」汇聚节点', async () => {
     await switchPanelTab(page, 'graph');
-    await panViewport(page, 220, 0);
+    await ensureNodeInView(page, 'out-scope');
     await clickNode(page, 'out-scope');
   }, 2400);
 
   await record('⑨ 示波器：暂停 · 修改窗口 30s · 继续', async () => {
-    const pauseBtn = await page.$('.scope-actions .v-btn');
-    await pauseBtn?.click();
+    await page.waitForSelector('.scope-window-input', { visible: true, timeout: 10000 });
+    await page.click('.scope-actions .v-btn');
     await sleep(500);
     await page.$eval('.scope-window-input', (el) => {
       el.value = '30';
       el.dispatchEvent(new Event('change', { bubbles: true }));
     });
     await sleep(500);
-    await pauseBtn?.click();
+    await page.click('.scope-actions .v-btn');
   }, 3000);
 
   await record('⑩ 拖拽面板右边框 / 上边框调整大小', async () => {
