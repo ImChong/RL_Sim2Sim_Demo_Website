@@ -143,18 +143,24 @@ function buildMotorSample(demo, jointCount = 3) {
   const runner = demo.policyRunner;
   const n = Math.min(jointCount, runner.numActions);
   const samples = [];
+
+  // Bolt: Cache simulation arrays outside loop to prevent repeated Emscripten TypedArray allocations
+  const simQpos = demo.simulation.qpos;
+  const simQvel = demo.simulation.qvel;
+  const simCtrl = demo.simulation.ctrl;
+
   for (let i = 0; i < n; i++) {
     const qposAdr = demo.qpos_adr_policy?.[i];
     const qvelAdr = demo.qvel_adr_policy?.[i];
     const ctrlAdr = demo.ctrl_adr_policy?.[i];
     const name = runner.policyJointNames[i] ?? `joint_${i}`;
     const target = demo.actionTarget?.[i] ?? runner.target[i] ?? 0;
-    const qpos = Number.isInteger(qposAdr) ? demo.simulation.qpos[qposAdr] : 0;
-    const qvel = Number.isInteger(qvelAdr) ? demo.simulation.qvel[qvelAdr] : 0;
+    const qpos = Number.isInteger(qposAdr) ? simQpos[qposAdr] : 0;
+    const qvel = Number.isInteger(qvelAdr) ? simQvel[qvelAdr] : 0;
     const kp = demo.kpPolicy?.[i] ?? 0;
     const kd = demo.kdPolicy?.[i] ?? 0;
     const torque = kp * (target - qpos) + kd * (0 - qvel);
-    const ctrl = Number.isInteger(ctrlAdr) ? demo.simulation.ctrl[ctrlAdr] : torque;
+    const ctrl = Number.isInteger(ctrlAdr) ? simCtrl[ctrlAdr] : torque;
     samples.push({
       name,
       qpos,
