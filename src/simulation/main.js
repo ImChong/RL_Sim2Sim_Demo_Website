@@ -793,25 +793,28 @@ export class MuJoCoDemo {
       return;
     }
 
+    // Bolt: Cache simulation arrays to avoid repeated Emscripten view allocations
+    const simQpos = this.simulation.qpos;
+
     const rootPos = initialState.root_pos;
     if (Array.isArray(rootPos) && rootPos.length >= 3) {
-      this.simulation.qpos[0] = Number(rootPos[0]) || 0.0;
-      this.simulation.qpos[1] = Number(rootPos[1]) || 0.0;
-      this.simulation.qpos[2] = Number(rootPos[2]) || 0.0;
+      simQpos[0] = Number(rootPos[0]) || 0.0;
+      simQpos[1] = Number(rootPos[1]) || 0.0;
+      simQpos[2] = Number(rootPos[2]) || 0.0;
     }
 
     const rootQuat = initialState.root_quat;
     if (Array.isArray(rootQuat) && rootQuat.length >= 4) {
-      this.simulation.qpos[3] = Number(rootQuat[0]) || 1.0;
-      this.simulation.qpos[4] = Number(rootQuat[1]) || 0.0;
-      this.simulation.qpos[5] = Number(rootQuat[2]) || 0.0;
-      this.simulation.qpos[6] = Number(rootQuat[3]) || 0.0;
+      simQpos[3] = Number(rootQuat[0]) || 1.0;
+      simQpos[4] = Number(rootQuat[1]) || 0.0;
+      simQpos[5] = Number(rootQuat[2]) || 0.0;
+      simQpos[6] = Number(rootQuat[3]) || 0.0;
     }
 
     const jointPosArray = initialState.joint_pos_array;
     if (Array.isArray(jointPosArray) && jointPosArray.length === this.numActions) {
       for (let i = 0; i < this.numActions; i++) {
-        this.simulation.qpos[this.qpos_adr_policy[i]] = Number(jointPosArray[i]) || 0.0;
+        simQpos[this.qpos_adr_policy[i]] = Number(jointPosArray[i]) || 0.0;
       }
     } else {
       const jointRules = initialState.joint_pos ?? {};
@@ -820,14 +823,15 @@ export class MuJoCoDemo {
         for (const [pattern, value] of Object.entries(jointRules)) {
           const regex = new RegExp(`^${pattern}$`);
           if (regex.test(jointName)) {
-            this.simulation.qpos[this.qpos_adr_policy[i]] = Number(value) || 0.0;
+            simQpos[this.qpos_adr_policy[i]] = Number(value) || 0.0;
           }
         }
       }
     }
 
-    for (let i = 0; i < this.simulation.qvel.length; i++) {
-      this.simulation.qvel[i] = 0.0;
+    const simQvel = this.simulation.qvel;
+    for (let i = 0; i < simQvel.length; i++) {
+      simQvel[i] = 0.0;
     }
     this.simulation.forward();
   }

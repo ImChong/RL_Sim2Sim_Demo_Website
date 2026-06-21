@@ -58,3 +58,6 @@
 ## 2025-06-25 - Avoid null reference exceptions when hoisting simulation array getters
 **Learning:** Found that hoisting `this.simulation.qpos`, `this.simulation.qvel`, etc., outside of loops in `main.js` must be done after carefully checking if `this.simulation` actually exists. Hoisting them above `if (!this.alive || !this.simulation)` causes a fatal `TypeError` during demo shutdown or reload when the simulation object is null.
 **Action:** Always check loop entry guards or exit conditions to ensure you don't hoist variables to a point in the code where the parent object might be null or undefined.
+## 2025-06-25 - Avoid null reference exceptions when hoisting simulation array getters
+**Learning:** Found that hoisting `this.simulation.qpos`, `this.simulation.qvel`, etc., outside of loops in `main.js` must be done after carefully checking if `this.simulation` actually exists. Hoisting them above `if (!this.alive || !this.simulation)` causes a fatal `TypeError` during demo shutdown or reload when the simulation object is null.
+**Action:** Always check loop entry guards or exit conditions to ensure you don't hoist variables to a point in the code where the parent object might be null or undefined.
