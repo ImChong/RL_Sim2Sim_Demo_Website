@@ -48,7 +48,7 @@
     >
       <v-card-title class="model-io-title">
         <span>{{ t.panelTitle }}</span>
-        <v-chip v-if="telemetryLive" size="x-small" color="primary" variant="tonal">
+        <v-chip v-if="telemetry.ready" size="x-small" color="primary" variant="tonal">
           {{ t.live }}
         </v-chip>
         <v-chip v-else size="x-small" color="on-surface" variant="outlined">
@@ -99,7 +99,7 @@
             v-show="viewTab === 'graph'"
             :telemetry="telemetry"
             :language="language"
-            :live="telemetryLive"
+            :live="telemetry.ready"
             :is-mobile="isSmallScreen"
             :active-probes="activeProbes"
             @probe-node="onProbeNode"
@@ -165,7 +165,6 @@
 
 <script>
 import { buildPolicyTelemetry } from '@/simulation/policyTelemetry.js';
-import { buildParkourPolicyTelemetry } from '@/simulation/parkourPolicyTelemetry.js';
 import ModelIOPipelineGraph from '@/components/ModelIOPipelineGraph.vue';
 import OnnxNetronViewer from '@/components/OnnxNetronViewer.vue';
 import SignalOscilloscope from '@/components/SignalOscilloscope.vue';
@@ -275,14 +274,6 @@ export default {
     mobileControlsCollapsed: {
       type: Boolean,
       default: true
-    },
-    parkourTelemetrySnapshot: {
-      type: Object,
-      default: null
-    },
-    parkourMode: {
-      type: Boolean,
-      default: false
     }
   },
   data: () => {
@@ -336,15 +327,6 @@ export default {
     pollIntervalMs() {
       return this.isSmallScreen ? 100 : 50;
     },
-    usesParkourTelemetry() {
-      return this.parkourMode;
-    },
-    telemetryLive() {
-      if (this.usesParkourTelemetry) {
-        return Boolean(this.parkourTelemetrySnapshot?.ready);
-      }
-      return Boolean(this.telemetry?.ready);
-    },
     mobileToggleBottom() {
       const safe = 'env(safe-area-inset-bottom, 0px)';
       const vvp = 'var(--vvp-offset-bottom, 0px)';
@@ -354,16 +336,6 @@ export default {
     }
   },
   watch: {
-    parkourTelemetrySnapshot() {
-      if (this.usesParkourTelemetry && this.ready) {
-        this.refreshTelemetry();
-      }
-    },
-    parkourMode(enabled) {
-      if (enabled && this.ready) {
-        this.refreshTelemetry();
-      }
-    },
     ready(isReady) {
       if (!isReady) {
         this.telemetry = { ready: false };
@@ -473,13 +445,7 @@ export default {
         if (this.expanded && this.ready) {
           this.refreshTelemetry();
           if (this.activeProbes.length > 0) {
-            if (this.usesParkourTelemetry) {
-              pushScopeSample(this.signalScope, null, null, performance.now(), {
-                parkourSnapshot: this.parkourTelemetrySnapshot
-              });
-            } else {
-              pushScopeSample(this.signalScope, this.demo?.policyRunner, this.demo);
-            }
+            pushScopeSample(this.signalScope, this.demo?.policyRunner, this.demo);
             this.scopeSnapshot = getScopeSnapshot(this.signalScope);
           }
         }
@@ -504,12 +470,6 @@ export default {
       this.expanded = false;
     },
     refreshTelemetry() {
-      if (this.usesParkourTelemetry) {
-        this.telemetry = buildParkourPolicyTelemetry(this.parkourTelemetrySnapshot, {
-          lang: this.language
-        });
-        return;
-      }
       if (!this.ready || !this.demo?.policyRunner) {
         this.telemetry = buildPolicyTelemetry(null, null, { lang: this.language });
         return;
@@ -535,11 +495,7 @@ export default {
       setScopeProbes(this.signalScope, probes);
       this.scopeZoom = null;
       this.viewTab = 'scope';
-      if (this.usesParkourTelemetry) {
-        pushScopeSample(this.signalScope, null, null, performance.now(), {
-          parkourSnapshot: this.parkourTelemetrySnapshot
-        });
-      } else if (this.ready && this.demo?.policyRunner) {
+      if (this.ready && this.demo?.policyRunner) {
         pushScopeSample(this.signalScope, this.demo.policyRunner, this.demo);
       }
       this.scopeSnapshot = getScopeSnapshot(this.signalScope);
