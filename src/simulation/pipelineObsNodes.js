@@ -102,19 +102,6 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
   const actions = numActions || jointNames.length || 1;
 
   switch (block.name) {
-    case 'base_lin_vel':
-      return [{
-        id: idBase,
-        kind: 'signal',
-        group: 'obs',
-        signalKind: 'vec3',
-        title: zh ? '基座线速度' : 'Base LinVel',
-        subtitle: zh ? '机体系' : 'body frame',
-        lines: vec3Lines(''),
-        concatOffset: block.offset,
-        concatSize: block.size
-      }];
-    case 'base_ang_vel':
     case 'RootAngVelB':
       return [{
         id: idBase,
@@ -127,7 +114,6 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
         concatOffset: block.offset,
         concatSize: block.size
       }];
-    case 'projected_gravity':
     case 'ProjectedGravityB':
       return [{
         id: idBase,
@@ -140,19 +126,6 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
         concatOffset: block.offset,
         concatSize: block.size
       }];
-    case 'robot_anchor_projected_gravity':
-      return [{
-        id: idBase,
-        kind: 'signal',
-        group: 'obs',
-        signalKind: 'vec3',
-        title: zh ? '锚点重力' : 'Anchor Gravity',
-        subtitle: zh ? 'torso 机体系' : 'torso body frame',
-        lines: vec3Lines(''),
-        concatOffset: block.offset,
-        concatSize: block.size
-      }];
-    case 'command':
     case 'Command':
       return [
         {
@@ -189,7 +162,6 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
           concatSize: 1
         }
       ];
-    case 'joint_pos':
     case 'JointPos': {
       const steps = block.kwargs?.pos_steps ?? [0];
       if (steps.length <= 1) {
@@ -216,7 +188,6 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
         concatSize: actions
       }));
     }
-    case 'joint_vel':
     case 'JointVel': {
       const steps = block.kwargs?.vel_steps ?? [0];
       if (steps.length <= 1) {
@@ -243,33 +214,6 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
         concatSize: actions
       }));
     }
-    case 'actions':
-      return [{
-        id: idBase,
-        kind: 'joints',
-        group: 'obs',
-        signalKind: 'joint',
-        title: zh ? '上一动作' : 'Last Action',
-        subtitle: zh ? '策略输出回环' : 'policy loopback',
-        lines: jointDimLines(actions, zh),
-        concatOffset: block.offset,
-        concatSize: block.size,
-        scrollable: actions > 6,
-        loopbackTarget: true
-      }];
-    case 'placeholder':
-      return [{
-        id: idBase,
-        kind: 'signal',
-        group: 'obs',
-        signalKind: 'indexed',
-        title: zh ? '虚拟摇杆' : 'Virtual input',
-        subtitle: '15D',
-        lines: Array.from({ length: Math.min(6, block.size) }, (_, i) => ({ k: `[${i}]` })),
-        concatOffset: block.offset,
-        concatSize: block.size,
-        scrollable: block.size > 6
-      }];
     case 'PrevActions': {
       const historySteps = Math.max(1, block.kwargs?.history_steps ?? 1);
       const nodes = [];
@@ -482,14 +426,12 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
 }
 
 export function isPrevActionObsNodeId(nodeId) {
-  return nodeId === 'obs-PrevActions'
-    || nodeId === 'obs-actions'
-    || /^obs-PrevActions-t\d+$/.test(nodeId ?? '');
+  return nodeId === 'obs-PrevActions' || /^obs-PrevActions-t\d+$/.test(nodeId ?? '');
 }
 
 export function findLoopbackPrevActionNode(nodes) {
   const prevNodes = (nodes ?? []).filter((node) => isPrevActionObsNodeId(node.id));
   return prevNodes.find((node) => node.loopbackTarget)
-    ?? prevNodes.find((node) => node.id === 'obs-PrevActions' || node.id === 'obs-PrevActions-t0' || node.id === 'obs-actions')
+    ?? prevNodes.find((node) => node.id === 'obs-PrevActions' || node.id === 'obs-PrevActions-t0')
     ?? prevNodes[0];
 }
