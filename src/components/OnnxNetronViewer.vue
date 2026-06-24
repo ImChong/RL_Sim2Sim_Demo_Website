@@ -16,6 +16,7 @@
         :src="viewerUrl"
         :title="frameTitle"
         referrerpolicy="same-origin"
+        sandbox="allow-scripts allow-same-origin allow-downloads allow-popups"
         @load="onFrameLoad"
       />
     </template>
