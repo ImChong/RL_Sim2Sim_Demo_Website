@@ -8,6 +8,7 @@
         <div class="header-spacer"></div>
         <div class="header-right">
           <a
+            v-if="showExternalSourceLinks"
             href="https://github.com/ImChong/RL_Sim2Sim_Demo_Website"
             class="github-link"
             target="_blank"
@@ -47,6 +48,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useTheme } from 'vuetify'
 import Demo from '@/views/Demo.vue'
+import { showExternalSourceLinks } from '@/config/siteLinks'
 import {
   applyDocumentTheme,
   getStoredTheme,

@@ -94,7 +94,7 @@
         </v-btn>
       </v-card-title>
       <v-card-text v-show="!isMobileControlsCollapsed" class="py-0 controls-body">
-        <div class="training-links">
+        <div v-if="showExternalSourceLinks" class="training-links">
           <v-btn
             href="https://github.com/ccrpRepo/AMP_mjlab"
             target="_blank"
@@ -145,7 +145,7 @@
           </v-btn>
         </div>
 
-        <v-divider class="my-2"/>
+        <v-divider v-if="showExternalSourceLinks" class="my-2"/>
         <span class="status-name">{{ t.policy }}</span>
         <div v-if="policyDescription" class="text-caption">{{ policyDescription }}</div>
         <v-select
@@ -693,6 +693,7 @@
 import ModelIOFlowchart from '@/components/ModelIOFlowchart.vue';
 import AmpMobileJoystick from '@/components/AmpMobileJoystick.vue';
 import ParkourMobileJoystick from '@/components/ParkourMobileJoystick.vue';
+import { showExternalSourceLinks } from '@/config/siteLinks.js';
 import {
   clampControlPanelSize,
   loadControlPanelSize,
@@ -1007,6 +1008,7 @@ export default {
     }
   },
   data: () => ({
+    showExternalSourceLinks,
     state: 0, // 0: loading, 1: running, -1: JS error, -2: wasm unsupported
     extra_error_message: '',
     keydown_listener: null,
