@@ -40,6 +40,7 @@
       class="parkour-frame"
       :title="embeddedDemoFrameTitle"
       allow="autoplay; fullscreen"
+      sandbox="allow-scripts allow-same-origin allow-downloads allow-forms allow-modals allow-popups"
       @load="onParkourLoad"
     ></iframe>
   </div>

@@ -50,3 +50,8 @@
 **Vulnerability:** Outdated dependencies `vite` (CVE-2026-53571, CVE-2026-53632) and `protobufjs` (CVE-2026-54269) allowed vulnerabilities such as server.fs bypass and path handling leaks.
 **Learning:** Security vulnerabilities often stem from sub-dependencies or out-of-date tooling like dev servers, not just main runtime code.
 **Prevention:** Regularly run `pnpm audit` and bump dependencies (using overrides if necessary) to stay ahead of known CVEs.
+
+## 2026-06-25 - [Iframe Privilege Escalation]
+**Vulnerability:** `<iframe>` elements missing the `sandbox` attribute.
+**Learning:** Iframes without a `sandbox` attribute inherit a wide range of permissions, including the ability to navigate the top-level parent window. This could be exploited by embedded third-party content (like Netron viewer or external demos) to perform malicious redirects or unauthorized DOM manipulation.
+**Prevention:** When embedding untrusted or external content via `<iframe>`, always include the `sandbox` attribute (e.g., `sandbox="allow-scripts allow-same-origin allow-downloads allow-popups"`) to apply the Principle of Least Privilege and restrict the frame's capabilities.
