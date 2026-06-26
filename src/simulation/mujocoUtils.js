@@ -687,8 +687,13 @@ function configureJointMappings(demo, jointNames) {
   demo.ctrl_adr_policy = [];
   demo.qpos_adr_policy = [];
   demo.qvel_adr_policy = [];
+  demo.ctrlMinPolicy = new Float32Array(jointNames.length);
+  demo.ctrlMaxPolicy = new Float32Array(jointNames.length);
 
-  for (const name of jointNames) {
+  const ctrlRange = model.actuator_ctrlrange;
+
+  for (let i = 0; i < jointNames.length; i++) {
+    const name = jointNames[i];
     const jointIdx = demo.jointNamesMJC.indexOf(name);
     if (jointIdx < 0) {
       throw new Error(`Joint "${name}" not found in MuJoCo model`);
@@ -700,6 +705,19 @@ function configureJointMappings(demo, jointNames) {
     demo.ctrl_adr_policy.push(actuatorIdx);
     demo.qpos_adr_policy.push(model.jnt_qposadr[jointIdx]);
     demo.qvel_adr_policy.push(model.jnt_dofadr[jointIdx]);
+
+    let min = -Infinity;
+    let max = Infinity;
+    if (ctrlRange && ctrlRange.length >= (actuatorIdx + 1) * 2) {
+      const rMin = ctrlRange[actuatorIdx * 2];
+      const rMax = ctrlRange[(actuatorIdx * 2) + 1];
+      if (Number.isFinite(rMin) && Number.isFinite(rMax) && rMin < rMax) {
+        min = rMin;
+        max = rMax;
+      }
+    }
+    demo.ctrlMinPolicy[i] = min;
+    demo.ctrlMaxPolicy[i] = max;
   }
 
   demo.numActions = jointNames.length;
