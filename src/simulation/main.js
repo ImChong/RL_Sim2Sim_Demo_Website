@@ -434,70 +434,82 @@ export class MuJoCoDemo {
   }
 
   applyJointPositionControl(simQpos, simQvel, simCtrl) {
-    const ctrlRange = this.model?.actuator_ctrlrange;
+    const actionTarget = this.actionTarget;
+    const kpPolicy = this.kpPolicy;
+    const kdPolicy = this.kdPolicy;
+    const ctrlMin = this.ctrlMinPolicy;
+    const ctrlMax = this.ctrlMaxPolicy;
 
     for (let i = 0; i < this.numActions; i++) {
       const qpos_adr = this.qpos_adr_policy[i];
       const qvel_adr = this.qvel_adr_policy[i];
       const ctrl_adr = this.ctrl_adr_policy[i];
 
-      const targetJpos = this.actionTarget ? this.actionTarget[i] : 0.0;
-      const kp = this.kpPolicy ? this.kpPolicy[i] : 0.0;
-      const kd = this.kdPolicy ? this.kdPolicy[i] : 0.0;
-      const torque = kp * (targetJpos - simQpos[qpos_adr]) + kd * (0 - simQvel[qvel_adr]);
+      const targetJpos = actionTarget ? actionTarget[i] : 0.0;
+      const kp = kpPolicy ? kpPolicy[i] : 0.0;
+      const kd = kdPolicy ? kdPolicy[i] : 0.0;
+      const torque = kp * (targetJpos - simQpos[qpos_adr]) - kd * simQvel[qvel_adr];
       let ctrlValue = torque;
 
-      if (ctrlRange && ctrlRange.length >= (ctrl_adr + 1) * 2) {
-        const min = ctrlRange[ctrl_adr * 2];
-        const max = ctrlRange[(ctrl_adr * 2) + 1];
-        if (Number.isFinite(min) && Number.isFinite(max) && min < max) {
-          ctrlValue = Math.min(Math.max(ctrlValue, min), max);
-        }
+      const min = ctrlMin[i];
+      const max = ctrlMax[i];
+      if (min < max) {
+        ctrlValue = Math.min(Math.max(ctrlValue, min), max);
       }
       simCtrl[ctrl_adr] = ctrlValue;
     }
   }
 
   applyUnitreePositionControl(simQpos, simQvel, simCtrl) {
-    const ctrlRange = this.model?.actuator_ctrlrange;
+    const actionTarget = this.actionTarget;
+    const kpPolicy = this.kpPolicy;
+    const kdPolicy = this.kdPolicy;
+    const Y1Policy = this.Y1Policy;
+    const Y2Policy = this.Y2Policy;
+    const effortLimitPolicy = this.effortLimitPolicy;
+    const X1Policy = this.X1Policy;
+    const X2Policy = this.X2Policy;
+    const frictionStaticPolicy = this.frictionStaticPolicy;
+    const frictionDynamicPolicy = this.frictionDynamicPolicy;
+    const frictionActivationVelPolicy = this.frictionActivationVelPolicy;
+    const ctrlMin = this.ctrlMinPolicy;
+    const ctrlMax = this.ctrlMaxPolicy;
 
     for (let i = 0; i < this.numActions; i++) {
       const qpos_adr = this.qpos_adr_policy[i];
       const qvel_adr = this.qvel_adr_policy[i];
       const ctrl_adr = this.ctrl_adr_policy[i];
 
-      const targetJpos = this.actionTarget ? this.actionTarget[i] : 0.0;
-      const kp = this.kpPolicy ? this.kpPolicy[i] : 0.0;
-      const kd = this.kdPolicy ? this.kdPolicy[i] : 0.0;
+      const targetJpos = actionTarget ? actionTarget[i] : 0.0;
+      const kp = kpPolicy ? kpPolicy[i] : 0.0;
+      const kd = kdPolicy ? kdPolicy[i] : 0.0;
       const qpos = simQpos[qpos_adr];
       const qvel = simQvel[qvel_adr];
-      let torque = kp * (targetJpos - qpos) + kd * (0 - qvel);
+      let torque = kp * (targetJpos - qpos) - kd * qvel;
       const sameDirection = qvel * torque > 0;
-      const y1 = this.Y1Policy ? this.Y1Policy[i] : Infinity;
-      const y2 = this.Y2Policy ? this.Y2Policy[i] : y1;
-      const effortLimit = this.effortLimitPolicy ? this.effortLimitPolicy[i] : Infinity;
+      const y1 = Y1Policy ? Y1Policy[i] : Infinity;
+      const y2 = Y2Policy ? Y2Policy[i] : y1;
+      const effortLimit = effortLimitPolicy ? effortLimitPolicy[i] : Infinity;
       let maxEffort = Math.min(sameDirection ? y1 : y2, effortLimit);
-      const x1 = this.X1Policy ? this.X1Policy[i] : Infinity;
-      const x2 = this.X2Policy ? this.X2Policy[i] : Infinity;
+      const x1 = X1Policy ? X1Policy[i] : Infinity;
+      const x2 = X2Policy ? X2Policy[i] : Infinity;
       const absVel = Math.abs(qvel);
       if (Number.isFinite(x1) && Number.isFinite(x2) && absVel >= x1) {
         const denom = Math.max(x2 - x1, 1e-6);
         maxEffort = Math.max((-maxEffort / denom) * (absVel - x1) + maxEffort, 0.0);
       }
       torque = Math.max(-maxEffort, Math.min(maxEffort, torque));
-      const fs = this.frictionStaticPolicy ? this.frictionStaticPolicy[i] : 0.0;
-      const fd = this.frictionDynamicPolicy ? this.frictionDynamicPolicy[i] : 0.0;
-      const va = this.frictionActivationVelPolicy ? Math.max(this.frictionActivationVelPolicy[i], 1e-6) : 0.01;
+      const fs = frictionStaticPolicy ? frictionStaticPolicy[i] : 0.0;
+      const fd = frictionDynamicPolicy ? frictionDynamicPolicy[i] : 0.0;
+      const va = frictionActivationVelPolicy ? Math.max(frictionActivationVelPolicy[i], 1e-6) : 0.01;
       torque -= fs * Math.tanh(qvel / va) + fd * qvel;
 
       let ctrlValue = torque;
 
-      if (ctrlRange && ctrlRange.length >= (ctrl_adr + 1) * 2) {
-        const min = ctrlRange[ctrl_adr * 2];
-        const max = ctrlRange[(ctrl_adr * 2) + 1];
-        if (Number.isFinite(min) && Number.isFinite(max) && min < max) {
-          ctrlValue = Math.min(Math.max(ctrlValue, min), max);
-        }
+      const min = ctrlMin[i];
+      const max = ctrlMax[i];
+      if (min < max) {
+        ctrlValue = Math.min(Math.max(ctrlValue, min), max);
       }
       simCtrl[ctrl_adr] = ctrlValue;
     }

@@ -61,3 +61,6 @@
 ## 2025-06-25 - Avoid null reference exceptions when hoisting simulation array getters
 **Learning:** Found that hoisting `this.simulation.qpos`, `this.simulation.qvel`, etc., outside of loops in `main.js` must be done after carefully checking if `this.simulation` actually exists. Hoisting them above `if (!this.alive || !this.simulation)` causes a fatal `TypeError` during demo shutdown or reload when the simulation object is null.
 **Action:** Always check loop entry guards or exit conditions to ensure you don't hoist variables to a point in the code where the parent object might be null or undefined.
+## 2024-03-24 - Pre-calculating actuator control ranges
+**Learning:** Checking the `actuator_ctrlrange` in the inner physics control loop (`applyJointPositionControl` and `applyUnitreePositionControl`) added unnecessary overhead and repeated array lookups because it is fixed per-model for all joint/actuator targets.
+**Action:** When setting up model bindings or mapping inputs (e.g. `configureJointMappings`), pre-compute fixed limits into flat TypedArrays (like `this.ctrlMinPolicy` and `this.ctrlMaxPolicy`) and evaluate bounds statically inside hot loops to reduce GC and lookup latency.
