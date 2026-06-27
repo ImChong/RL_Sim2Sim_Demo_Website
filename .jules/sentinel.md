@@ -55,3 +55,8 @@
 **Vulnerability:** `<iframe>` elements missing the `sandbox` attribute.
 **Learning:** Iframes without a `sandbox` attribute inherit a wide range of permissions, including the ability to navigate the top-level parent window. This could be exploited by embedded third-party content (like Netron viewer or external demos) to perform malicious redirects or unauthorized DOM manipulation.
 **Prevention:** When embedding untrusted or external content via `<iframe>`, always include the `sandbox` attribute (e.g., `sandbox="allow-scripts allow-same-origin allow-downloads allow-popups"`) to apply the Principle of Least Privilege and restrict the frame's capabilities.
+
+## 2026-06-27 - [CSP Object Injection & Mixed Content]
+**Vulnerability:** Missing `object-src 'none'` and `block-all-mixed-content` in CSP.
+**Learning:** Without `object-src 'none'`, attackers could potentially inject malicious `<object>` or `<embed>` elements (e.g. Flash/Java) if an injection flaw exists. Without `block-all-mixed-content`, active network attacks could downgrade HTTPS connections by loading HTTP subresources.
+**Prevention:** Always include `object-src 'none'; block-all-mixed-content;` in the baseline Content-Security-Policy to proactively disable legacy plugins and enforce secure transport.
