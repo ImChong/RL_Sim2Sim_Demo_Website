@@ -50,12 +50,18 @@ export async function readResponseBodyWithProgress(response, onProgress) {
  * @param {(ratio: number) => void} [onProgress]
  * @returns {Promise<Uint8Array>}
  */
-export async function fetchUint8ArrayWithProgress(url, onProgress) {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ${url}: ${response.status}`);
+export async function fetchUint8ArrayWithProgress(url, onProgress, timeoutMs = 30000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch ${url}: ${response.status}`);
+    }
+    return await readResponseBodyWithProgress(response, onProgress);
+  } finally {
+    clearTimeout(timeoutId);
   }
-  return readResponseBodyWithProgress(response, onProgress);
 }
 
 /**
