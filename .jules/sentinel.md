@@ -60,3 +60,13 @@
 **Vulnerability:** Missing `object-src 'none'` and `block-all-mixed-content` in CSP.
 **Learning:** Without `object-src 'none'`, attackers could potentially inject malicious `<object>` or `<embed>` elements (e.g. Flash/Java) if an injection flaw exists. Without `block-all-mixed-content`, active network attacks could downgrade HTTPS connections by loading HTTP subresources.
 **Prevention:** Always include `object-src 'none'; block-all-mixed-content;` in the baseline Content-Security-Policy to proactively disable legacy plugins and enforce secure transport.
+
+## 2026-06-28 - [Fetch Timeout Security Enhancement]
+**Vulnerability:** Missing timeout on network requests in `fetchWithProgress.js`.
+**Learning:** `fetch` requests without a timeout can cause the application to hang indefinitely if the server is unresponsive, potentially leading to resource exhaustion or a poor user experience.
+**Prevention:** Always implement a timeout (e.g., using `AbortController`) for network requests to ensure they fail gracefully.
+
+## 2026-06-28 - [Insecure Randomness Security Enhancement]
+**Vulnerability:** Weak random number generation using `Math.random()`.
+**Learning:** `Math.random()` is not cryptographically secure, which could lead to predictable outcomes in simulation generation or terrain seeding.
+**Prevention:** Use `window.crypto.getRandomValues()` instead of `Math.random()` to ensure strong random number generation for security or unpredictability.

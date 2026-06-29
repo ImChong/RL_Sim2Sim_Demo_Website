@@ -1825,7 +1825,10 @@ export default {
       this.bfmSimTime = null;
     },
     bfmTerrainRandomize() {
-      this.bfmTerrainSeed = Math.floor(Math.random() * 1e9) + 1;
+      const cryptoRandom = typeof window !== 'undefined' && window.crypto
+        ? window.crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296
+        : Math.random();
+      this.bfmTerrainSeed = Math.floor(cryptoRandom * 1e9) + 1;
     },
     bfmTerrainGenerate() {
       const cfg = {

@@ -705,7 +705,10 @@ export class MuJoCoDemo {
     if (!this.simulation || !this.model) {
       return;
     }
-    const theta = Math.random() * Math.PI * 2;
+    const cryptoRandom = typeof window !== 'undefined' && window.crypto
+      ? window.crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296
+      : Math.random();
+    const theta = cryptoRandom * Math.PI * 2;
     this._knockdownDirX = Math.cos(theta);
     this._knockdownDirY = Math.sin(theta);
     this._knockdownSubstepsRemaining = 14;
