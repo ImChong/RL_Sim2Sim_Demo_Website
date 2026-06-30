@@ -70,3 +70,8 @@
 **Vulnerability:** Weak random number generation using `Math.random()`.
 **Learning:** `Math.random()` is not cryptographically secure, which could lead to predictable outcomes in simulation generation or terrain seeding.
 **Prevention:** Use `window.crypto.getRandomValues()` instead of `Math.random()` to ensure strong random number generation for security or unpredictability.
+
+## 2026-06-29 - [Zip Slip Path Traversal]
+**Vulnerability:** Path traversal (Zip Slip) vulnerability in file download handling.
+**Learning:** Writing files directly to the MuJoCo WASM virtual filesystem (`mujoco.FS.writeFile`) using paths sourced from external/downloaded files (like `files.json`) without validation allows malicious paths (e.g., `../` or `/`) to write outside the intended working directory.
+**Prevention:** Always validate relative paths to prevent directory traversal by checking against regex like `/(^|\/)\.\.(\/|$)/` and checking for absolute paths (`startsWith('/')`) before performing file system operations.

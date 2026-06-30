@@ -753,6 +753,9 @@ export async function downloadExampleScenesFolder(mujoco, onProgress, options = 
   });
 
   const writeToFs = (relativePath, data) => {
+    if (/(^|\/)\.\.(\/|$)/.test(relativePath) || relativePath.startsWith('/')) {
+      throw new Error(`Path traversal detected: ${relativePath}`);
+    }
     const split = relativePath.split('/');
     let working = '/working/';
     for (let f = 0; f < split.length - 1; f++) {
