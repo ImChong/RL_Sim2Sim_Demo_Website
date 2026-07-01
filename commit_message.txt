@@ -1,0 +1,4 @@
+feat: 添加 fetch 超时处理以增强网络请求安全性
+
+- 在 `fetchParkourBundleIosPatchStatus` 中的 `fetch` 请求增加了 `AbortController`，并设置了 10 秒超时。
+- 修复了因为缺失超时机制而可能导致的未受控网络请求挂起（DoS）的安全风险。

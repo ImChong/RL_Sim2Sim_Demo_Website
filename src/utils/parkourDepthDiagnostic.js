@@ -173,16 +173,19 @@ export function buildParkourDepthDiagnosticReport({
 
 /** Check whether the parkour iframe bundle includes the iOS depth readback patch. */
 export async function fetchParkourBundleIosPatchStatus(iframeSrc, fetchImpl = fetch) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
   try {
+    const fetchWithTimeout = (url) => fetchImpl(url, { signal: controller.signal });
     const base = new URL(iframeSrc, globalThis.location?.href ?? 'http://localhost/');
-    const html = await fetchImpl(base.href).then((response) => response.text());
+    const html = await fetchWithTimeout(base.href).then((response) => response.text());
     const scriptMatch = html.match(/assets\/index-[A-Za-z0-9_-]+\.js/);
     if (!scriptMatch) {
       return { hasIosPatch: false, bundleUrl: null, error: 'bundle_script_not_found' };
     }
 
     const bundleUrl = new URL(scriptMatch[0], base).href;
-    const bundle = await fetchImpl(bundleUrl).then((response) => response.text());
+    const bundle = await fetchWithTimeout(bundleUrl).then((response) => response.text());
     return {
       hasIosPatch: bundle.includes('_appleDepthReadback'),
       bundleUrl,
@@ -194,6 +197,8 @@ export async function fetchParkourBundleIosPatchStatus(iframeSrc, fetchImpl = fe
       bundleUrl: null,
       error: error?.message ? String(error.message) : String(error)
     };
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
