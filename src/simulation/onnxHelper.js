@@ -13,6 +13,8 @@ export class ONNXModule {
     this._carry = {};
     this._emptyCarry = {};
     this.architecture = null;
+    this._inferenceOutput = [null, this._carry];
+    this._inferenceOutputEmpty = [null, this._emptyCarry];
     console.log("isRecurrent", this.isRecurrent);
   }
 
@@ -80,8 +82,10 @@ export class ONNXModule {
     if (this.isRecurrent) {
       this._carry.is_init = this._isInitFalse;
       this._carry.adapt_hx = result['next,adapt_hx'];
-      return [result, this._carry];
+      this._inferenceOutput[0] = result;
+      return this._inferenceOutput;
     }
-    return [result, this._emptyCarry];
+    this._inferenceOutputEmpty[0] = result;
+    return this._inferenceOutputEmpty;
   }
 }

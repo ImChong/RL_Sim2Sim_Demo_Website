@@ -64,3 +64,6 @@
 ## 2024-03-24 - Pre-calculating actuator control ranges
 **Learning:** Checking the `actuator_ctrlrange` in the inner physics control loop (`applyJointPositionControl` and `applyUnitreePositionControl`) added unnecessary overhead and repeated array lookups because it is fixed per-model for all joint/actuator targets.
 **Action:** When setting up model bindings or mapping inputs (e.g. `configureJointMappings`), pre-compute fixed limits into flat TypedArrays (like `this.ctrlMinPolicy` and `this.ctrlMaxPolicy`) and evaluate bounds statically inside hot loops to reduce GC and lookup latency.
+## 2023-10-27 - Pre-allocated Array Returns in High-Frequency Inference Loops
+**Learning:** Returning multiple values as a newly instantiated array (e.g., `return [result, carry]`) from high-frequency methods like `ONNXModule.runInference` (called at 50Hz during simulation) creates substantial, continuous GC pressure due to array allocation on every tick.
+**Action:** Pre-allocate the return array as a class property (e.g., `this._inferenceOutput = [null, this._carry]`), mutate the necessary indices (e.g., `this._inferenceOutput[0] = result`), and return the pre-allocated instance. This eliminates array allocation inside the hot path while maintaining the expected return shape.
