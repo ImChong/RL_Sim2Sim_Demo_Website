@@ -661,16 +661,20 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
 
   parent.mujocoRoot = mujocoRoot;
   if (parent.lastSimState) {
-    parent.lastSimState.bodies = new Map();
-    parent.lastSimState.lights = new Map();
+    parent.lastSimState.bodies = [];
+    parent.lastSimState.lights = [];
     parent.lastSimState.tendons = {
       count: 0,
       matrix: parent.lastSimState.tendons?.matrix ?? new THREE.Matrix4()
     };
   }
 
-  parent.lastSimState.bodies.clear?.();
-  parent.lastSimState.lights.clear?.();
+  if (parent.lastSimState?.bodies) {
+    parent.lastSimState.bodies.length = 0;
+  }
+  if (parent.lastSimState?.lights) {
+    parent.lastSimState.lights.length = 0;
+  }
 
   return [model, data, simulation, bodies, lights];
 }
