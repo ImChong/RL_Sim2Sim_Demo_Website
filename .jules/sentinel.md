@@ -75,3 +75,7 @@
 **Vulnerability:** Path traversal (Zip Slip) vulnerability in file download handling.
 **Learning:** Writing files directly to the MuJoCo WASM virtual filesystem (`mujoco.FS.writeFile`) using paths sourced from external/downloaded files (like `files.json`) without validation allows malicious paths (e.g., `../` or `/`) to write outside the intended working directory.
 **Prevention:** Always validate relative paths to prevent directory traversal by checking against regex like `/(^|\/)\.\.(\/|$)/` and checking for absolute paths (`startsWith('/')`) before performing file system operations.
+## 2026-07-07 - Unresponsive network requests application hang (DoS)
+**Vulnerability:** External `fetch` calls lacked timeout mechanisms, which could cause the application to hang indefinitely if the external server is unresponsive.
+**Learning:** The native `fetch` API does not have a default timeout. Unresponsive endpoints can keep connections open, tying up resources.
+**Prevention:** Wrap all external network requests with an `AbortController` timeout or use a timeout-aware helper function.
