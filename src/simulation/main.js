@@ -163,9 +163,11 @@ export class MuJoCoDemo {
     this._dragPointVec = new THREE.Vector3();
     this._lightLookAt = new THREE.Vector3();
 
+    // Bolt: Use pre-allocated Arrays instead of Maps for high-frequency state caching
+    // to avoid iterator allocations and map lookup overhead per tick.
     this.lastSimState = {
-      bodies: new Map(),
-      lights: new Map(),
+      bodies: [],
+      lights: [],
       tendons: {
         count: 0,
         matrix: new THREE.Matrix4()
@@ -416,7 +418,7 @@ export class MuJoCoDemo {
     if (bodyId === null) {
       return;
     }
-    const cached = this.lastSimState.bodies.get(bodyId);
+    const cached = this.lastSimState.bodies[bodyId];
     if (!cached) {
       return;
     }
@@ -601,13 +603,13 @@ export class MuJoCoDemo {
           if (!this.bodies[b]) {
             continue;
           }
-          if (!this.lastSimState.bodies.has(b)) {
-            this.lastSimState.bodies.set(b, {
+          if (!this.lastSimState.bodies[b]) {
+            this.lastSimState.bodies[b] = {
               position: new THREE.Vector3(),
               quaternion: new THREE.Quaternion()
-            });
+            };
           }
-          const cached = this.lastSimState.bodies.get(b);
+          const cached = this.lastSimState.bodies[b];
           getPosition(simXpos, b, cached.position);
           getQuaternion(simXquat, b, cached.quaternion);
         }
@@ -619,13 +621,13 @@ export class MuJoCoDemo {
           if (!this.lights[l]) {
             continue;
           }
-          if (!this.lastSimState.lights.has(l)) {
-            this.lastSimState.lights.set(l, {
+          if (!this.lastSimState.lights[l]) {
+            this.lastSimState.lights[l] = {
               position: new THREE.Vector3(),
               direction: new THREE.Vector3()
-            });
+            };
           }
-          const cached = this.lastSimState.lights.get(l);
+          const cached = this.lastSimState.lights[l];
           getPosition(simLightXpos, l, cached.position);
           getPosition(simLightXdir, l, cached.direction);
         }
@@ -882,16 +884,20 @@ export class MuJoCoDemo {
     this.updateCameraFollow();
     this.controls.update();
 
-    for (const [b, cached] of this.lastSimState.bodies) {
-      if (this.bodies[b]) {
+    // Bolt: Use traditional for loop over Arrays instead of Map iterators
+    // to avoid allocating Iterator objects during high-frequency render loops.
+    for (let b = 0; b < this.lastSimState.bodies.length; b++) {
+      const cached = this.lastSimState.bodies[b];
+      if (cached && this.bodies[b]) {
         this.bodies[b].position.copy(cached.position);
         this.bodies[b].quaternion.copy(cached.quaternion);
         this.bodies[b].updateWorldMatrix();
       }
     }
 
-    for (const [l, cached] of this.lastSimState.lights) {
-      if (this.lights[l]) {
+    for (let l = 0; l < this.lastSimState.lights.length; l++) {
+      const cached = this.lastSimState.lights[l];
+      if (cached && this.lights[l]) {
         this.lights[l].position.copy(cached.position);
         this._lightLookAt.copy(cached.direction).add(this.lights[l].position);
         this.lights[l].lookAt(this._lightLookAt);

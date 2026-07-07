@@ -258,7 +258,10 @@ class TargetJointPosObs {
     let offset = 0;
     const halfLen = indices.length * tracking.nJoints;
 
-    for (const idx of indices) {
+    // Bolt: Replaced for...of with index-based loop over TypedArray
+    // to avoid Iterator allocation overhead in high-frequency compute path.
+    for (let i = 0; i < indices.length; i++) {
+      const idx = indices[i];
       const target = tracking.refJointPos[idx];
       this.out.set(target, offset);
       for (let j = 0; j < tracking.nJoints; j++) {
@@ -293,7 +296,10 @@ class TargetProjectedGravityBObs {
     }
     const indices = clampFutureIndices(tracking.refIdx, this.futureSteps, tracking.refLen, this._indices);
     let offset = 0;
-    for (const idx of indices) {
+    // Bolt: Replaced for...of with index-based loop over TypedArray
+    // to avoid Iterator allocation overhead in high-frequency compute path.
+    for (let i = 0; i < indices.length; i++) {
+      const idx = indices[i];
       normalizeQuat(tracking.refRootQuat[idx], this._quat);
       quatApplyInv(this._quat, this.g, this._gLocal);
       this.out[offset++] = this._gLocal[0];
