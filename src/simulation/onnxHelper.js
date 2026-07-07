@@ -22,9 +22,16 @@ export class ONNXModule {
    * @param {(ratio: number) => void} [onProgress] ratio in [0,1] for download + WASM session init
    */
   async init(onProgress) {
-    const modelResponse = await fetch(this.modelPath);
-    if (!modelResponse.ok) {
-      throw new Error(`Failed to fetch ONNX model ${this.modelPath}: ${modelResponse.status}`);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    let modelResponse;
+    try {
+      modelResponse = await fetch(this.modelPath, { signal: controller.signal });
+      if (!modelResponse.ok) {
+        throw new Error(`Failed to fetch ONNX model ${this.modelPath}: ${modelResponse.status}`);
+      }
+    } finally {
+      clearTimeout(timeoutId);
     }
     const bytes = await readResponseBodyWithProgress(modelResponse, (r) => {
       onProgress?.(0.82 * r);

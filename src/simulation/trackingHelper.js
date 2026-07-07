@@ -122,9 +122,16 @@ export class TrackingHelper {
     }
     const loadPromise = (async () => {
       const clipUrl = new URL(entry.file, this.motionBaseUrl).toString();
-      const response = await fetch(clipUrl);
-      if (!response.ok) {
-        throw new Error(`Failed to load motion clip from ${clipUrl}: ${response.status}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      let response;
+      try {
+        response = await fetch(clipUrl, { signal: controller.signal });
+        if (!response.ok) {
+          throw new Error(`Failed to load motion clip from ${clipUrl}: ${response.status}`);
+        }
+      } finally {
+        clearTimeout(timeoutId);
       }
       const clip = await response.json();
       const normalized = normalizeMotionClip(clip);

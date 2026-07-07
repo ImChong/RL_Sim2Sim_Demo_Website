@@ -83,12 +83,18 @@ async function fetchMotionClip(entry, baseUrl, onProgress) {
     throw new Error('Motion index entries must include a name and file path.');
   }
   const clipUrl = new URL(entry.file, baseUrl).toString();
-  const response = await fetch(clipUrl);
-  if (!response.ok) {
-    throw new Error(`Failed to load motion clip from ${clipUrl}: ${response.status}`);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  try {
+    const response = await fetch(clipUrl, { signal: controller.signal });
+    if (!response.ok) {
+      throw new Error(`Failed to load motion clip from ${clipUrl}: ${response.status}`);
+    }
+    const bytes = await readResponseBodyWithProgress(response, onProgress);
+    return JSON.parse(new TextDecoder('utf-8').decode(bytes));
+  } finally {
+    clearTimeout(timeoutId);
   }
-  const bytes = await readResponseBodyWithProgress(response, onProgress);
-  return JSON.parse(new TextDecoder('utf-8').decode(bytes));
 }
 
 async function loadMotionIndex(indexPayload, motionsUrl, onProgress, options = {}) {
@@ -729,9 +735,16 @@ function configureJointMappings(demo, jointNames) {
 export async function downloadExampleScenesFolder(mujoco, onProgress, options = {}) {
   const prefixes = options.prefixes ?? null;
   const listUrl = './examples/scenes/files.json';
-  const listResponse = await fetch(listUrl);
-  if (!listResponse.ok) {
-    throw new Error(`Failed to load scene file list: ${listResponse.status}`);
+  const listController = new AbortController();
+  const listTimeoutId = setTimeout(() => listController.abort(), 30000);
+  let listResponse;
+  try {
+    listResponse = await fetch(listUrl, { signal: listController.signal });
+    if (!listResponse.ok) {
+      throw new Error(`Failed to load scene file list: ${listResponse.status}`);
+    }
+  } finally {
+    clearTimeout(listTimeoutId);
   }
   const allFiles = JSON.parse(
     new TextDecoder('utf-8').decode(await readResponseBodyWithProgress(listResponse, (r) => {
@@ -771,16 +784,22 @@ export async function downloadExampleScenesFolder(mujoco, onProgress, options = 
   await Promise.all(
     filesToDownload.map(async (rel, i) => {
       const url = base + rel;
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Failed to load scene asset ${url}: ${response.status}`);
-      }
-      if (rel.match(/\.(png|stl|skn)$/i)) {
-        const buf = await readResponseBodyWithProgress(response, (r) => reporter(i, r));
-        writeToFs(rel, new Uint8Array(buf));
-      } else {
-        const buf = await readResponseBodyWithProgress(response, (r) => reporter(i, r));
-        writeToFs(rel, new TextDecoder('utf-8').decode(buf));
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      try {
+        const response = await fetch(url, { signal: controller.signal });
+        if (!response.ok) {
+          throw new Error(`Failed to load scene asset ${url}: ${response.status}`);
+        }
+        if (rel.match(/\.(png|stl|skn)$/i)) {
+          const buf = await readResponseBodyWithProgress(response, (r) => reporter(i, r));
+          writeToFs(rel, new Uint8Array(buf));
+        } else {
+          const buf = await readResponseBodyWithProgress(response, (r) => reporter(i, r));
+          writeToFs(rel, new TextDecoder('utf-8').decode(buf));
+        }
+      } finally {
+        clearTimeout(timeoutId);
       }
     })
   );
