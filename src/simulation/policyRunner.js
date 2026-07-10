@@ -139,7 +139,9 @@ export class PolicyRunner {
       this.tracking.reset(state);
     }
     const policyState = this.makePolicyState(state);
-    for (const obs of this.obsModules) {
+    // Bolt: Avoid for...of loops to prevent iterator allocation overhead
+    for (let i = 0; i < this.obsModules.length; i++) {
+      const obs = this.obsModules[i];
       if (typeof obs.reset === 'function') {
         obs.reset(policyState);
       }
@@ -164,7 +166,9 @@ export class PolicyRunner {
 
       const obsForPolicy = this.obsForPolicy;
       let offset = 0;
-      for (const obs of this.obsModules) {
+      // Bolt: Avoid for...of loops to prevent iterator allocation overhead in hot path
+      for (let i = 0; i < this.obsModules.length; i++) {
+        const obs = this.obsModules[i];
         if (typeof obs.update === 'function') {
           obs.update(policyState);
         }
