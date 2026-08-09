@@ -19,18 +19,18 @@ This is a **purely client-side SPA** (Vue 3 + Vite + Three.js + MuJoCo WASM + ON
 
 | Task | Command |
 |------|---------|
-| Install deps | `npm install` |
-| Dev server | `npm run dev` (port 3000, `--host` enabled) |
-| Unit tests | `npm test` (Node.js built-in test runner, 28 tests) |
+| Install deps | `npm ci` (or `npm install`) |
+| Dev server | `npm run dev` (port 3000, `--host` enabled; Cloud Agent starts this via `.cursor/environment.json` `terminals`) |
+| Unit tests | `npm test` (Node.js built-in test runner) |
 | Production build | `npm run build` |
-| E2E smoke test | `VITE_URL=http://127.0.0.1:3000/ node scripts/verify-knockdown-button.mjs` (needs `CHROME_PATH`; script default URL is port 5173) |
+| E2E smoke test | `VITE_URL=http://127.0.0.1:3000/ node scripts/verify-knockdown-button.mjs` (Chrome defaults to `/usr/local/bin/google-chrome`; script default URL is port 5173) |
 
 ### Notes for cloud agents
 
 - Node.js >= 20 is required. The VM ships with v22 which is fine.
-- Both `package-lock.json` and `pnpm-lock.yaml` exist; use **npm** (matches README and CI).
+- Both `package-lock.json` and `pnpm-lock.yaml` exist; use **npm** (matches README and CI). Cloud `install` uses `npm ci`.
 - No ESLint or Prettier is configured; there is no lint command.
-- The Vite dev server binds to `0.0.0.0:3000` (`--host` flag in the `dev` script).
+- The Vite dev server binds to `0.0.0.0:3000` (`--host` flag in the `dev` script) and is launched from `terminals` (not `install`/`start`) so logs stay visible in tmux.
 - WASM and ONNX model loading can take several seconds on first page load; wait for the progress dialog to reach 100% before interacting.
 - Motion clip controls are accessible via the robot icon button in the top navigation bar (not immediately visible on the main panel).
 - Commit messages must be in Chinese following the existing convention (see top of this file).
