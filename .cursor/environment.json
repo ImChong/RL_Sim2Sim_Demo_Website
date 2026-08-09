@@ -1,6 +1,13 @@
 {
+  "name": "RL Sim2Sim Demo Website",
   "install": "npm ci",
-  "start": "npm run dev -- --host 127.0.0.1 --port 3000",
+  "terminals": [
+    {
+      "name": "vite-dev",
+      "description": "Vite dev server for the Vue SPA (port 3000).",
+      "command": "npm run dev -- --port 3000"
+    }
+  ],
   "ports": [
     {
       "name": "vite-dev",
