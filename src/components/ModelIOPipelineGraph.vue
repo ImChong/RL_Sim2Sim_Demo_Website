@@ -98,6 +98,8 @@
               height: `${node.height}px`,
               transform: `translate(${node.x}px, ${node.y}px)`
             }"
+            :title="nodeClickHint(node)"
+            @click.stop="onNodeClick(node)"
           >
             <div class="pipeline-node-body">
               <span
@@ -135,7 +137,7 @@
                   </div>
                   <v-icon
                     v-if="isNodeClickable(node)"
-                    icon="mdi-chart-line-variant"
+                    :icon="nodeHintIcon(node)"
                     size="12"
                     class="pipeline-node-scope-hint"
                   />
@@ -156,7 +158,10 @@
 <script>
 import { buildPipelineGraph } from '@/simulation/pipelineGraphLayout.js';
 import { portPointFromLayoutNode } from '@/simulation/pipelineGraphEdgeCoords.js';
-import { nodeHasProbes } from '@/simulation/signalScope.js';
+import {
+  pipelineNodeClickAction,
+  pipelineNodeHintIcon
+} from '@/utils/pipelineNodeClick.js';
 
 let graphInstanceCounter = 0;
 
@@ -207,7 +212,7 @@ export default {
       default: () => []
     }
   },
-  emits: ['probe-node', 'open-scope'],
+  emits: ['probe-node', 'open-scope', 'open-architecture'],
   data: () => ({
     resizeObserver: null,
     arrowMarkerId: `pipeline-arrow-${++graphInstanceCounter}`,
@@ -235,12 +240,12 @@ export default {
     scrollHint() {
       if (this.isMobile) {
         return this.language === 'en'
-          ? 'Click a node to plot all of its signals in the scope · Drag canvas to pan · Pinch to zoom'
-          : '点击节点在示波器查看该节点全部信号曲线 · 拖空白平移画布 · 双指缩放';
+          ? 'Click a node for all its signals · Click Policy net for Architecture · Drag to pan · Pinch to zoom'
+          : '点击节点查看该节点全部曲线 · 点击策略网络打开模型架构 · 拖空白平移 · 双指缩放';
       }
       return this.language === 'en'
-        ? 'Click a node to plot all of its signals in the scope · Drag canvas to pan · Wheel to zoom'
-        : '点击节点在示波器查看该节点全部信号曲线 · 拖空白平移画布 · 滚轮缩放';
+        ? 'Click a node for all its signals · Click Policy net for Architecture · Drag to pan · Wheel to zoom'
+        : '点击节点查看该节点全部曲线 · 点击策略网络打开模型架构 · 拖空白平移 · 滚轮缩放';
     },
     viewportStyle() {
       if (this.isMobile) {
@@ -546,14 +551,33 @@ export default {
       const c2x = to.x - bend;
       return `M ${from.x} ${from.y} C ${c1x} ${from.y}, ${c1x} ${dropY}, ${(from.x + to.x) / 2} ${dropY} C ${c2x} ${dropY}, ${c2x} ${to.y}, ${to.x} ${to.y}`;
     },
+    nodeClickAction(node) {
+      return pipelineNodeClickAction(node);
+    },
     isNodeClickable(node) {
-      if (!node) {
-        return false;
+      return this.nodeClickAction(node) !== null;
+    },
+    nodeHintIcon(node) {
+      return pipelineNodeHintIcon(this.nodeClickAction(node));
+    },
+    nodeClickHint(node) {
+      const action = this.nodeClickAction(node);
+      if (action === 'open-architecture') {
+        return this.language === 'en'
+          ? 'Open ONNX architecture'
+          : '打开模型架构';
       }
-      if (node.kind === 'scope') {
-        return true;
+      if (action === 'open-scope') {
+        return this.language === 'en'
+          ? 'Open oscilloscope'
+          : '打开示波器';
       }
-      return nodeHasProbes(node);
+      if (action === 'probe-node') {
+        return this.language === 'en'
+          ? 'Plot all signals of this node in the oscilloscope'
+          : '在示波器中查看该节点的全部信号曲线';
+      }
+      return undefined;
     },
     isNodeProbed(node) {
       // Joint nodes only render a dimension summary, so match on the node id:
@@ -564,14 +588,18 @@ export default {
       return this.activeProbeIds.has(`${nodeId}:${lineKey}`);
     },
     onNodeClick(node) {
-      if (node.kind === 'scope') {
+      const action = this.nodeClickAction(node);
+      if (action === 'open-scope') {
         this.$emit('open-scope');
         return;
       }
-      if (!this.isNodeClickable(node)) {
+      if (action === 'open-architecture') {
+        this.$emit('open-architecture');
         return;
       }
-      this.$emit('probe-node', node);
+      if (action === 'probe-node') {
+        this.$emit('probe-node', node);
+      }
     }
   }
 };
@@ -778,6 +806,10 @@ export default {
   cursor: default;
   user-select: text;
   position: relative;
+}
+
+.pipeline-node-clickable {
+  cursor: pointer;
 }
 
 .pipeline-node-card-clickable {
