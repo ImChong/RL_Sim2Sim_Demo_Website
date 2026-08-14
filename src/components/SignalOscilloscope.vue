@@ -65,7 +65,11 @@
           {{ emptyLabel }}
         </div>
       </div>
-      <div v-if="snapshot.series.length" class="scope-legend">
+      <div
+        v-if="snapshot.series.length"
+        class="scope-legend"
+        :class="{ 'scope-legend-dense': isDenseLegend }"
+      >
         <button
           v-for="series in snapshot.series"
           :key="series.id"
@@ -166,6 +170,13 @@ export default {
     drawRaf: null,
     windowInput: 20
   }),
+  computed: {
+    // A joint node plots one curve per joint; tighten the legend so the list
+    // stays usable instead of turning into a long scroll of tall rows.
+    isDenseLegend() {
+      return this.snapshot.series.length > 10;
+    }
+  },
   watch: {
     windowSeconds: {
       immediate: true,
@@ -173,11 +184,11 @@ export default {
         this.windowInput = value;
       }
     },
-    snapshot: {
-      handler() {
-        this.scheduleDraw();
-      },
-      deep: true
+    // Not deep: the parent hands over a freshly built snapshot on every poll,
+    // so identity changes are enough. A deep watcher would walk every sample of
+    // every channel each tick, which is costly once a node plots 29 curves.
+    snapshot() {
+      this.scheduleDraw();
     },
     zoom: {
       handler() {
@@ -500,6 +511,25 @@ export default {
 .scope-legend-remove {
   opacity: 0.55;
   flex-shrink: 0;
+}
+
+.scope-legend-dense {
+  gap: 3px;
+}
+
+.scope-legend-dense .scope-legend-item {
+  padding: 2px 6px;
+  gap: 5px;
+  border-radius: 6px;
+}
+
+.scope-legend-dense .scope-legend-swatch {
+  width: 8px;
+  height: 8px;
+}
+
+.scope-legend-dense .scope-legend-label {
+  font-size: 0.6rem;
 }
 
 @media (max-width: 640px) {

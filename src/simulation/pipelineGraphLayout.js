@@ -294,7 +294,9 @@ function buildHorizontalAtomicGraph(telemetry, zh, atomic) {
     height: warehouseHeight,
     x: xWarehouse,
     y: coreY - warehouseHeight / 2,
-    lines: warehouseLines
+    lines: warehouseLines,
+    // Structural nodes describe the tensor layout, they carry no plottable signal.
+    probeKeys: []
   });
   col += 1;
 
@@ -315,7 +317,8 @@ function buildHorizontalAtomicGraph(telemetry, zh, atomic) {
       height: historyHeight,
       x: xHistory,
       y: coreY - historyHeight / 2,
-      lines: historyLines
+      lines: historyLines,
+      probeKeys: []
     });
     edges.push({ id: 'e-wh-hist', from: 'warehouse', to: 'history' });
     onnxFrom = 'history';
@@ -341,7 +344,8 @@ function buildHorizontalAtomicGraph(telemetry, zh, atomic) {
     height: onnxHeight,
     x: xOnnx,
     y: coreY - onnxHeight / 2,
-    lines: onnxLines
+    lines: onnxLines,
+    probeKeys: []
   });
   edges.push({ id: `e-${onnxFrom}-onnx`, from: onnxFrom, to: 'onnx' });
   lanes.push({
@@ -426,7 +430,8 @@ function buildVerticalAtomicGraph(telemetry, zh, atomic) {
     lines: [
       { k: zh ? '单帧' : 'frame', v: `${telemetry.concat.currentFrameSize}D` },
       ...(historyLabel ? [{ k: zh ? '历史' : 'hist', v: historyLabel }] : [])
-    ]
+    ],
+    probeKeys: []
   });
 
   if (hasHistory) {
@@ -435,7 +440,8 @@ function buildVerticalAtomicGraph(telemetry, zh, atomic) {
       kind: 'process',
       title: zh ? '历史缓冲' : 'History buffer',
       height: 52,
-      lines: [{ k: zh ? '窗口' : 'win', v: historyLabel }]
+      lines: [{ k: zh ? '窗口' : 'win', v: historyLabel }],
+      probeKeys: []
     });
   }
 
@@ -449,7 +455,8 @@ function buildVerticalAtomicGraph(telemetry, zh, atomic) {
     lines: [
       { k: 'in', v: shapeStr(telemetry.onnx.inputShape) },
       { k: 'act', v: formatVec(telemetry.onnx.clippedAction, 3) }
-    ]
+    ],
+    probeKeys: []
   });
 
   for (const node of atomic.filter((n) => n.group === 'output' || n.group === 'motor')) {

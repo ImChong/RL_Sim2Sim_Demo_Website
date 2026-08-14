@@ -212,7 +212,7 @@ export default {
       default: () => []
     }
   },
-  emits: ['probe-node', 'open-scope', 'open-architecture'],
+  emits: ['probe-node', 'open-scope', 'open-architecture', 'open-stack'],
   data: () => ({
     resizeObserver: null,
     arrowMarkerId: `pipeline-arrow-${++graphInstanceCounter}`,
@@ -234,15 +234,18 @@ export default {
     activeProbeIds() {
       return new Set(this.activeProbes.map((probe) => probe.id));
     },
+    probedNodeIds() {
+      return new Set(this.activeProbes.map((probe) => probe.nodeId));
+    },
     scrollHint() {
       if (this.isMobile) {
         return this.language === 'en'
-          ? 'Click a node for its signals · Click Policy net for Architecture · Drag to pan · Pinch to zoom'
-          : '点击节点查看示波器 · 点击策略网络打开模型架构 · 拖空白平移 · 双指缩放';
+          ? 'Click a node for all its signals · Click Policy net for Architecture · Drag to pan · Pinch to zoom'
+          : '点击节点查看该节点全部曲线 · 点击策略网络打开模型架构 · 拖空白平移 · 双指缩放';
       }
       return this.language === 'en'
-        ? 'Click a node for its signals · Click Policy net for Architecture · Drag to pan · Wheel to zoom'
-        : '点击节点查看示波器 · 点击策略网络打开模型架构 · 拖空白平移 · 滚轮缩放';
+        ? 'Click a node for all its signals · Click Policy net for Architecture · Drag to pan · Wheel to zoom'
+        : '点击节点查看该节点全部曲线 · 点击策略网络打开模型架构 · 拖空白平移 · 滚轮缩放';
     },
     viewportStyle() {
       if (this.isMobile) {
@@ -569,18 +572,22 @@ export default {
           ? 'Open oscilloscope'
           : '打开示波器';
       }
+      if (action === 'open-stack') {
+        return this.language === 'en'
+          ? 'Show how the observation tensor is stacked'
+          : '查看观测张量的堆叠方式';
+      }
       if (action === 'probe-node') {
         return this.language === 'en'
-          ? 'Plot this node in the oscilloscope'
-          : '在示波器中查看该节点信号';
+          ? 'Plot all signals of this node in the oscilloscope'
+          : '在示波器中查看该节点的全部信号曲线';
       }
       return undefined;
     },
     isNodeProbed(node) {
-      if (!node?.lines?.length) {
-        return false;
-      }
-      return node.lines.some((line) => this.isLineProbed(node.id, line.k));
+      // Joint nodes only render a dimension summary, so match on the node id:
+      // their channels are keyed by joint name, not by a rendered line.
+      return Boolean(node?.id) && this.probedNodeIds.has(node.id);
     },
     isLineProbed(nodeId, lineKey) {
       return this.activeProbeIds.has(`${nodeId}:${lineKey}`);
@@ -593,6 +600,10 @@ export default {
       }
       if (action === 'open-architecture') {
         this.$emit('open-architecture');
+        return;
+      }
+      if (action === 'open-stack') {
+        this.$emit('open-stack');
         return;
       }
       if (action === 'probe-node') {

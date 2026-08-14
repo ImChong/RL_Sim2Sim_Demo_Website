@@ -1,12 +1,20 @@
-import { isProbeableLine } from '../simulation/signalScope.js';
+import { nodeHasProbes } from '../simulation/signalScope.js';
 
 export function isArchitectureNode(node) {
   return node?.kind === 'model' || node?.id === 'onnx';
 }
 
 /**
+ * Structural nodes describe how the observation vector is assembled rather than
+ * carrying a signal, so clicking them opens the stacking view.
+ */
+export function isStackNode(node) {
+  return node?.kind === 'warehouse' || node?.id === 'warehouse' || node?.id === 'history';
+}
+
+/**
  * Decide what clicking a pipeline graph node should do.
- * @returns {'open-architecture' | 'open-scope' | 'probe-node' | null}
+ * @returns {'open-architecture' | 'open-scope' | 'open-stack' | 'probe-node' | null}
  */
 export function pipelineNodeClickAction(node) {
   if (!node) {
@@ -18,7 +26,12 @@ export function pipelineNodeClickAction(node) {
   if (isArchitectureNode(node)) {
     return 'open-architecture';
   }
-  if (node.lines?.some((line) => isProbeableLine(line))) {
+  if (isStackNode(node)) {
+    return 'open-stack';
+  }
+  // Not the rendered lines: nodes that only show a dimension summary
+  // ("dim 23D") still expose one scope channel per joint.
+  if (nodeHasProbes(node)) {
     return 'probe-node';
   }
   return null;
@@ -27,6 +40,9 @@ export function pipelineNodeClickAction(node) {
 export function pipelineNodeHintIcon(action) {
   if (action === 'open-architecture') {
     return 'mdi-sitemap-outline';
+  }
+  if (action === 'open-stack') {
+    return 'mdi-layers-outline';
   }
   return 'mdi-chart-line-variant';
 }

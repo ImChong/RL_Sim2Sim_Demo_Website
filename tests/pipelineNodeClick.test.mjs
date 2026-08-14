@@ -4,6 +4,7 @@ import { buildPipelineGraph } from '../src/simulation/pipelineGraphLayout.js';
 import { buildAtomicNodes } from '../src/simulation/pipelineAtomicNodes.js';
 import {
   isArchitectureNode,
+  isStackNode,
   pipelineNodeClickAction,
   pipelineNodeHintIcon
 } from '../src/utils/pipelineNodeClick.js';
@@ -100,6 +101,27 @@ test('pipelineNodeClickAction opens scope for the scope sink', () => {
   const scope = graph.nodes.find((n) => n.id === 'out-scope');
   assert.ok(scope);
   assert.equal(pipelineNodeClickAction(scope), 'open-scope');
+});
+
+test('pipelineNodeClickAction opens the stacking view for structural nodes', () => {
+  const graph = buildPipelineGraph(telemetry, 'zh');
+  const warehouse = graph.nodes.find((n) => n.id === 'warehouse');
+  const history = graph.nodes.find((n) => n.id === 'history');
+  assert.ok(warehouse);
+  assert.ok(history);
+  assert.equal(isStackNode(warehouse), true);
+  assert.equal(isStackNode(history), true);
+  assert.equal(pipelineNodeClickAction(warehouse), 'open-stack');
+  assert.equal(pipelineNodeClickAction(history), 'open-stack');
+  assert.equal(pipelineNodeHintIcon('open-stack'), 'mdi-layers-outline');
+});
+
+test('pipelineNodeClickAction plots nodes that only show a dimension summary', () => {
+  const graph = buildPipelineGraph(telemetry, 'en');
+  const jointPos = graph.nodes.find((n) => n.id === 'sim-joint-pos');
+  assert.equal(jointPos.lines.length, 1);
+  assert.equal(jointPos.lines[0].k, 'dim');
+  assert.equal(pipelineNodeClickAction(jointPos), 'probe-node');
 });
 
 test('pipelineNodeClickAction probes signal nodes and ignores empty nodes', () => {
