@@ -104,6 +104,7 @@
             :active-probes="activeProbes"
             @probe-node="onProbeNode"
             @open-scope="openScopeTab"
+            @open-architecture="openArchitectureTab"
           />
           <OnnxNetronViewer
             v-if="viewTab === 'architecture'"
@@ -205,7 +206,7 @@ const translations = {
     tabGraph: 'Graph',
     tabArchitecture: 'Architecture',
     tabScope: 'Scope',
-    graphHint: 'Click a node to view its signals in the scope',
+    graphHint: 'Click a node to view its signals · Click Policy net to open Architecture',
     scopeChannels: 'Channels',
     scopeSamples: 'Samples',
     scopeWindow: 'Window',
@@ -232,7 +233,7 @@ const translations = {
     tabGraph: '流程图',
     tabArchitecture: '模型架构',
     tabScope: '示波器',
-    graphHint: '点击节点在示波器查看信号曲线',
+    graphHint: '点击节点在示波器查看信号 · 点击策略网络打开模型架构',
     scopeChannels: '通道',
     scopeSamples: '采样',
     scopeWindow: '窗口',
@@ -512,6 +513,9 @@ export default {
     },
     openScopeTab() {
       this.viewTab = 'scope';
+    },
+    openArchitectureTab() {
+      this.viewTab = 'architecture';
     },
     toggleScopePause() {
       this.signalScope.paused = !this.signalScope.paused;
