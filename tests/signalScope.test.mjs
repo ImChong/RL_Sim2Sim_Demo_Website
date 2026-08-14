@@ -286,6 +286,29 @@ test('resolveSignalValue reads raw observation blocks by block-local index', () 
   assert.equal(resolveSignalValue(runner, null, { nodeId: 'obs-CustomBlock', lineKey: '[2]' }), 12);
 });
 
+test('resolveSignalValue reads the newest frame of a history window', () => {
+  const numObs = 3;
+  const historyLength = 4;
+  const fullObs = new Float32Array(numObs * historyLength);
+  // [oldest … newest]: PolicyRunner appends the current frame at the end.
+  fullObs.set([0.1, 0.2, 0.3], 0);
+  fullObs.set([9.1, 9.2, 9.3], numObs * (historyLength - 1));
+  const runner = {
+    policyJointNames: [],
+    numActions: 0,
+    numObs,
+    historyLength,
+    fullObs,
+    obsForPolicy: fullObs.subarray(0, numObs),
+    obsModules: [{ size: 3 }],
+    config: { obs_config: { policy: [{ name: 'RootAngVelB' }] } }
+  };
+
+  const read = (lineKey) => resolveSignalValue(runner, null, { nodeId: 'obs-RootAngVelB', lineKey });
+  assert.ok(Math.abs(read('x') - 9.1) < 1e-5);
+  assert.ok(Math.abs(read('z') - 9.3) < 1e-5);
+});
+
 test('setScopeProbes keeps probes from a single node only', () => {
   const scope = createSignalScope({ capacity: 8, maxChannels: 8 });
   setScopeProbes(scope, [

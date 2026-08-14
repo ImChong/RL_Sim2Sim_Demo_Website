@@ -65,15 +65,29 @@ function vecComponent(values, key, map = VEC3_COMPONENT_INDEX) {
   return Number(values[idx]);
 }
 
+/**
+ * Offset of the newest frame inside the observation buffer.
+ * fullObs holds [oldest … newest] (PolicyRunner shifts frames forward), so a
+ * within-frame offset has to be rebased or the scope plots the oldest frame.
+ */
+function obsFrameBase(runner) {
+  const historyLength = runner?.historyLength ?? 1;
+  if (historyLength > 1) {
+    return (historyLength - 1) * (runner.numObs ?? 0);
+  }
+  return 0;
+}
+
 function readObsScalar(runner, offset) {
   if (!runner || !Number.isInteger(offset) || offset < 0) {
     return NaN;
   }
   const data = runner.historyLength > 1 ? runner.fullObs : runner.obsForPolicy;
-  if (!data || offset >= data.length) {
+  const index = obsFrameBase(runner) + offset;
+  if (!data || index >= data.length) {
     return NaN;
   }
-  return Number(data[offset]);
+  return Number(data[index]);
 }
 
 /**
@@ -180,7 +194,8 @@ function readObsSlice(runner, offset, size) {
   if (!data) {
     return [];
   }
-  return Array.from(data.subarray(offset, offset + size));
+  const start = obsFrameBase(runner) + offset;
+  return Array.from(data.subarray(start, start + size));
 }
 
 function buildObsOffsetLookup(runner) {

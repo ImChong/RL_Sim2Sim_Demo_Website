@@ -17,6 +17,7 @@
     "verify:record-model-io-flowchart-ops": "node scripts/record-model-io-flowchart-ops-video.mjs",
     "verify:e2e-knockdown": "node scripts/verify-knockdown-button.mjs",
     "verify:e2e-policy-net-architecture": "node scripts/verify-policy-net-architecture.mjs",
+    "verify:e2e-obs-stack-view": "node scripts/verify-obs-stack-view.mjs",
     "verify:e2e-parkour-cross": "node scripts/verify-parkour-cross-obstacle.mjs",
     "verify:e2e-parkour-depth": "node scripts/verify-parkour-depth.mjs",
     "verify:record-parkour-ios": "node scripts/record-parkour-ios-verify.mjs"

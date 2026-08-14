@@ -67,9 +67,13 @@
             <v-icon icon="mdi-graph-outline" size="small" start />
             {{ t.tabGraph }}
           </v-btn>
+          <v-btn value="stack" size="x-small" variant="text">
+            <v-icon icon="mdi-layers-outline" size="small" :start="!isSmallScreen" />
+            <span v-if="!isSmallScreen">{{ t.tabStack }}</span>
+          </v-btn>
           <v-btn value="architecture" size="x-small" variant="text">
-            <v-icon icon="mdi-sitemap-outline" size="small" start />
-            {{ t.tabArchitecture }}
+            <v-icon icon="mdi-sitemap-outline" size="small" :start="!isSmallScreen" />
+            <span v-if="!isSmallScreen">{{ t.tabArchitecture }}</span>
           </v-btn>
           <v-btn value="scope" size="x-small" variant="text">
             <v-icon icon="mdi-chart-line-variant" size="small" start />
@@ -105,6 +109,12 @@
             @probe-node="onProbeNode"
             @open-scope="openScopeTab"
             @open-architecture="openArchitectureTab"
+            @open-stack="openStackTab"
+          />
+          <ObsStackChart
+            v-if="viewTab === 'stack'"
+            :layout="stackLayout"
+            :labels="stackLabels"
           />
           <OnnxNetronViewer
             v-if="viewTab === 'architecture'"
@@ -167,8 +177,10 @@
 <script>
 import { buildPolicyTelemetry } from '@/simulation/policyTelemetry.js';
 import ModelIOPipelineGraph from '@/components/ModelIOPipelineGraph.vue';
+import ObsStackChart from '@/components/ObsStackChart.vue';
 import OnnxNetronViewer from '@/components/OnnxNetronViewer.vue';
 import SignalOscilloscope from '@/components/SignalOscilloscope.vue';
+import { buildObsStackLayout } from '@/simulation/obsStackLayout.js';
 import {
   clearScopeBuffer,
   createSignalScope,
@@ -205,9 +217,22 @@ const translations = {
     resizeHeight: 'Resize panel height (top edge)',
     resizeBoth: 'Resize panel (top-right corner)',
     tabGraph: 'Graph',
+    tabStack: 'Stacking',
     tabArchitecture: 'Architecture',
     tabScope: 'Scope',
-    graphHint: 'Click a node to plot all of its signals · Click Policy net to open Architecture',
+    graphHint: 'Click a node to plot all of its signals · Obs Warehouse shows the tensor stacking · Policy net opens Architecture',
+    stackEmpty: 'The observation layout appears once the policy is running.',
+    stackFrame: 'frame',
+    stackHistory: 'history',
+    stackTensor: 'tensor',
+    stackInput: 'ONNX input',
+    stackFrameTitle: 'Frame composition (concat order)',
+    stackTitle: 'Tensor stacking',
+    stackLatestLast: 'oldest first · newest frame last',
+    stackSingleFrame: 'single frame · no history window',
+    stackColBlock: 'Block',
+    stackColSize: 'Size',
+    stackColRange: 'Range',
     scopeChannels: 'Channels',
     scopeSamples: 'Samples',
     scopeWindow: 'Window',
@@ -232,9 +257,22 @@ const translations = {
     resizeHeight: '拖拽上边框调整高度',
     resizeBoth: '拖拽右上角同时调整',
     tabGraph: '流程图',
+    tabStack: '数据堆叠',
     tabArchitecture: '模型架构',
     tabScope: '示波器',
-    graphHint: '点击节点在示波器查看该节点全部信号曲线 · 点击策略网络打开模型架构',
+    graphHint: '点击节点查看该节点全部信号曲线 · 点击观测仓库查看张量堆叠 · 点击策略网络打开模型架构',
+    stackEmpty: '策略就绪后显示观测张量的堆叠结构。',
+    stackFrame: '单帧',
+    stackHistory: '历史',
+    stackTensor: '张量',
+    stackInput: 'ONNX 输入',
+    stackFrameTitle: '单帧观测构成（按拼接顺序）',
+    stackTitle: '张量堆叠',
+    stackLatestLast: '最旧在前 · 最新一帧在末尾',
+    stackSingleFrame: '单帧输入 · 无历史窗口',
+    stackColBlock: '观测块',
+    stackColSize: '维度',
+    stackColRange: '区间',
     scopeChannels: '通道',
     scopeSamples: '采样',
     scopeWindow: '窗口',
@@ -253,6 +291,7 @@ export default {
   name: 'ModelIOFlowchart',
   components: {
     ModelIOPipelineGraph,
+    ObsStackChart,
     OnnxNetronViewer,
     SignalOscilloscope
   },
@@ -319,6 +358,26 @@ export default {
     },
     t() {
       return translations[this.language === 'en' ? 'en' : 'zh'];
+    },
+    stackLayout() {
+      return buildObsStackLayout(this.telemetry);
+    },
+    stackLabels() {
+      const t = this.t;
+      return {
+        empty: t.stackEmpty,
+        frame: t.stackFrame,
+        history: t.stackHistory,
+        tensor: t.stackTensor,
+        input: t.stackInput,
+        frameTitle: t.stackFrameTitle,
+        stackTitle: t.stackTitle,
+        latestLast: t.stackLatestLast,
+        singleFrame: t.stackSingleFrame,
+        colBlock: t.stackColBlock,
+        colSize: t.stackColSize,
+        colRange: t.stackColRange
+      };
     },
     scopeWindowMinSeconds() {
       return MIN_SCOPE_WINDOW_SECONDS;
@@ -517,6 +576,9 @@ export default {
     },
     openArchitectureTab() {
       this.viewTab = 'architecture';
+    },
+    openStackTab() {
+      this.viewTab = 'stack';
     },
     toggleScopePause() {
       this.signalScope.paused = !this.signalScope.paused;

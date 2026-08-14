@@ -212,7 +212,7 @@ export default {
       default: () => []
     }
   },
-  emits: ['probe-node', 'open-scope', 'open-architecture'],
+  emits: ['probe-node', 'open-scope', 'open-architecture', 'open-stack'],
   data: () => ({
     resizeObserver: null,
     arrowMarkerId: `pipeline-arrow-${++graphInstanceCounter}`,
@@ -572,6 +572,11 @@ export default {
           ? 'Open oscilloscope'
           : '打开示波器';
       }
+      if (action === 'open-stack') {
+        return this.language === 'en'
+          ? 'Show how the observation tensor is stacked'
+          : '查看观测张量的堆叠方式';
+      }
       if (action === 'probe-node') {
         return this.language === 'en'
           ? 'Plot all signals of this node in the oscilloscope'
@@ -595,6 +600,10 @@ export default {
       }
       if (action === 'open-architecture') {
         this.$emit('open-architecture');
+        return;
+      }
+      if (action === 'open-stack') {
+        this.$emit('open-stack');
         return;
       }
       if (action === 'probe-node') {
