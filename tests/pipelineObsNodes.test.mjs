@@ -44,6 +44,28 @@ test('decomposeObsBlockNodes splits TrackingCommandObsRaw', () => {
   assert.ok(nodes.find((n) => n.id === 'obs-TrackingCommandObsRaw-r6'));
 });
 
+test('decomposeObsBlockNodes exposes every channel of a block', () => {
+  const [prevActions] = decomposeObsBlockNodes(
+    { name: 'PrevActions', offset: 0, size: 2, kwargs: { history_steps: 1 } },
+    null,
+    ['left_hip_joint', 'right_knee_joint'],
+    'zh',
+    2
+  );
+  assert.deepEqual(prevActions.probeKeys, ['L_hip', 'R_knee']);
+
+  const [raw] = decomposeObsBlockNodes(
+    { name: 'CustomBlock', offset: 8, size: 3 },
+    new Float32Array([1, 2, 3]),
+    [],
+    'en',
+    0
+  );
+  // Indices are local to the block so the scope reads blockOffset + i.
+  assert.deepEqual(raw.lines.map((line) => line.k), ['[0]', '[1]', '[2]']);
+  assert.deepEqual(raw.probeKeys, ['[0]', '[1]', '[2]']);
+});
+
 test('inferPolicyFamily detects tracking, amp, and parkour', () => {
   assert.equal(inferPolicyFamily({
     config: { obs_config: { policy: [{ name: 'BootIndicator' }] } }

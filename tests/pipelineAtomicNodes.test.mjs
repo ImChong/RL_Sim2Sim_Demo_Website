@@ -44,6 +44,20 @@ test('buildAtomicNodes splits command and root signals', () => {
   assert.equal(obsJointPos.lines[0].v, '2D');
 });
 
+test('buildAtomicNodes carries the full channel list on summarized nodes', () => {
+  const nodes = buildAtomicNodes(runner, state, obsVector, obsLayout, 'en');
+  const jointPos = nodes.find((n) => n.id === 'sim-joint-pos');
+  assert.deepEqual(jointPos.probeKeys, ['hip', 'knee']);
+
+  const obsJointPos = nodes.find((n) => n.id === 'obs-JointPos');
+  assert.deepEqual(obsJointPos.probeKeys, ['hip', 'knee']);
+
+  assert.deepEqual(nodes.find((n) => n.id === 'sim-root-quat').probeKeys, ['w', 'x', 'y', 'z']);
+  assert.deepEqual(nodes.find((n) => n.id === 'sim-root-angvel').probeKeys, ['x', 'y', 'z']);
+  // Static configuration, never a plotted signal.
+  assert.deepEqual(nodes.find((n) => n.id === 'prep-action-clip').probeKeys, []);
+});
+
 test('buildAtomicNodes includes per-joint policy output', () => {
   const nodes = buildAtomicNodes(runner, state, obsVector, obsLayout, 'zh', [
     { name: 'hip', ctrl: 1.2 }

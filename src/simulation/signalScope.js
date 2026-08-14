@@ -1,21 +1,13 @@
 import { clampScopeWindowSeconds } from '../utils/scopeWindowPreference.js';
 import { registerObsNodeOffsets } from './pipelineObsNodes.js';
+import { shortJointName } from './jointLabels.js';
+import { MAX_SCOPE_CHANNELS, scopeChannelColor } from './scopeChannels.js';
 
 const DEFAULT_CAPACITY = 3000;
-const DEFAULT_MAX_CHANNELS = 8;
 export const DEFAULT_WINDOW_SECONDS = 20;
 export const MIN_WINDOW_SECONDS = 10;
 
-export const SCOPE_CHANNEL_COLORS = [
-  '#00d992',
-  '#4cb3d4',
-  '#f59e0b',
-  '#ef4444',
-  '#a78bfa',
-  '#22d3ee',
-  '#f472b6',
-  '#84cc16'
-];
+export { MAX_SCOPE_CHANNELS, SCOPE_CHANNEL_COLORS, scopeChannelColor } from './scopeChannels.js';
 
 export function buildProbeId(nodeId, lineKey) {
   return `${nodeId}:${lineKey}`;
@@ -32,30 +24,40 @@ export function parseProbeId(probeId) {
   };
 }
 
-function shortJointName(name) {
-  if (!name) {
-    return 'j';
+// Joint names never change for a loaded policy, so the short-name → index
+// lookup is built once per runner instead of scanned per channel per sample.
+const jointIndexCache = new WeakMap();
+
+function getJointIndexLookup(runner) {
+  if (!runner) {
+    return null;
   }
-  return name
-    .replace(/_joint$/, '')
-    .replace(/^left_/, 'L_')
-    .replace(/^right_/, 'R_');
+  const names = runner.policyJointNames ?? [];
+  const cached = jointIndexCache.get(runner);
+  if (cached && cached.names === names) {
+    return cached.map;
+  }
+  const map = new Map();
+  for (let i = 0; i < names.length; i++) {
+    map.set(shortJointName(names[i]), i);
+  }
+  jointIndexCache.set(runner, { names, map });
+  return map;
 }
 
-function findJointIndex(jointNames, lineKey) {
-  if (!jointNames?.length || !lineKey) {
+function findJointIndex(jointIndex, lineKey) {
+  if (!jointIndex || !lineKey) {
     return -1;
   }
-  for (let i = 0; i < jointNames.length; i++) {
-    if (shortJointName(jointNames[i]) === lineKey) {
-      return i;
-    }
-  }
-  return -1;
+  const idx = jointIndex.get(lineKey);
+  return idx === undefined ? -1 : idx;
 }
 
-function vecComponent(values, key) {
-  const map = { x: 0, y: 1, z: 2, w: 0 };
+const VEC3_COMPONENT_INDEX = { x: 0, y: 1, z: 2 };
+// Quaternions are stored as [w, x, y, z], so the components shift by one.
+const QUAT_COMPONENT_INDEX = { w: 0, x: 1, y: 2, z: 3 };
+
+function vecComponent(values, key, map = VEC3_COMPONENT_INDEX) {
   const idx = map[key];
   if (idx === undefined || !values?.length) {
     return NaN;
@@ -79,14 +81,20 @@ function readObsScalar(runner, offset) {
  * @param {import('./policyRunner.js').PolicyRunner | null} runner
  * @param {import('./main.js').MuJoCoDemo | null} demo
  * @param {{ nodeId: string, lineKey: string }} probe
+ * @param {{ state?: object | null, obsLookup?: Map | null } | null} [context]
+ *   Per-sample cache shared by every channel of one sample. A full joint node
+ *   plots dozens of channels, so re-reading the policy state and rebuilding the
+ *   observation layout per channel would be O(channels²) work each tick.
  */
-export function resolveSignalValue(runner, demo, probe) {
+export function resolveSignalValue(runner, demo, probe, context = null) {
   if (!runner || !probe?.nodeId) {
     return NaN;
   }
   const { nodeId, lineKey } = probe;
-  const state = demo?.readPolicyState?.() ?? null;
-  const jointNames = runner.policyJointNames ?? [];
+  const state = context && 'state' in context
+    ? context.state
+    : (demo?.readPolicyState?.() ?? null);
+  const jointIndex = getJointIndexLookup(runner);
 
   if (nodeId === 'sim-cmd-vx') return Number(state?.cmd?.[0] ?? 0);
   if (nodeId === 'sim-cmd-vy') return Number(state?.cmd?.[1] ?? 0);
@@ -94,33 +102,35 @@ export function resolveSignalValue(runner, demo, probe) {
 
   if (nodeId === 'sim-root-pos') return vecComponent(state?.rootPos, lineKey);
   if (nodeId === 'sim-root-angvel') return vecComponent(state?.rootAngVel, lineKey);
-  if (nodeId === 'sim-root-quat') return vecComponent(state?.rootQuat, lineKey);
+  if (nodeId === 'sim-root-quat') {
+    return vecComponent(state?.rootQuat, lineKey, QUAT_COMPONENT_INDEX);
+  }
 
   if (nodeId === 'sim-joint-pos') {
-    const idx = findJointIndex(jointNames, lineKey);
+    const idx = findJointIndex(jointIndex, lineKey);
     return idx >= 0 ? Number(state?.jointPos?.[idx] ?? NaN) : NaN;
   }
   if (nodeId === 'sim-joint-vel') {
-    const idx = findJointIndex(jointNames, lineKey);
+    const idx = findJointIndex(jointIndex, lineKey);
     return idx >= 0 ? Number(state?.jointVel?.[idx] ?? NaN) : NaN;
   }
 
   if (nodeId === 'prep-joint-rel') {
-    const idx = findJointIndex(jointNames, lineKey);
+    const idx = findJointIndex(jointIndex, lineKey);
     return idx >= 0 ? Number(runner.cachedJointPosRel?.[idx] ?? NaN) : NaN;
   }
 
   if (nodeId === 'out-action') {
-    const idx = findJointIndex(jointNames, lineKey);
+    const idx = findJointIndex(jointIndex, lineKey);
     return idx >= 0 ? Number(runner.lastActions?.[idx] ?? NaN) : NaN;
   }
   if (nodeId === 'out-target') {
-    const idx = findJointIndex(jointNames, lineKey);
+    const idx = findJointIndex(jointIndex, lineKey);
     return idx >= 0 ? Number(runner.target?.[idx] ?? NaN) : NaN;
   }
 
   if (nodeId === 'motor-torque') {
-    const idx = findJointIndex(jointNames, lineKey);
+    const idx = findJointIndex(jointIndex, lineKey);
     if (idx < 0) {
       return NaN;
     }
@@ -137,7 +147,7 @@ export function resolveSignalValue(runner, demo, probe) {
   }
 
   if (nodeId.startsWith('obs-')) {
-    const obsLayout = buildObsOffsetLookup(runner);
+    const obsLayout = context?.obsLookup ?? getObsOffsetLookup(runner);
     const entry = obsLayout.get(nodeId);
     if (!entry) {
       return NaN;
@@ -149,7 +159,7 @@ export function resolveSignalValue(runner, demo, probe) {
       );
     }
     if (entry.kind === 'joint') {
-      const idx = findJointIndex(jointNames, lineKey);
+      const idx = findJointIndex(jointIndex, lineKey);
       return idx >= 0 ? readObsScalar(runner, entry.offset + idx) : NaN;
     }
     if (entry.kind === 'scalar') {
@@ -189,6 +199,39 @@ function buildObsOffsetLookup(runner) {
   return map;
 }
 
+// The layout only changes when a new policy is loaded (which rebuilds
+// obsModules), so it is cached per runner instead of per resolved sample.
+const obsLookupCache = new WeakMap();
+
+function getObsOffsetLookup(runner) {
+  if (!runner?.obsModules) {
+    return new Map();
+  }
+  const cached = obsLookupCache.get(runner);
+  if (cached && cached.modules === runner.obsModules && cached.config === runner.config) {
+    return cached.map;
+  }
+  const map = buildObsOffsetLookup(runner);
+  obsLookupCache.set(runner, {
+    modules: runner.obsModules,
+    config: runner.config,
+    map
+  });
+  return map;
+}
+
+/**
+ * Values shared by every channel of a single sample.
+ * @param {object | null} runner
+ * @param {object | null} demo
+ */
+function createSampleContext(runner, demo) {
+  return {
+    state: demo?.readPolicyState?.() ?? null,
+    obsLookup: runner ? getObsOffsetLookup(runner) : null
+  };
+}
+
 export function setScopeWindowSeconds(scope, seconds) {
   if (!scope) {
     return DEFAULT_WINDOW_SECONDS;
@@ -200,7 +243,7 @@ export function setScopeWindowSeconds(scope, seconds) {
 
 export function createSignalScope(options = {}) {
   const capacity = options.capacity ?? DEFAULT_CAPACITY;
-  const maxChannels = options.maxChannels ?? DEFAULT_MAX_CHANNELS;
+  const maxChannels = options.maxChannels ?? MAX_SCOPE_CHANNELS;
   const windowSeconds = options.windowSeconds ?? DEFAULT_WINDOW_SECONDS;
   return {
     capacity,
@@ -226,19 +269,45 @@ export function isProbeableLine(line) {
   );
 }
 
+/**
+ * Every scope channel a pipeline node exposes.
+ *
+ * Node cards summarize wide signals (`维度 23D`), so the full channel list is
+ * carried on the node as `probeKeys`; only nodes without that hint fall back to
+ * the rendered lines. An explicit empty `probeKeys` means "not a live signal".
+ * @param {{ id: string, probeKeys?: string[], lines?: Array<{ k: string }> }} node
+ * @returns {string[]}
+ */
+export function nodeProbeKeys(node) {
+  if (!node) {
+    return [];
+  }
+  if (Array.isArray(node.probeKeys)) {
+    return node.probeKeys;
+  }
+  return (node.lines ?? [])
+    .filter((line) => isProbeableLine(line))
+    .map((line) => line.k);
+}
+
+export function nodeHasProbes(node) {
+  return nodeProbeKeys(node).length > 0;
+}
+
+/**
+ * Build the default probe set for a node: all of its curves.
+ */
 export function listNodeProbes(node) {
-  if (!node?.lines?.length) {
+  if (!node?.id) {
     return [];
   }
   const title = node.title ?? node.id;
-  return node.lines
-    .filter((line) => isProbeableLine(line))
-    .map((line) => ({
-      id: buildProbeId(node.id, line.k),
-      nodeId: node.id,
-      lineKey: line.k,
-      label: `${title} · ${line.k}`
-    }));
+  return nodeProbeKeys(node).map((lineKey) => ({
+    id: buildProbeId(node.id, lineKey),
+    nodeId: node.id,
+    lineKey,
+    label: `${title} · ${lineKey}`
+  }));
 }
 
 export function setScopeProbes(scope, probes) {
@@ -258,7 +327,7 @@ export function setScopeProbes(scope, probes) {
     nodeId: probe.nodeId,
     lineKey: probe.lineKey,
     label: probe.label,
-    color: SCOPE_CHANNEL_COLORS[index % SCOPE_CHANNEL_COLORS.length],
+    color: scopeChannelColor(index),
     values: new Float32Array(scope.capacity)
   }));
   clearScopeBuffer(scope);
@@ -274,7 +343,7 @@ export function toggleScopeProbe(scope, probe) {
   if (scope.channels.length >= scope.maxChannels) {
     return null;
   }
-  const color = SCOPE_CHANNEL_COLORS[scope.channels.length % SCOPE_CHANNEL_COLORS.length];
+  const color = scopeChannelColor(scope.channels.length);
   scope.channels.push({
     id: probe.id,
     nodeId: probe.nodeId,
@@ -318,8 +387,10 @@ export function pushScopeSample(scope, runner, demo, timeMs = performance.now())
   const t = (timeMs - scope.timeOrigin) / 1000;
   const idx = scope.head;
   scope.times[idx] = t;
-  for (const ch of scope.channels) {
-    const value = resolveSignalValue(runner, demo, ch);
+  const context = createSampleContext(runner, demo);
+  for (let i = 0; i < scope.channels.length; i++) {
+    const ch = scope.channels[i];
+    const value = resolveSignalValue(runner, demo, ch, context);
     ch.values[idx] = Number.isFinite(value) ? value : 0;
   }
   scope.head = (scope.head + 1) % scope.capacity;

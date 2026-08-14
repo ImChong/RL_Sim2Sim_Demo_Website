@@ -6,11 +6,17 @@ import {
   createSignalScope,
   DEFAULT_WINDOW_SECONDS,
   getScopeSnapshot,
+  listNodeProbes,
+  MAX_SCOPE_CHANNELS,
+  nodeHasProbes,
+  nodeProbeKeys,
   pushScopeSample,
   resolveSignalValue,
+  scopeChannelColor,
   setScopeProbes,
   toggleScopeProbe
 } from '../src/simulation/signalScope.js';
+import { buildAtomicNodes } from '../src/simulation/pipelineAtomicNodes.js';
 
 test('buildProbeId and toggleScopeProbe manage channels', () => {
   const scope = createSignalScope({ capacity: 8, maxChannels: 2 });
@@ -159,6 +165,125 @@ test('getScopeSnapshot keeps only the latest windowSeconds of samples', () => {
   assert.ok(snapshot.times[0] >= 10);
   assert.equal(snapshot.times[0], 10);
   assert.equal(snapshot.times[snapshot.times.length - 1], 30);
+});
+
+function buildJointRunnerNodes(jointCount) {
+  const jointNames = Array.from(
+    { length: jointCount },
+    (_, i) => `left_joint_${i}_joint`
+  );
+  const runner = {
+    policyJointNames: jointNames,
+    numActions: jointCount,
+    obsJointPosRelative: false,
+    actionClip: 10,
+    lastActions: new Float32Array(jointCount),
+    target: new Float32Array(jointCount)
+  };
+  const state = {
+    rootPos: new Float32Array([0, 0, 0.9]),
+    rootQuat: new Float32Array([1, 0, 0, 0]),
+    rootAngVel: new Float32Array([0, 0, 0]),
+    jointPos: Float32Array.from(jointNames, (_, i) => i / 10),
+    jointVel: new Float32Array(jointCount),
+    cmd: [0, 0, 0]
+  };
+  const obsLayout = [{ name: 'JointPos', offset: 0, size: jointCount, kwargs: { pos_steps: [0] } }];
+  const nodes = buildAtomicNodes(
+    runner,
+    state,
+    new Float32Array(jointCount),
+    obsLayout,
+    'zh'
+  );
+  return { runner, state, nodes };
+}
+
+test('listNodeProbes expands a node summarized by its dimension', () => {
+  const { nodes } = buildJointRunnerNodes(23);
+  const jointPos = nodes.find((n) => n.id === 'sim-joint-pos');
+
+  // The card only renders "维度 23D" but every joint must still be plottable.
+  assert.equal(jointPos.lines.length, 1);
+  assert.equal(nodeHasProbes(jointPos), true);
+
+  const probes = listNodeProbes(jointPos);
+  assert.equal(probes.length, 23);
+  assert.equal(probes[0].nodeId, 'sim-joint-pos');
+  assert.equal(probes[0].lineKey, 'L_joint_0');
+  assert.equal(probes[0].id, 'sim-joint-pos:L_joint_0');
+});
+
+test('clicking a joint node plots every joint curve', () => {
+  const { runner, state, nodes } = buildJointRunnerNodes(23);
+  const scope = createSignalScope({ capacity: 8 });
+  const probes = listNodeProbes(nodes.find((n) => n.id === 'sim-joint-pos'));
+
+  const channels = setScopeProbes(scope, probes);
+  assert.equal(channels.length, 23);
+  assert.equal(new Set(channels.map((ch) => ch.color)).size, 23);
+
+  const demo = { readPolicyState: () => state };
+  pushScopeSample(scope, runner, demo, 1000);
+  const snapshot = getScopeSnapshot(scope);
+  assert.equal(snapshot.series.length, 23);
+  assert.ok(Math.abs(snapshot.series[7].values[0] - 0.7) < 1e-5);
+});
+
+test('nodeProbeKeys treats an empty probeKeys list as not probeable', () => {
+  const { nodes } = buildJointRunnerNodes(2);
+  const clip = nodes.find((n) => n.id === 'prep-action-clip');
+  assert.deepEqual(nodeProbeKeys(clip), []);
+  assert.equal(nodeHasProbes(clip), false);
+  assert.deepEqual(listNodeProbes(clip), []);
+});
+
+test('nodeProbeKeys falls back to rendered lines when no probeKeys exist', () => {
+  const node = { id: 'legacy', lines: [{ k: 'a' }, { k: 'dim', v: '3D' }, { k: '…' }] };
+  assert.deepEqual(nodeProbeKeys(node), ['a']);
+});
+
+test('setScopeProbes stops at the channel cap', () => {
+  const scope = createSignalScope({ capacity: 4 });
+  const probes = Array.from({ length: MAX_SCOPE_CHANNELS + 5 }, (_, i) => ({
+    id: buildProbeId('obs-Wide', `[${i}]`),
+    nodeId: 'obs-Wide',
+    lineKey: `[${i}]`,
+    label: `Wide · [${i}]`
+  }));
+  assert.equal(setScopeProbes(scope, probes).length, MAX_SCOPE_CHANNELS);
+});
+
+test('scopeChannelColor stays distinct past the curated palette', () => {
+  const colors = Array.from({ length: MAX_SCOPE_CHANNELS }, (_, i) => scopeChannelColor(i));
+  assert.equal(new Set(colors).size, MAX_SCOPE_CHANNELS);
+  assert.equal(colors[0], scopeChannelColor(0));
+});
+
+test('resolveSignalValue maps quaternion components onto [w, x, y, z]', () => {
+  const runner = { policyJointNames: [], historyLength: 1, obsModules: [], config: {} };
+  const demo = { readPolicyState: () => ({ rootQuat: [0.1, 0.2, 0.3, 0.4] }) };
+  const read = (lineKey) => resolveSignalValue(runner, demo, { nodeId: 'sim-root-quat', lineKey });
+
+  assert.ok(Math.abs(read('w') - 0.1) < 1e-6);
+  assert.ok(Math.abs(read('x') - 0.2) < 1e-6);
+  assert.ok(Math.abs(read('y') - 0.3) < 1e-6);
+  assert.ok(Math.abs(read('z') - 0.4) < 1e-6);
+});
+
+test('resolveSignalValue reads raw observation blocks by block-local index', () => {
+  const runner = {
+    policyJointNames: [],
+    numActions: 0,
+    historyLength: 1,
+    obsForPolicy: new Float32Array([0, 1, 2, 10, 11, 12, 13]),
+    fullObs: new Float32Array([0, 1, 2, 10, 11, 12, 13]),
+    obsModules: [{ size: 3 }, { size: 4 }],
+    config: { obs_config: { policy: [{ name: 'RootAngVelB' }, { name: 'CustomBlock' }] } }
+  };
+
+  assert.equal(resolveSignalValue(runner, null, { nodeId: 'obs-CustomBlock', lineKey: '[0]' }), 10);
+  assert.equal(resolveSignalValue(runner, null, { nodeId: 'obs-CustomBlock', lineKey: '[2]' }), 12);
 });
 
 test('setScopeProbes keeps probes from a single node only', () => {

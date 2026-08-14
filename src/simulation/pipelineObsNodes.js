@@ -1,9 +1,36 @@
+import { shortJointName } from './jointLabels.js';
+import { MAX_SCOPE_CHANNELS } from './scopeChannels.js';
+
+const VEC3_KEYS = ['x', 'y', 'z'];
+
 function vec3Lines(prefix = '') {
   return [
     { k: `${prefix}x` },
     { k: `${prefix}y` },
     { k: `${prefix}z` }
   ];
+}
+
+/**
+ * Scope channel keys for a per-joint block: one curve per policy joint.
+ * @param {string[]} jointNames
+ */
+function jointProbeKeys(jointNames) {
+  return (jointNames ?? []).map((name) => shortJointName(name));
+}
+
+/**
+ * Scope channel keys for a raw slice: one curve per element inside the block.
+ * Indices are local to the block, matching how signalScope resolves `[i]`.
+ * @param {number} size
+ */
+function indexProbeKeys(size) {
+  const count = Math.min(MAX_SCOPE_CHANNELS, Math.max(0, Math.floor(size) || 0));
+  const keys = [];
+  for (let i = 0; i < count; i++) {
+    keys.push(`[${i}]`);
+  }
+  return keys;
 }
 
 function jointDimLines(count, zh) {
@@ -111,6 +138,7 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
         title: zh ? '根角速度' : 'Root AngVel',
         subtitle: zh ? '机体系 ω' : 'body ω',
         lines: vec3Lines(''),
+        probeKeys: VEC3_KEYS,
         concatOffset: block.offset,
         concatSize: block.size
       }];
@@ -123,6 +151,7 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
         title: zh ? '投影重力' : 'Proj Gravity',
         subtitle: zh ? '机体系' : 'body frame',
         lines: vec3Lines(''),
+        probeKeys: VEC3_KEYS,
         concatOffset: block.offset,
         concatSize: block.size
       }];
@@ -136,6 +165,7 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
           scalarKeys: ['vx'],
           title: zh ? '指令 vx' : 'Cmd vx',
           lines: [{ k: 'vx' }],
+          probeKeys: ['vx'],
           concatOffset: block.offset,
           concatSize: 1
         },
@@ -147,6 +177,7 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
           scalarKeys: ['vy'],
           title: zh ? '指令 vy' : 'Cmd vy',
           lines: [{ k: 'vy' }],
+          probeKeys: ['vy'],
           concatOffset: block.offset + 1,
           concatSize: 1
         },
@@ -158,12 +189,14 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
           scalarKeys: ['yaw'],
           title: zh ? '指令 yaw' : 'Cmd yaw',
           lines: [{ k: 'yaw' }],
+          probeKeys: ['yaw'],
           concatOffset: block.offset + 2,
           concatSize: 1
         }
       ];
     case 'JointPos': {
       const steps = block.kwargs?.pos_steps ?? [0];
+      const jointKeys = jointProbeKeys(jointNames);
       if (steps.length <= 1) {
         return [{
           id: idBase,
@@ -173,6 +206,7 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
           title: zh ? '关节位置' : 'Joint Position',
           subtitle: steps.length ? `step ${JSON.stringify(steps)}` : undefined,
           lines: jointDimLines(block.size, zh),
+          probeKeys: jointKeys,
           concatOffset: block.offset,
           concatSize: block.size
         }];
@@ -184,12 +218,14 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
         signalKind: 'joint',
         title: zh ? `关节位置 ${futureStepLabel(step, zh)}` : `Joint Pos ${futureStepLabel(step, zh)}`,
         lines: jointDimLines(actions, zh),
+        probeKeys: jointKeys,
         concatOffset: block.offset + idx * actions,
         concatSize: actions
       }));
     }
     case 'JointVel': {
       const steps = block.kwargs?.vel_steps ?? [0];
+      const jointKeys = jointProbeKeys(jointNames);
       if (steps.length <= 1) {
         return [{
           id: idBase,
@@ -199,6 +235,7 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
           title: zh ? '关节速度' : 'Joint Velocity',
           subtitle: steps.length ? `step ${JSON.stringify(steps)}` : undefined,
           lines: jointDimLines(block.size, zh),
+          probeKeys: jointKeys,
           concatOffset: block.offset,
           concatSize: block.size
         }];
@@ -210,12 +247,14 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
         signalKind: 'joint',
         title: zh ? `关节速度 ${futureStepLabel(step, zh)}` : `Joint Vel ${futureStepLabel(step, zh)}`,
         lines: jointDimLines(actions, zh),
+        probeKeys: jointKeys,
         concatOffset: block.offset + idx * actions,
         concatSize: actions
       }));
     }
     case 'PrevActions': {
       const historySteps = Math.max(1, block.kwargs?.history_steps ?? 1);
+      const jointKeys = jointProbeKeys(jointNames);
       const nodes = [];
       for (let t = 0; t < historySteps; t += 1) {
         const isLatest = t === 0;
@@ -230,6 +269,7 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
             : (zh ? `历史动作 t-${t}` : `Action t-${t}`),
           subtitle: historySteps > 1 ? `×${historySteps}` : undefined,
           lines: jointDimLines(actions, zh),
+          probeKeys: jointKeys,
           concatOffset: block.offset + t * actions,
           concatSize: actions,
           scrollable: actions > 6
@@ -246,6 +286,7 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
         scalarKeys: ['val'],
         title: 'Boot',
         lines: [{ k: 'val' }],
+        probeKeys: ['val'],
         concatOffset: block.offset,
         concatSize: block.size
       }];
@@ -259,6 +300,7 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
           scalarKeys: ['on'],
           title: zh ? '顺应 开关' : 'Compliance on',
           lines: [{ k: 'on' }],
+          probeKeys: ['on'],
           concatOffset: block.offset,
           concatSize: 1
         },
@@ -270,6 +312,7 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
           scalarKeys: ['thr'],
           title: zh ? '顺应 阈值' : 'Compliance thr',
           lines: [{ k: 'thr' }],
+          probeKeys: ['thr'],
           concatOffset: block.offset + 1,
           concatSize: 1
         },
@@ -281,6 +324,7 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
           scalarKeys: ['kp'],
           title: zh ? '顺应 kp' : 'Compliance kp',
           lines: [{ k: 'kp' }],
+          probeKeys: ['kp'],
           concatOffset: block.offset + 2,
           concatSize: 1
         }
@@ -299,6 +343,7 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
           title: zh ? '跟踪指令 Δpos' : 'Track Δpos',
           subtitle: zh ? '未来根位移' : 'future root delta',
           lines: dimLine(dposSize, zh),
+          probeKeys: indexProbeKeys(dposSize),
           concatOffset: block.offset,
           concatSize: dposSize
         });
@@ -312,6 +357,7 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
           title: zh ? '跟踪指令 rot6d' : 'Track rot6d',
           subtitle: zh ? '未来根姿态' : 'future root rot6d',
           lines: dimLine(rotSize, zh),
+          probeKeys: indexProbeKeys(rotSize),
           concatOffset: block.offset + dposSize,
           concatSize: rotSize
         });
@@ -323,6 +369,7 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
         signalKind: 'indexed',
         title: block.name,
         lines: dimLine(block.size, zh),
+        probeKeys: indexProbeKeys(block.size),
         concatOffset: block.offset,
         concatSize: block.size
       }];
@@ -339,6 +386,7 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
           title: zh ? '目标关节角' : 'Target Joint Pos',
           subtitle: zh ? '参考轨迹' : 'reference',
           lines: dimLine(half, zh),
+          probeKeys: indexProbeKeys(half),
           concatOffset: block.offset,
           concatSize: half
         },
@@ -350,6 +398,7 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
           title: zh ? '关节角误差' : 'Joint Pos Error',
           subtitle: `×${futureSteps.length}`,
           lines: dimLine(block.size - half, zh),
+          probeKeys: indexProbeKeys(block.size - half),
           concatOffset: block.offset + half,
           concatSize: block.size - half
         }
@@ -366,6 +415,7 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
           scalarKeys: ['z'],
           title: zh ? '目标根高度' : 'Target Root Z',
           lines: [{ k: 'z' }],
+          probeKeys: ['z'],
           concatOffset: block.offset,
           concatSize: block.size
         }];
@@ -378,6 +428,7 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
         scalarKeys: ['z'],
         title: zh ? `目标根高度 ${futureStepLabel(step, zh)}` : `Target Root Z ${futureStepLabel(step, zh)}`,
         lines: [{ k: 'z' }],
+        probeKeys: ['z'],
         concatOffset: block.offset + idx,
         concatSize: 1
       }));
@@ -392,6 +443,7 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
           signalKind: 'vec3',
           title: zh ? '目标重力方向' : 'Target Gravity',
           lines: vec3Lines(''),
+          probeKeys: VEC3_KEYS,
           concatOffset: block.offset,
           concatSize: block.size
         }];
@@ -403,11 +455,17 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
         signalKind: 'vec3',
         title: zh ? `目标重力 ${futureStepLabel(step, zh)}` : `Target Gravity ${futureStepLabel(step, zh)}`,
         lines: vec3Lines(''),
+        probeKeys: VEC3_KEYS,
         concatOffset: block.offset + idx * 3,
         concatSize: 3
       }));
     }
-    default:
+    default: {
+      // Indices are local to the block: signalScope resolves `[i]` as
+      // blockOffset + i, so absolute offsets here would read the wrong slot.
+      // The preview is built from a plain array — mapping over the typed-array
+      // slice directly would coerce the line objects back to numbers.
+      const previewKeys = indexProbeKeys(Math.min(6, data.length));
       return [{
         id: idBase,
         kind: 'signal',
@@ -415,13 +473,13 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
         signalKind: 'indexed',
         title: block.name,
         subtitle: `${block.size}D`,
-        lines: data.slice(0, 6).map((_, i) => ({
-          k: `[${block.offset + i}]`
-        })),
+        lines: previewKeys.map((k) => ({ k })),
+        probeKeys: indexProbeKeys(block.size),
         concatOffset: block.offset,
         concatSize: block.size,
         scrollable: data.length > 4
       }];
+    }
   }
 }
 

@@ -156,7 +156,7 @@
 <script>
 import { buildPipelineGraph } from '@/simulation/pipelineGraphLayout.js';
 import { portPointFromLayoutNode } from '@/simulation/pipelineGraphEdgeCoords.js';
-import { isProbeableLine } from '@/simulation/signalScope.js';
+import { nodeHasProbes } from '@/simulation/signalScope.js';
 
 let graphInstanceCounter = 0;
 
@@ -229,15 +229,18 @@ export default {
     activeProbeIds() {
       return new Set(this.activeProbes.map((probe) => probe.id));
     },
+    probedNodeIds() {
+      return new Set(this.activeProbes.map((probe) => probe.nodeId));
+    },
     scrollHint() {
       if (this.isMobile) {
         return this.language === 'en'
-          ? 'Click a node to view its signals in the scope · Drag canvas to pan · Pinch to zoom'
-          : '点击节点在示波器查看信号曲线 · 拖空白平移画布 · 双指缩放';
+          ? 'Click a node to plot all of its signals in the scope · Drag canvas to pan · Pinch to zoom'
+          : '点击节点在示波器查看该节点全部信号曲线 · 拖空白平移画布 · 双指缩放';
       }
       return this.language === 'en'
-        ? 'Click a node to view its signals in the scope · Drag canvas to pan · Wheel to zoom'
-        : '点击节点在示波器查看信号曲线 · 拖空白平移画布 · 滚轮缩放';
+        ? 'Click a node to plot all of its signals in the scope · Drag canvas to pan · Wheel to zoom'
+        : '点击节点在示波器查看该节点全部信号曲线 · 拖空白平移画布 · 滚轮缩放';
     },
     viewportStyle() {
       if (this.isMobile) {
@@ -543,9 +546,6 @@ export default {
       const c2x = to.x - bend;
       return `M ${from.x} ${from.y} C ${c1x} ${from.y}, ${c1x} ${dropY}, ${(from.x + to.x) / 2} ${dropY} C ${c2x} ${dropY}, ${c2x} ${to.y}, ${to.x} ${to.y}`;
     },
-    isLineProbeable(line) {
-      return isProbeableLine(line);
-    },
     isNodeClickable(node) {
       if (!node) {
         return false;
@@ -553,13 +553,12 @@ export default {
       if (node.kind === 'scope') {
         return true;
       }
-      return node.lines?.some((line) => this.isLineProbeable(line));
+      return nodeHasProbes(node);
     },
     isNodeProbed(node) {
-      if (!node?.lines?.length) {
-        return false;
-      }
-      return node.lines.some((line) => this.isLineProbed(node.id, line.k));
+      // Joint nodes only render a dimension summary, so match on the node id:
+      // their channels are keyed by joint name, not by a rendered line.
+      return Boolean(node?.id) && this.probedNodeIds.has(node.id);
     },
     isLineProbed(nodeId, lineKey) {
       return this.activeProbeIds.has(`${nodeId}:${lineKey}`);

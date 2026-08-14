@@ -189,6 +189,7 @@ import {
   MIN_SCOPE_WINDOW_SECONDS,
   saveScopeWindowSeconds
 } from '@/utils/scopeWindowPreference.js';
+import { MAX_SCOPE_CHANNELS } from '@/simulation/scopeChannels.js';
 
 const translations = {
   en: {
@@ -205,7 +206,7 @@ const translations = {
     tabGraph: 'Graph',
     tabArchitecture: 'Architecture',
     tabScope: 'Scope',
-    graphHint: 'Click a node to view its signals in the scope',
+    graphHint: 'Click a node to plot all of its signals in the scope',
     scopeChannels: 'Channels',
     scopeSamples: 'Samples',
     scopeWindow: 'Window',
@@ -215,8 +216,8 @@ const translations = {
     scopePause: 'Pause',
     scopeResume: 'Resume',
     scopeEmpty: 'Waiting for samples…',
-    scopeHint: 'Switch to Graph and click a node to plot its signals (up to 8 channels).',
-    scopeMaxChannels: 'Maximum 8 scope channels'
+    scopeHint: `Switch to Graph and click a node to plot all of its signals (up to ${MAX_SCOPE_CHANNELS} channels).`,
+    scopeMaxChannels: `Maximum ${MAX_SCOPE_CHANNELS} scope channels`
   },
   zh: {
     panelTitle: '模型 I/O 连接图',
@@ -232,7 +233,7 @@ const translations = {
     tabGraph: '流程图',
     tabArchitecture: '模型架构',
     tabScope: '示波器',
-    graphHint: '点击节点在示波器查看信号曲线',
+    graphHint: '点击节点在示波器查看该节点全部信号曲线',
     scopeChannels: '通道',
     scopeSamples: '采样',
     scopeWindow: '窗口',
@@ -242,8 +243,8 @@ const translations = {
     scopePause: '暂停',
     scopeResume: '继续',
     scopeEmpty: '等待采样数据…',
-    scopeHint: '切到「流程图」后点击节点即可绘制该节点信号（最多 8 路）。',
-    scopeMaxChannels: '示波器最多 8 路通道'
+    scopeHint: `切到「流程图」后点击节点即可绘制该节点的全部信号曲线（最多 ${MAX_SCOPE_CHANNELS} 路）。`,
+    scopeMaxChannels: `示波器最多 ${MAX_SCOPE_CHANNELS} 路通道`
   }
 };
 
