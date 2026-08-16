@@ -329,3 +329,28 @@ test('setScopeProbes keeps probes from a single node only', () => {
   assert.equal(scope.channels[0].nodeId, 'sim-cmd-vx');
   assert.equal(DEFAULT_WINDOW_SECONDS, 20);
 });
+
+test('setScopeProbes spans several nodes when the caller allows it', () => {
+  const scope = createSignalScope({ capacity: 8, maxChannels: 8 });
+  const probe = (nodeId, lineKey) => ({
+    id: buildProbeId(nodeId, lineKey),
+    nodeId,
+    lineKey,
+    label: `${nodeId} · ${lineKey}`
+  });
+  // One observation block (Command) is drawn as three pipeline nodes.
+  const channels = setScopeProbes(
+    scope,
+    [
+      probe('obs-Command-vx', 'vx'),
+      probe('obs-Command-vy', 'vy'),
+      probe('obs-Command-yaw', 'yaw')
+    ],
+    { allowMultipleNodes: true }
+  );
+  assert.deepEqual(
+    channels.map((ch) => ch.nodeId),
+    ['obs-Command-vx', 'obs-Command-vy', 'obs-Command-yaw']
+  );
+  assert.equal(new Set(channels.map((ch) => ch.color)).size, 3);
+});

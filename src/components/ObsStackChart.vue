@@ -45,12 +45,31 @@
                 class="stack-row"
                 :class="{
                   'stack-row-active': hoverBlockId === block.id,
-                  'stack-row-muted': hoverBlockId && hoverBlockId !== block.id
+                  'stack-row-muted': hoverBlockId && hoverBlockId !== block.id,
+                  'stack-row-clickable': isBlockProbeable(block),
+                  'stack-row-probed': isBlockProbed(block)
                 }"
                 @mouseenter="onHoverBlock(block, $event)"
                 @mousemove="moveTooltip($event)"
+                @click="selectBlock(block)"
               >
-                <th scope="row" class="stack-cell-name" :title="block.name">{{ block.name }}</th>
+                <th scope="row" class="stack-cell-name">
+                  <button
+                    v-if="isBlockProbeable(block)"
+                    type="button"
+                    class="stack-name-btn"
+                    :aria-label="`${block.name} — ${blockHint(block)}`"
+                    @click.stop="selectBlock(block)"
+                  >
+                    <span class="stack-name-text">{{ block.name }}</span>
+                    <v-icon
+                      icon="mdi-chart-line-variant"
+                      size="11"
+                      class="stack-name-icon"
+                    />
+                  </button>
+                  <span v-else class="stack-name-text" :title="block.name">{{ block.name }}</span>
+                </th>
                 <td class="stack-cell-bar">
                   <span class="stack-bar-track">
                     <span
@@ -92,12 +111,15 @@
                     idx % 2 === 0 ? 'stack-seg-a' : 'stack-seg-b',
                     {
                       'stack-seg-active': hoverBlockId === block.id,
-                      'stack-seg-muted': hoverBlockId && hoverBlockId !== block.id
+                      'stack-seg-muted': hoverBlockId && hoverBlockId !== block.id,
+                      'stack-seg-clickable': isBlockProbeable(block),
+                      'stack-seg-probed': isBlockProbed(block)
                     }
                   ]"
                   :style="{ flexGrow: block.size || 0.001 }"
                   @mouseenter="onHoverBlock(block, $event, frame)"
                   @mousemove="moveTooltip($event)"
+                  @click="selectBlock(block)"
                 >
                   <span v-if="block.share > 0.16" class="stack-seg-label">{{ block.name }}</span>
                 </span>
@@ -127,6 +149,7 @@
           <div class="stack-tooltip-title">{{ tooltip.title }}</div>
           <div class="stack-tooltip-line">{{ tooltip.range }}</div>
           <div v-if="tooltip.description" class="stack-tooltip-desc">{{ tooltip.description }}</div>
+          <div v-if="tooltip.hint" class="stack-tooltip-hint">{{ tooltip.hint }}</div>
         </div>
       </div>
     </template>
@@ -144,13 +167,22 @@ export default {
     labels: {
       type: Object,
       required: true
+    },
+    /** Pipeline node ids currently plotted on the oscilloscope. */
+    activeNodeIds: {
+      type: Array,
+      default: () => []
     }
   },
+  emits: ['select-block'],
   data: () => ({
     hoverBlockId: null,
     tooltip: null
   }),
   computed: {
+    activeNodeIdSet() {
+      return new Set(this.activeNodeIds);
+    },
     maxBlockSize() {
       return this.layout.blocks.reduce((max, block) => Math.max(max, block.size), 0);
     },
@@ -170,6 +202,24 @@ export default {
     }
   },
   methods: {
+    isBlockProbeable(block) {
+      return (block?.channelCount ?? 0) > 0;
+    },
+    isBlockProbed(block) {
+      return (block?.nodeIds ?? []).some((nodeId) => this.activeNodeIdSet.has(nodeId));
+    },
+    blockHint(block) {
+      if (!this.isBlockProbeable(block)) {
+        return '';
+      }
+      return `${this.labels.plot} · ${block.channelCount} ${this.labels.channels}`;
+    },
+    selectBlock(block) {
+      if (!this.isBlockProbeable(block)) {
+        return;
+      }
+      this.$emit('select-block', block);
+    },
     barWidth(block) {
       if (!this.maxBlockSize) {
         return 0;
@@ -187,6 +237,7 @@ export default {
           ? `${frame.label} · [${offset}, ${offset + block.size})`
           : `[${block.offset}, ${block.end})`,
         description: block.description,
+        hint: this.blockHint(block),
         x: 0,
         y: 0
       };
@@ -224,6 +275,7 @@ export default {
   --stack-mark: #4bacd6;
   --stack-seg-a: #8ecbe2;
   --stack-seg-b: #3f9fc9;
+  --stack-probe: #00d992;
   --stack-ink: rgba(226, 232, 240, 0.92);
   --stack-ink-muted: rgba(148, 163, 184, 0.78);
   display: flex;
@@ -341,6 +393,14 @@ export default {
   filter: brightness(1.15);
 }
 
+.stack-row-clickable {
+  cursor: pointer;
+}
+
+.stack-row-probed .stack-bar-fill {
+  background: var(--stack-probe);
+}
+
 .stack-cell-name {
   width: 30%;
   max-width: 0;
@@ -351,6 +411,48 @@ export default {
   font-weight: 400;
   color: var(--stack-ink);
   padding-right: 8px;
+}
+
+.stack-name-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.stack-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stack-name-icon {
+  flex: 0 0 auto;
+  opacity: 0.4;
+  transition: opacity 0.15s ease;
+}
+
+.stack-row-clickable:hover .stack-name-text,
+.stack-name-btn:focus-visible .stack-name-text {
+  color: var(--stack-probe);
+}
+
+.stack-row-clickable:hover .stack-name-icon,
+.stack-name-btn:focus-visible .stack-name-icon,
+.stack-row-probed .stack-name-icon {
+  opacity: 1;
+  color: var(--stack-probe);
+}
+
+.stack-row-probed .stack-name-text {
+  color: var(--stack-probe);
 }
 
 .stack-cell-bar {
@@ -463,6 +565,14 @@ export default {
   box-shadow: inset 0 0 0 2px var(--stack-surface);
 }
 
+.stack-seg-clickable {
+  cursor: pointer;
+}
+
+.stack-seg-probed {
+  background: var(--stack-probe);
+}
+
 .stack-seg-label {
   font-size: 0.55rem;
   color: #0b1018;
@@ -517,6 +627,11 @@ export default {
 .stack-tooltip-desc {
   margin-top: 3px;
   color: var(--stack-ink-muted);
+}
+
+.stack-tooltip-hint {
+  margin-top: 3px;
+  color: var(--stack-probe);
 }
 
 @media (max-width: 640px) {

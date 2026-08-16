@@ -50,6 +50,48 @@ async function openStackView(page, nodeId) {
   ));
 }
 
+async function readScopeState(page, blockName) {
+  const state = await page.evaluate(() => ({
+    tab: [...document.querySelectorAll('.model-io-tabs .v-btn')]
+      .find((el) => el.classList.contains('v-btn--active'))
+      ?.getAttribute('value'),
+    channels: document.querySelectorAll('.scope-legend-item').length,
+    legend: [...document.querySelectorAll('.scope-legend-label')]
+      .map((el) => el.textContent.trim())
+  }));
+  return { ...state, block: blockName };
+}
+
+/** Click the n-th probeable row of the frame-composition table. */
+async function clickStackBlock(page, index) {
+  const name = await page.evaluate((i) => {
+    const row = document.querySelectorAll('.stack-row-clickable')[i];
+    const label = row?.querySelector('.stack-name-text')?.textContent.trim();
+    row?.querySelector('.stack-name-btn')?.click();
+    return label;
+  }, index);
+  await sleep(600);
+  return readScopeState(page, name);
+}
+
+/** Click the n-th probeable segment of the newest frame strip. */
+async function clickStackSegment(page, index) {
+  await page.evaluate(() => {
+    const tab = [...document.querySelectorAll('.model-io-tabs .v-btn')]
+      .find((el) => el.getAttribute('value') === 'stack');
+    tab?.click();
+  });
+  await sleep(300);
+  const name = await page.evaluate((i) => {
+    const strip = document.querySelector('.stack-frame:last-child .stack-strip');
+    const seg = strip?.querySelectorAll('.stack-seg-clickable')[i];
+    seg?.click();
+    return seg?.textContent.trim() ?? `segment ${i}`;
+  }, index);
+  await sleep(600);
+  return readScopeState(page, name);
+}
+
 async function main() {
   const browser = await puppeteer.launch({
     executablePath: CHROME,
@@ -135,6 +177,27 @@ async function main() {
     }
   }
 
+  const clickableRows = await page.$$eval('.stack-row-clickable', (rows) => rows.length);
+  if (clickableRows === 0) {
+    throw new Error('No observation block is marked clickable in the stacking view');
+  }
+
+  const scope = await clickStackBlock(page, 0);
+  if (scope.tab !== 'scope') {
+    throw new Error(`Clicking an observation block did not open the scope (active: ${scope.tab})`);
+  }
+  if (scope.channels === 0) {
+    throw new Error(`Block "${scope.block}" opened the scope with no channels`);
+  }
+
+  // Clicking a frame segment plots the same block from the stacking strip.
+  const fromSegment = await clickStackSegment(page, 0);
+  if (fromSegment.tab !== 'scope' || fromSegment.channels === 0) {
+    throw new Error(
+      `Clicking a frame segment did not plot the block (tab: ${fromSegment.tab}, channels: ${fromSegment.channels})`
+    );
+  }
+
   const historyTab = await openStackView(page, 'history');
   if (historyTab && historyTab !== 'stack' && await page.$('[data-node-id="history"]')) {
     throw new Error(`History buffer node did not open the stacking tab (active: ${historyTab})`);
@@ -142,6 +205,9 @@ async function main() {
 
   console.log(
     `OK: Obs Warehouse opened the stacking view (${view.rows.length} blocks, ${view.frames} frame(s), ${view.total}D per frame).`
+  );
+  console.log(
+    `OK: clicking block "${scope.block}" plotted ${scope.channels} scope channel(s): ${scope.legend.slice(0, 3).join(', ')}…`
   );
   await browser.close();
 }

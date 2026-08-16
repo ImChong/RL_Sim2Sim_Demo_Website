@@ -111,10 +111,15 @@
             @open-architecture="openArchitectureTab"
             @open-stack="openStackTab"
           />
+          <p v-if="!isSmallScreen && viewTab === 'stack'" class="text-caption text-medium-emphasis pipeline-hint">
+            {{ t.stackHint }}
+          </p>
           <ObsStackChart
             v-if="viewTab === 'stack'"
             :layout="stackLayout"
             :labels="stackLabels"
+            :active-node-ids="probedNodeIds"
+            @select-block="onStackBlock"
           />
           <OnnxNetronViewer
             v-if="viewTab === 'architecture'"
@@ -221,6 +226,8 @@ const translations = {
     tabArchitecture: 'Architecture',
     tabScope: 'Scope',
     graphHint: 'Click a node to plot all of its signals · Obs Warehouse shows the tensor stacking · Policy net opens Architecture',
+    stackHint: 'Click an observation block (row or frame segment) to plot its live signals in the oscilloscope.',
+    stackPlot: 'Click to plot in the oscilloscope',
     stackEmpty: 'The observation layout appears once the policy is running.',
     stackFrame: 'frame',
     stackHistory: 'history',
@@ -261,6 +268,8 @@ const translations = {
     tabArchitecture: '模型架构',
     tabScope: '示波器',
     graphHint: '点击节点查看该节点全部信号曲线 · 点击观测仓库查看张量堆叠 · 点击策略网络打开模型架构',
+    stackHint: '点击观测块（表格行或帧色块）即可在示波器中查看该块的实时曲线。',
+    stackPlot: '点击在示波器中查看曲线',
     stackEmpty: '策略就绪后显示观测张量的堆叠结构。',
     stackFrame: '单帧',
     stackHistory: '历史',
@@ -346,6 +355,9 @@ export default {
     activeProbeIds() {
       return this.activeProbes.map((probe) => probe.id);
     },
+    probedNodeIds() {
+      return [...new Set(this.activeProbes.map((probe) => probe.nodeId))];
+    },
     desktopPanelStyle() {
       if (this.isSmallScreen) {
         return null;
@@ -376,7 +388,9 @@ export default {
         singleFrame: t.stackSingleFrame,
         colBlock: t.stackColBlock,
         colSize: t.stackColSize,
-        colRange: t.stackColRange
+        colRange: t.stackColRange,
+        plot: t.stackPlot,
+        channels: t.scopeChannels
       };
     },
     scopeWindowMinSeconds() {
@@ -542,18 +556,33 @@ export default {
       });
     },
     onProbeNode(node) {
-      const probes = listNodeProbes(node);
+      this.plotProbes(listNodeProbes(node));
+    },
+    /**
+     * Plot an observation block from the stacking view: one block can span
+     * several pipeline nodes (Command → vx / vy / yaw), so every node it owns
+     * goes on the scope together.
+     */
+    onStackBlock(block) {
+      const nodeIds = new Set(block?.nodeIds ?? []);
+      if (nodeIds.size === 0) {
+        return;
+      }
+      const probes = (this.telemetry.atomicNodes ?? [])
+        .filter((node) => nodeIds.has(node.id))
+        .flatMap((node) => listNodeProbes(node));
+      this.plotProbes(probes, { allowMultipleNodes: true });
+    },
+    /**
+     * Swap the scope over to a new probe set and show it.
+     * setScopeProbes rebuilds every channel and clears the sample buffer, so
+     * the previous selection needs no separate teardown.
+     */
+    plotProbes(probes, options = {}) {
       if (!probes.length) {
         return;
       }
-      const switchingNode = this.signalScope.channels.some(
-        (channel) => channel.nodeId !== node.id
-      );
-      if (switchingNode) {
-        clearScopeBuffer(this.signalScope);
-        this.signalScope.channels = [];
-      }
-      setScopeProbes(this.signalScope, probes);
+      setScopeProbes(this.signalScope, probes, options);
       this.scopeZoom = null;
       this.viewTab = 'scope';
       if (this.ready && this.demo?.policyRunner) {

@@ -325,7 +325,16 @@ export function listNodeProbes(node) {
   }));
 }
 
-export function setScopeProbes(scope, probes) {
+/**
+ * Replace every scope channel with the given probe set.
+ * @param {object} scope
+ * @param {Array<{ id: string, nodeId: string, lineKey: string, label: string }>} probes
+ * @param {{ allowMultipleNodes?: boolean }} [options]
+ *   Probes normally come from one pipeline node, and a mixed list is a caller
+ *   bug. One observation block can span several nodes (Command → vx / vy / yaw),
+ *   so the stacking view opts in to plotting all of them together.
+ */
+export function setScopeProbes(scope, probes, options = {}) {
   if (!scope) {
     return null;
   }
@@ -335,9 +344,10 @@ export function setScopeProbes(scope, probes) {
     clearScopeBuffer(scope);
     return [];
   }
-  const nodeId = limited[0].nodeId;
-  const sameNodeProbes = limited.filter((probe) => probe.nodeId === nodeId);
-  scope.channels = sameNodeProbes.map((probe, index) => ({
+  const selected = options.allowMultipleNodes
+    ? limited
+    : limited.filter((probe) => probe.nodeId === limited[0].nodeId);
+  scope.channels = selected.map((probe, index) => ({
     id: probe.id,
     nodeId: probe.nodeId,
     lineKey: probe.lineKey,

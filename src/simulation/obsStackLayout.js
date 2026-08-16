@@ -7,8 +7,34 @@
  * frame is the newest (see the copyWithin/set pair in policyRunner.step).
  */
 
+import { MAX_SCOPE_CHANNELS } from './scopeChannels.js';
+import { nodeProbeKeys } from './signalScope.js';
+
 function frameLabel(stepsAgo) {
   return stepsAgo === 0 ? 't' : `t-${stepsAgo}`;
+}
+
+/**
+ * Pipeline nodes carrying the live signals of one frame slice.
+ *
+ * The graph splits a single observation block into several nodes (Command →
+ * vx / vy / yaw, JointPos → one node per step), so a stack block maps to every
+ * observation node that starts inside its range.
+ * @param {Array<{ id: string, group?: string, concatOffset?: number }>} atomicNodes
+ * @param {number} offset inclusive start of the block inside a frame
+ * @param {number} end exclusive end of the block inside a frame
+ */
+function blockProbeNodes(atomicNodes, offset, end) {
+  return atomicNodes.filter((node) => {
+    if (node?.group !== 'obs') {
+      return false;
+    }
+    const nodeOffset = Number(node.concatOffset);
+    if (!Number.isFinite(nodeOffset) || nodeOffset < offset || nodeOffset >= end) {
+      return false;
+    }
+    return nodeProbeKeys(node).length > 0;
+  });
 }
 
 /**
@@ -43,11 +69,17 @@ export function buildObsStackLayout(telemetry) {
     return empty;
   }
 
+  const atomicNodes = telemetry.atomicNodes ?? [];
   let mapped = 0;
   const blocks = sourceBlocks.map((block, index) => {
     const size = Math.max(0, Number(block.size) || 0);
     const offset = Math.max(0, Number(block.offset) || 0);
     mapped += size;
+    const probeNodes = blockProbeNodes(atomicNodes, offset, offset + size);
+    const probeKeyCount = probeNodes.reduce(
+      (sum, node) => sum + nodeProbeKeys(node).length,
+      0
+    );
     return {
       id: `${block.name ?? 'block'}-${index}`,
       name: block.name ?? `Block ${index}`,
@@ -55,7 +87,10 @@ export function buildObsStackLayout(telemetry) {
       offset,
       end: offset + size,
       size,
-      share: frameSize > 0 ? size / frameSize : 0
+      share: frameSize > 0 ? size / frameSize : 0,
+      nodeIds: probeNodes.map((node) => node.id),
+      // The scope truncates at its channel cap, so report what will be drawn.
+      channelCount: Math.min(MAX_SCOPE_CHANNELS, probeKeyCount)
     };
   });
 
