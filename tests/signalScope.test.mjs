@@ -14,6 +14,7 @@ import {
   resolveSignalValue,
   scopeChannelColor,
   setScopeProbes,
+  toggleScopeChannelHidden,
   toggleScopeProbe
 } from '../src/simulation/signalScope.js';
 import { buildAtomicNodes } from '../src/simulation/pipelineAtomicNodes.js';
@@ -328,4 +329,64 @@ test('setScopeProbes keeps probes from a single node only', () => {
   assert.equal(scope.channels.length, 1);
   assert.equal(scope.channels[0].nodeId, 'sim-cmd-vx');
   assert.equal(DEFAULT_WINDOW_SECONDS, 20);
+});
+
+test('hiding a channel keeps it sampling and off the value range', () => {
+  const scope = createSignalScope({ capacity: 8, maxChannels: 4 });
+  const probe = (nodeId, lineKey) => ({
+    id: buildProbeId(nodeId, lineKey),
+    nodeId,
+    lineKey,
+    label: `${nodeId} · ${lineKey}`
+  });
+  setScopeProbes(scope, [probe('sim-cmd-vx', 'vx'), probe('sim-cmd-vy', 'vy')], {
+    allowMultipleNodes: true
+  });
+
+  const runner = { policyJointNames: [], numActions: 0, numObs: 0, historyLength: 1 };
+  // vy is the outlier: hiding it must let vx use the whole axis.
+  const demo = { readPolicyState: () => ({ cmd: [0.25, 9, 0] }) };
+  pushScopeSample(scope, runner, demo, 0);
+
+  assert.deepEqual(getScopeSnapshot(scope).valueRange, [0.25, 9]);
+
+  assert.equal(toggleScopeChannelHidden(scope, buildProbeId('sim-cmd-vy', 'vy')), true);
+  pushScopeSample(scope, runner, demo, 100);
+
+  const snapshot = getScopeSnapshot(scope);
+  assert.deepEqual(snapshot.series.map((s) => s.hidden), [false, true]);
+  // vx alone is flat at 0.25, so the range is padded around it instead of
+  // being stretched to vy's 9.
+  assert.deepEqual(snapshot.valueRange, [-0.25, 0.75]);
+  // Still recording while hidden, so unhiding shows an unbroken curve.
+  assert.deepEqual(Array.from(snapshot.series[1].values), [9, 9]);
+
+  assert.equal(toggleScopeChannelHidden(scope, buildProbeId('sim-cmd-vy', 'vy')), false);
+  assert.deepEqual(getScopeSnapshot(scope).valueRange, [0.25, 9]);
+  assert.equal(toggleScopeChannelHidden(scope, 'nope:x'), null);
+});
+
+test('setScopeProbes spans several nodes when the caller allows it', () => {
+  const scope = createSignalScope({ capacity: 8, maxChannels: 8 });
+  const probe = (nodeId, lineKey) => ({
+    id: buildProbeId(nodeId, lineKey),
+    nodeId,
+    lineKey,
+    label: `${nodeId} · ${lineKey}`
+  });
+  // One observation block (Command) is drawn as three pipeline nodes.
+  const channels = setScopeProbes(
+    scope,
+    [
+      probe('obs-Command-vx', 'vx'),
+      probe('obs-Command-vy', 'vy'),
+      probe('obs-Command-yaw', 'yaw')
+    ],
+    { allowMultipleNodes: true }
+  );
+  assert.deepEqual(
+    channels.map((ch) => ch.nodeId),
+    ['obs-Command-vx', 'obs-Command-vy', 'obs-Command-yaw']
+  );
+  assert.equal(new Set(channels.map((ch) => ch.color)).size, 3);
 });

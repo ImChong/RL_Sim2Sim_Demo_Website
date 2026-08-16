@@ -2,7 +2,10 @@
   <div class="scope-shell">
     <div class="scope-toolbar">
       <div class="scope-stats">
-        <span>{{ channelsLabel }}: {{ snapshot.series.length }}</span>
+        <span>
+          {{ channelsLabel }}: {{ snapshot.series.length }}
+          <template v-if="hiddenCount">({{ hiddenCount }} {{ hiddenLabel }})</template>
+        </span>
         <span class="scope-stat-sep">/</span>
         <span>{{ samplesLabel }}: {{ snapshot.sampleCount }}</span>
         <span class="scope-stat-sep">/</span>
@@ -21,6 +24,12 @@
           />
           <span class="scope-window-unit">s</span>
         </label>
+        <template v-if="source">
+          <span class="scope-stat-sep">/</span>
+          <span class="scope-source" :title="source">
+            {{ sourceLabel }}: <strong class="scope-source-name">{{ source }}</strong>
+          </span>
+        </template>
       </div>
       <div class="scope-actions">
         <v-btn
@@ -70,18 +79,40 @@
         class="scope-legend"
         :class="{ 'scope-legend-dense': isDenseLegend }"
       >
-        <button
+        <div
           v-for="series in snapshot.series"
           :key="series.id"
-          type="button"
           class="scope-legend-item"
-          :class="{ 'scope-legend-item-active': activeProbeIds.includes(series.id) }"
-          @click="$emit('remove-probe', series.id)"
+          :class="{
+            'scope-legend-item-active': activeProbeIds.includes(series.id),
+            'scope-legend-item-hidden': series.hidden
+          }"
         >
-          <span class="scope-legend-swatch" :style="{ background: series.color }" />
-          <span class="scope-legend-label" :title="series.label">{{ series.label }}</span>
-          <v-icon icon="mdi-close" size="12" class="scope-legend-remove" />
-        </button>
+          <button
+            type="button"
+            class="scope-legend-toggle"
+            :title="series.hidden ? showSeriesLabel : hideSeriesLabel"
+            :aria-pressed="!series.hidden"
+            @click="$emit('toggle-series', series.id)"
+          >
+            <span
+              class="scope-legend-swatch"
+              :style="series.hidden
+                ? { borderColor: series.color }
+                : { background: series.color, borderColor: series.color }"
+            />
+            <span class="scope-legend-label" :title="series.label">{{ series.label }}</span>
+          </button>
+          <button
+            type="button"
+            class="scope-legend-remove"
+            :title="removeSeriesLabel"
+            :aria-label="`${removeSeriesLabel}: ${series.label}`"
+            @click="$emit('remove-probe', series.id)"
+          >
+            <v-icon icon="mdi-close" size="12" />
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -155,6 +186,31 @@ export default {
       type: String,
       default: 'Switch to the pipeline graph and click a node to plot its signals.'
     },
+    /** Name of the pipeline node / observation block feeding the scope. */
+    source: {
+      type: String,
+      default: ''
+    },
+    sourceLabel: {
+      type: String,
+      default: 'Source'
+    },
+    hiddenLabel: {
+      type: String,
+      default: 'hidden'
+    },
+    hideSeriesLabel: {
+      type: String,
+      default: 'Hide this curve'
+    },
+    showSeriesLabel: {
+      type: String,
+      default: 'Show this curve'
+    },
+    removeSeriesLabel: {
+      type: String,
+      default: 'Remove this channel'
+    },
     canResetZoom: {
       type: Boolean,
       default: false
@@ -164,7 +220,14 @@ export default {
       default: null
     }
   },
-  emits: ['toggle-pause', 'reset-zoom', 'clear', 'remove-probe', 'update-window-seconds'],
+  emits: [
+    'toggle-pause',
+    'reset-zoom',
+    'clear',
+    'remove-probe',
+    'toggle-series',
+    'update-window-seconds'
+  ],
   data: () => ({
     resizeObserver: null,
     drawRaf: null,
@@ -175,6 +238,9 @@ export default {
     // stays usable instead of turning into a long scroll of tall rows.
     isDenseLegend() {
       return this.snapshot.series.length > 10;
+    },
+    hiddenCount() {
+      return this.snapshot.series.filter((series) => series.hidden).length;
     }
   },
   watch: {
@@ -329,6 +395,9 @@ export default {
       const mapY = (v) => pad.top + plotH - ((v - vMin) / vSpan) * plotH;
 
       for (const series of snapshot.series) {
+        if (series.hidden) {
+          continue;
+        }
         ctx.strokeStyle = series.color;
         ctx.lineWidth = 1.5;
         ctx.beginPath();
@@ -384,6 +453,18 @@ export default {
 
 .scope-stat-sep {
   opacity: 0.45;
+}
+
+.scope-source {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scope-source-name {
+  font-weight: 500;
+  color: rgba(var(--v-theme-on-surface), 0.92);
 }
 
 .scope-window-control {
@@ -476,14 +557,13 @@ export default {
 .scope-legend-item {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   width: 100%;
   border: 1px solid rgba(71, 85, 105, 0.55);
   border-radius: 8px;
   background: rgba(15, 23, 42, 0.65);
   color: #e2e8f0;
   padding: 6px 8px;
-  cursor: pointer;
   text-align: left;
 }
 
@@ -491,10 +571,34 @@ export default {
   border-color: rgba(var(--v-theme-primary), 0.45);
 }
 
+.scope-legend-item-hidden {
+  border-style: dashed;
+}
+
+.scope-legend-item-hidden .scope-legend-label {
+  color: rgba(148, 163, 184, 0.65);
+}
+
+.scope-legend-toggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
 .scope-legend-swatch {
   width: 10px;
   height: 10px;
   border-radius: 999px;
+  border: 1px solid transparent;
   flex-shrink: 0;
 }
 
@@ -509,8 +613,21 @@ export default {
 }
 
 .scope-legend-remove {
-  opacity: 0.55;
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  opacity: 0.45;
   flex-shrink: 0;
+  cursor: pointer;
+}
+
+.scope-legend-remove:hover,
+.scope-legend-remove:focus-visible {
+  opacity: 1;
+  color: rgb(var(--v-theme-error));
 }
 
 .scope-legend-dense {

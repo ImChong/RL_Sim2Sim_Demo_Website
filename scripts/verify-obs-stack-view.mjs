@@ -50,6 +50,76 @@ async function openStackView(page, nodeId) {
   ));
 }
 
+async function readScopeState(page, blockName) {
+  const state = await page.evaluate(() => ({
+    tab: [...document.querySelectorAll('.model-io-tabs .v-btn')]
+      .find((el) => el.classList.contains('v-btn--active'))
+      ?.getAttribute('value'),
+    channels: document.querySelectorAll('.scope-legend-item').length,
+    hiddenChannels: document.querySelectorAll('.scope-legend-item-hidden').length,
+    source: document.querySelector('.scope-source-name')?.textContent.trim() ?? '',
+    legend: [...document.querySelectorAll('.scope-legend-label')]
+      .map((el) => el.textContent.trim())
+  }));
+  return { ...state, block: blockName };
+}
+
+async function openStackTab(page) {
+  await page.evaluate(() => {
+    [...document.querySelectorAll('.model-io-tabs .v-btn')]
+      .find((el) => el.getAttribute('value') === 'stack')
+      ?.click();
+  });
+  await sleep(300);
+}
+
+/** Click the n-th probeable row of the frame-composition table. */
+async function clickStackBlock(page, index) {
+  const name = await page.evaluate((i) => {
+    const row = document.querySelectorAll('.stack-row-clickable')[i];
+    const label = row?.querySelector('.stack-name-text')?.textContent.trim();
+    row?.querySelector('.stack-name-btn')?.click();
+    return label;
+  }, index);
+  await sleep(600);
+  return readScopeState(page, name);
+}
+
+/** Click the n-th module sub-row, i.e. one node inside a multi-node block. */
+async function clickStackSubrow(page, index) {
+  await openStackTab(page);
+  const name = await page.evaluate((i) => {
+    const row = document.querySelectorAll('.stack-subrow')[i];
+    const label = row?.querySelector('.stack-name-text')?.textContent.trim();
+    row?.querySelector('.stack-name-btn')?.click();
+    return label;
+  }, index);
+  await sleep(600);
+  return readScopeState(page, name);
+}
+
+/** Click the n-th legend row, which hides / shows that curve. */
+async function toggleLegendSeries(page, index) {
+  await page.evaluate((i) => {
+    document.querySelectorAll('.scope-legend-toggle')[i]?.click();
+  }, index);
+  await sleep(400);
+  return readScopeState(page, '');
+}
+
+/** Click the n-th probeable segment of the newest frame strip. */
+async function clickStackSegment(page, index) {
+  await openStackTab(page);
+  const name = await page.evaluate((i) => {
+    const strip = document.querySelector('.stack-frame:last-child .stack-strip');
+    const seg = strip?.querySelectorAll('.stack-seg-clickable')[i];
+    seg?.click();
+    return seg?.textContent.trim() ?? `segment ${i}`;
+  }, index);
+  await sleep(600);
+  return readScopeState(page, name);
+}
+
 async function main() {
   const browser = await puppeteer.launch({
     executablePath: CHROME,
@@ -135,6 +205,56 @@ async function main() {
     }
   }
 
+  const clickableRows = await page.$$eval('.stack-row-clickable', (rows) => rows.length);
+  if (clickableRows === 0) {
+    throw new Error('No observation block is marked clickable in the stacking view');
+  }
+
+  const scope = await clickStackBlock(page, 0);
+  if (scope.tab !== 'scope') {
+    throw new Error(`Clicking an observation block did not open the scope (active: ${scope.tab})`);
+  }
+  if (scope.channels === 0) {
+    throw new Error(`Block "${scope.block}" opened the scope with no channels`);
+  }
+  if (!scope.source) {
+    throw new Error('The oscilloscope toolbar does not name the plotted source');
+  }
+
+  // Clicking a frame segment plots the same block from the stacking strip.
+  const fromSegment = await clickStackSegment(page, 0);
+  if (fromSegment.tab !== 'scope' || fromSegment.channels === 0) {
+    throw new Error(
+      `Clicking a frame segment did not plot the block (tab: ${fromSegment.tab}, channels: ${fromSegment.channels})`
+    );
+  }
+
+  // A block split into several modules exposes each one as its own sub-row.
+  await openStackTab(page);
+  const subrows = await page.$$eval('.stack-subrow', (rows) => rows.length);
+  let module = null;
+  if (subrows > 0) {
+    module = await clickStackSubrow(page, 0);
+    if (module.tab !== 'scope' || module.channels === 0) {
+      throw new Error(
+        `Clicking a module sub-row did not plot it (tab: ${module.tab}, channels: ${module.channels})`
+      );
+    }
+  }
+
+  // Clicking a legend row mutes the curve instead of dropping the channel.
+  const before = module ?? fromSegment;
+  const muted = await toggleLegendSeries(page, 0);
+  if (muted.hiddenChannels !== 1 || muted.channels !== before.channels) {
+    throw new Error(
+      `Legend click should hide one curve without removing it (hidden: ${muted.hiddenChannels}, channels: ${muted.channels})`
+    );
+  }
+  const unmuted = await toggleLegendSeries(page, 0);
+  if (unmuted.hiddenChannels !== 0) {
+    throw new Error(`Clicking a hidden legend row again should restore the curve (hidden: ${unmuted.hiddenChannels})`);
+  }
+
   const historyTab = await openStackView(page, 'history');
   if (historyTab && historyTab !== 'stack' && await page.$('[data-node-id="history"]')) {
     throw new Error(`History buffer node did not open the stacking tab (active: ${historyTab})`);
@@ -143,6 +263,15 @@ async function main() {
   console.log(
     `OK: Obs Warehouse opened the stacking view (${view.rows.length} blocks, ${view.frames} frame(s), ${view.total}D per frame).`
   );
+  console.log(
+    `OK: clicking block "${scope.block}" plotted ${scope.channels} scope channel(s) from "${scope.source}": ${scope.legend.slice(0, 3).join(', ')}…`
+  );
+  if (module) {
+    console.log(
+      `OK: module sub-row "${module.block}" plotted ${module.channels} channel(s) from "${module.source}".`
+    );
+  }
+  console.log('OK: a legend click hides the curve and keeps the channel.');
   await browser.close();
 }
 
