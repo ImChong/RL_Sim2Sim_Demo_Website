@@ -3,11 +3,13 @@ import assert from 'node:assert/strict';
 import { buildObsStackLayout } from '../src/simulation/obsStackLayout.js';
 import { MAX_SCOPE_CHANNELS } from '../src/simulation/scopeChannels.js';
 
-const obsNode = (id, concatOffset, probeKeys) => ({
+const obsNode = (id, concatOffset, probeKeys, extra = {}) => ({
   id,
   group: 'obs',
   concatOffset,
-  probeKeys
+  concatSize: probeKeys.length,
+  probeKeys,
+  ...extra
 });
 
 const telemetry = {
@@ -19,11 +21,11 @@ const telemetry = {
   ],
   atomicNodes: [
     { id: 'sim-root-angvel', group: 'sim', probeKeys: ['x', 'y', 'z'] },
-    obsNode('obs-RootAngVelB', 0, ['x', 'y', 'z']),
-    obsNode('obs-Command-vx', 3, ['vx']),
-    obsNode('obs-Command-vy', 4, ['vy']),
-    obsNode('obs-Command-yaw', 5, ['yaw']),
-    obsNode('obs-JointPos', 6, ['hip', 'knee'])
+    obsNode('obs-RootAngVelB', 0, ['x', 'y', 'z'], { title: '根角速度' }),
+    obsNode('obs-Command-vx', 3, ['vx'], { title: '指令 vx' }),
+    obsNode('obs-Command-vy', 4, ['vy'], { title: '指令 vy' }),
+    obsNode('obs-Command-yaw', 5, ['yaw'], { title: '指令 yaw' }),
+    obsNode('obs-JointPos', 6, ['hip', 'knee'], { title: '关节位置' })
   ],
   concat: {
     currentFrameSize: 35,
@@ -94,6 +96,21 @@ test('buildObsStackLayout maps each block onto the nodes carrying its signals', 
 
   assert.deepEqual(jointPos.nodeIds, ['obs-JointPos']);
   assert.equal(jointPos.channelCount, 2);
+});
+
+test('buildObsStackLayout names each module and its slice of the block', () => {
+  const [angVel, command] = buildObsStackLayout(telemetry).blocks;
+
+  // One module: the block row can name the node inline.
+  assert.deepEqual(angVel.modules, [
+    { id: 'obs-RootAngVelB', title: '根角速度', offset: 0, end: 3, size: 3, channelCount: 3 }
+  ]);
+
+  // Three modules: each gets its own name, slice and channel count.
+  assert.deepEqual(
+    command.modules.map((mod) => [mod.title, mod.offset, mod.end, mod.channelCount]),
+    [['指令 vx', 3, 4, 1], ['指令 vy', 4, 5, 1], ['指令 yaw', 5, 6, 1]]
+  );
 });
 
 test('buildObsStackLayout leaves blocks without live signals unprobeable', () => {

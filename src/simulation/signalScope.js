@@ -353,10 +353,33 @@ export function setScopeProbes(scope, probes, options = {}) {
     lineKey: probe.lineKey,
     label: probe.label,
     color: scopeChannelColor(index),
+    hidden: false,
     values: new Float32Array(scope.capacity)
   }));
   clearScopeBuffer(scope);
   return scope.channels;
+}
+
+/**
+ * Hide or show one channel's curve. Hidden channels keep sampling, so a curve
+ * brought back still carries the history recorded while it was off.
+ * @returns {boolean | null} the new hidden state, or null when unknown
+ */
+export function setScopeChannelHidden(scope, probeId, hidden) {
+  const channel = scope?.channels?.find((ch) => ch.id === probeId);
+  if (!channel) {
+    return null;
+  }
+  channel.hidden = Boolean(hidden);
+  return channel.hidden;
+}
+
+export function toggleScopeChannelHidden(scope, probeId) {
+  const channel = scope?.channels?.find((ch) => ch.id === probeId);
+  if (!channel) {
+    return null;
+  }
+  return setScopeChannelHidden(scope, probeId, !channel.hidden);
 }
 
 export function toggleScopeProbe(scope, probe) {
@@ -375,6 +398,7 @@ export function toggleScopeProbe(scope, probe) {
     lineKey: probe.lineKey,
     label: probe.label,
     color,
+    hidden: false,
     values: new Float32Array(scope.capacity)
   });
   return true;
@@ -435,6 +459,7 @@ export function getScopeSnapshot(scope) {
         id: ch.id,
         label: ch.label,
         color: ch.color,
+        hidden: Boolean(ch.hidden),
         values: []
       })),
       timeRange: [0, scope.windowSeconds ?? DEFAULT_WINDOW_SECONDS]
@@ -446,6 +471,7 @@ export function getScopeSnapshot(scope) {
     id: ch.id,
     label: ch.label,
     color: ch.color,
+    hidden: Boolean(ch.hidden),
     values: new Float32Array(length)
   }));
 
@@ -476,7 +502,12 @@ export function getScopeSnapshot(scope) {
 
   let minY = Infinity;
   let maxY = -Infinity;
+  // Hidden channels must not stretch the axis: muting an outlier is the usual
+  // reason to hide one, and the remaining curves should expand to fill.
   for (const series of visibleSeries) {
+    if (series.hidden) {
+      continue;
+    }
     for (let i = 0; i < visibleLength; i++) {
       const v = series.values[i];
       if (v < minY) minY = v;

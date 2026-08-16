@@ -120,6 +120,7 @@
             :labels="stackLabels"
             :active-node-ids="probedNodeIds"
             @select-block="onStackBlock"
+            @select-module="onStackModule"
           />
           <OnnxNetronViewer
             v-if="viewTab === 'architecture'"
@@ -144,12 +145,19 @@
             :resume-label="t.scopeResume"
             :empty-label="t.scopeEmpty"
             :hint="t.scopeHint"
+            :source="scopeSourceName"
+            :source-label="t.scopeSource"
+            :hidden-label="t.scopeHidden"
+            :hide-series-label="t.scopeHideSeries"
+            :show-series-label="t.scopeShowSeries"
+            :remove-series-label="t.scopeRemoveSeries"
             :can-reset-zoom="Boolean(scopeZoom)"
             :zoom="scopeZoom"
             @toggle-pause="toggleScopePause"
             @reset-zoom="resetScopeZoom"
             @clear="clearScope"
             @remove-probe="onRemoveProbe"
+            @toggle-series="onToggleSeries"
             @update-window-seconds="onScopeWindowChange"
           />
         </template>
@@ -194,7 +202,8 @@ import {
   pushScopeSample,
   removeScopeProbe,
   setScopeProbes,
-  setScopeWindowSeconds
+  setScopeWindowSeconds,
+  toggleScopeChannelHidden
 } from '@/simulation/signalScope.js';
 import {
   clampPanelSize,
@@ -208,6 +217,10 @@ import {
   saveScopeWindowSeconds
 } from '@/utils/scopeWindowPreference.js';
 import { MAX_SCOPE_CHANNELS } from '@/simulation/scopeChannels.js';
+
+// A block can decompose into many nodes; the toolbar names the first few and
+// counts the rest so the stats row stays on one line.
+const MAX_SOURCE_NODE_NAMES = 3;
 
 const translations = {
   en: {
@@ -226,7 +239,7 @@ const translations = {
     tabArchitecture: 'Architecture',
     tabScope: 'Scope',
     graphHint: 'Click a node to plot all of its signals · Obs Warehouse shows the tensor stacking · Policy net opens Architecture',
-    stackHint: 'Click an observation block (row or frame segment) to plot its live signals in the oscilloscope.',
+    stackHint: 'Click an observation block or one of its modules (row, sub-row or frame segment) to plot its live signals in the oscilloscope.',
     stackPlot: 'Click to plot in the oscilloscope',
     stackEmpty: 'The observation layout appears once the policy is running.',
     stackFrame: 'frame',
@@ -240,9 +253,15 @@ const translations = {
     stackColBlock: 'Block',
     stackColSize: 'Size',
     stackColRange: 'Range',
+    stackColModule: 'Modules',
     scopeChannels: 'Channels',
     scopeSamples: 'Samples',
     scopeWindow: 'Window',
+    scopeSource: 'Source',
+    scopeHidden: 'hidden',
+    scopeHideSeries: 'Click to hide this curve',
+    scopeShowSeries: 'Click to show this curve',
+    scopeRemoveSeries: 'Remove this channel',
     scopeWindowInput: 'Oscilloscope window (seconds)',
     scopeResetZoom: 'Reset zoom',
     scopeClear: 'Clear',
@@ -268,7 +287,7 @@ const translations = {
     tabArchitecture: '模型架构',
     tabScope: '示波器',
     graphHint: '点击节点查看该节点全部信号曲线 · 点击观测仓库查看张量堆叠 · 点击策略网络打开模型架构',
-    stackHint: '点击观测块（表格行或帧色块）即可在示波器中查看该块的实时曲线。',
+    stackHint: '点击观测块或其中的模块（表格行 / 子行 / 帧色块）即可在示波器中查看对应的实时曲线。',
     stackPlot: '点击在示波器中查看曲线',
     stackEmpty: '策略就绪后显示观测张量的堆叠结构。',
     stackFrame: '单帧',
@@ -282,9 +301,15 @@ const translations = {
     stackColBlock: '观测块',
     stackColSize: '维度',
     stackColRange: '区间',
+    stackColModule: '模块',
     scopeChannels: '通道',
     scopeSamples: '采样',
     scopeWindow: '窗口',
+    scopeSource: '来源',
+    scopeHidden: '已隐藏',
+    scopeHideSeries: '点击隐藏该曲线',
+    scopeShowSeries: '点击显示该曲线',
+    scopeRemoveSeries: '移除该通道',
     scopeWindowInput: '示波器显示时长（秒）',
     scopeResetZoom: '重置缩放',
     scopeClear: '清空',
@@ -389,9 +414,32 @@ export default {
         colBlock: t.stackColBlock,
         colSize: t.stackColSize,
         colRange: t.stackColRange,
+        colModule: t.stackColModule,
         plot: t.stackPlot,
         channels: t.scopeChannels
       };
+    },
+    /**
+     * What the scope is currently plotting: the graph node titles, prefixed
+     * with the observation block when every channel comes from one block.
+     */
+    scopeSourceName() {
+      const nodeIds = this.probedNodeIds;
+      if (nodeIds.length === 0) {
+        return '';
+      }
+      const byId = new Map(
+        (this.telemetry.atomicNodes ?? []).map((node) => [node.id, node])
+      );
+      const titles = nodeIds.map((id) => byId.get(id)?.title ?? id);
+      // Not " / ": that already separates the stats in the toolbar row.
+      const shown = titles.slice(0, MAX_SOURCE_NODE_NAMES).join(', ');
+      const rest = titles.length - MAX_SOURCE_NODE_NAMES;
+      const nodeNames = rest > 0 ? `${shown} +${rest}` : shown;
+      const block = this.stackLayout.blocks.find(
+        (candidate) => nodeIds.every((id) => candidate.nodeIds.includes(id))
+      );
+      return block ? `${block.name} · ${nodeNames}` : nodeNames;
     },
     scopeWindowMinSeconds() {
       return MIN_SCOPE_WINDOW_SECONDS;
@@ -573,6 +621,16 @@ export default {
         .flatMap((node) => listNodeProbes(node));
       this.plotProbes(probes, { allowMultipleNodes: true });
     },
+    /** Plot a single module (graph node) of an observation block. */
+    onStackModule(mod) {
+      const node = (this.telemetry.atomicNodes ?? []).find(
+        (candidate) => candidate.id === mod?.id
+      );
+      if (!node) {
+        return;
+      }
+      this.plotProbes(listNodeProbes(node));
+    },
     /**
      * Swap the scope over to a new probe set and show it.
      * setScopeProbes rebuilds every channel and clears the sample buffer, so
@@ -592,6 +650,14 @@ export default {
     },
     onRemoveProbe(probeId) {
       removeScopeProbe(this.signalScope, probeId);
+      this.scopeSnapshot = getScopeSnapshot(this.signalScope);
+    },
+    /**
+     * Mute a curve instead of dropping it: the channel keeps sampling, so
+     * bringing it back shows the history recorded while it was hidden.
+     */
+    onToggleSeries(probeId) {
+      toggleScopeChannelHidden(this.signalScope, probeId);
       this.scopeSnapshot = getScopeSnapshot(this.signalScope);
     },
     onScopeWindowChange(seconds) {

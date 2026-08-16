@@ -80,6 +80,18 @@ export function buildObsStackLayout(telemetry) {
       (sum, node) => sum + nodeProbeKeys(node).length,
       0
     );
+    const modules = probeNodes.map((node) => {
+      const moduleOffset = Number(node.concatOffset);
+      const moduleSize = Math.max(0, Number(node.concatSize) || 0);
+      return {
+        id: node.id,
+        title: node.title ?? node.id,
+        offset: moduleOffset,
+        end: moduleOffset + moduleSize,
+        size: moduleSize,
+        channelCount: Math.min(MAX_SCOPE_CHANNELS, nodeProbeKeys(node).length)
+      };
+    });
     return {
       id: `${block.name ?? 'block'}-${index}`,
       name: block.name ?? `Block ${index}`,
@@ -89,6 +101,8 @@ export function buildObsStackLayout(telemetry) {
       size,
       share: frameSize > 0 ? size / frameSize : 0,
       nodeIds: probeNodes.map((node) => node.id),
+      // The graph nodes this block decomposes into, in concat order.
+      modules,
       // The scope truncates at its channel cap, so report what will be drawn.
       channelCount: Math.min(MAX_SCOPE_CHANNELS, probeKeyCount)
     };

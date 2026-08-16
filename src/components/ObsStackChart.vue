@@ -39,48 +39,93 @@
               </tr>
             </thead>
             <tbody>
-              <tr
-                v-for="block in layout.blocks"
-                :key="block.id"
-                class="stack-row"
-                :class="{
-                  'stack-row-active': hoverBlockId === block.id,
-                  'stack-row-muted': hoverBlockId && hoverBlockId !== block.id,
-                  'stack-row-clickable': isBlockProbeable(block),
-                  'stack-row-probed': isBlockProbed(block)
-                }"
-                @mouseenter="onHoverBlock(block, $event)"
-                @mousemove="moveTooltip($event)"
-                @click="selectBlock(block)"
-              >
-                <th scope="row" class="stack-cell-name">
-                  <button
-                    v-if="isBlockProbeable(block)"
-                    type="button"
-                    class="stack-name-btn"
-                    :aria-label="`${block.name} — ${blockHint(block)}`"
-                    @click.stop="selectBlock(block)"
-                  >
-                    <span class="stack-name-text">{{ block.name }}</span>
-                    <v-icon
-                      icon="mdi-chart-line-variant"
-                      size="11"
-                      class="stack-name-icon"
-                    />
-                  </button>
-                  <span v-else class="stack-name-text" :title="block.name">{{ block.name }}</span>
-                </th>
-                <td class="stack-cell-bar">
-                  <span class="stack-bar-track">
-                    <span
-                      class="stack-bar-fill"
-                      :style="{ width: `${barWidth(block)}%` }"
-                    />
-                    <span class="stack-bar-value">{{ block.size }}D</span>
-                  </span>
-                </td>
-                <td class="stack-cell-range">[{{ block.offset }}, {{ block.end }})</td>
-              </tr>
+              <template v-for="block in layout.blocks" :key="block.id">
+                <tr
+                  class="stack-row"
+                  :class="{
+                    'stack-row-active': hoverBlockId === block.id,
+                    'stack-row-muted': hoverBlockId && hoverBlockId !== block.id,
+                    'stack-row-clickable': isBlockProbeable(block),
+                    'stack-row-probed': isBlockProbed(block)
+                  }"
+                  @mouseenter="onHoverBlock(block, $event)"
+                  @mousemove="moveTooltip($event)"
+                  @click="selectBlock(block)"
+                >
+                  <th scope="row" class="stack-cell-name">
+                    <button
+                      v-if="isBlockProbeable(block)"
+                      type="button"
+                      class="stack-name-btn"
+                      :aria-label="`${blockFullName(block)} — ${blockHint(block)}`"
+                      @click.stop="selectBlock(block)"
+                    >
+                      <span class="stack-name-text">{{ block.name }}</span>
+                      <span
+                        v-if="soleModuleTitle(block)"
+                        class="stack-name-node"
+                      >· {{ soleModuleTitle(block) }}</span>
+                      <v-icon
+                        icon="mdi-chart-line-variant"
+                        size="11"
+                        class="stack-name-icon"
+                      />
+                    </button>
+                    <span v-else class="stack-name-text" :title="block.name">{{ block.name }}</span>
+                  </th>
+                  <td class="stack-cell-bar">
+                    <span class="stack-bar-track">
+                      <span
+                        class="stack-bar-fill"
+                        :style="{ width: `${barWidth(block)}%` }"
+                      />
+                      <span class="stack-bar-value">{{ block.size }}D</span>
+                    </span>
+                  </td>
+                  <td class="stack-cell-range">[{{ block.offset }}, {{ block.end }})</td>
+                </tr>
+                <tr
+                  v-for="(mod, modIdx) in submodules(block)"
+                  :key="mod.id"
+                  class="stack-subrow"
+                  :class="{
+                    'stack-row-muted': hoverBlockId && hoverBlockId !== block.id,
+                    'stack-subrow-probed': isModuleProbed(mod)
+                  }"
+                  @mouseenter="onHoverModule(block, mod, $event)"
+                  @mousemove="moveTooltip($event)"
+                  @click.stop="selectModule(mod)"
+                >
+                  <th scope="row" class="stack-cell-name stack-cell-subname">
+                    <button
+                      type="button"
+                      class="stack-name-btn"
+                      :aria-label="`${block.name} / ${mod.title} — ${moduleHint(mod)}`"
+                      @click.stop="selectModule(mod)"
+                    >
+                      <span class="stack-subrow-branch" aria-hidden="true">
+                        {{ modIdx === submodules(block).length - 1 ? '└' : '├' }}
+                      </span>
+                      <span class="stack-name-text">{{ mod.title }}</span>
+                      <v-icon
+                        icon="mdi-chart-line-variant"
+                        size="10"
+                        class="stack-name-icon"
+                      />
+                    </button>
+                  </th>
+                  <td class="stack-cell-bar">
+                    <span class="stack-bar-track">
+                      <span
+                        class="stack-bar-fill stack-bar-fill-sub"
+                        :style="{ width: `${barWidth(mod)}%` }"
+                      />
+                      <span class="stack-bar-value">{{ mod.size }}D</span>
+                    </span>
+                  </td>
+                  <td class="stack-cell-range">[{{ mod.offset }}, {{ mod.end }})</td>
+                </tr>
+              </template>
             </tbody>
           </table>
         </section>
@@ -149,6 +194,7 @@
           <div class="stack-tooltip-title">{{ tooltip.title }}</div>
           <div class="stack-tooltip-line">{{ tooltip.range }}</div>
           <div v-if="tooltip.description" class="stack-tooltip-desc">{{ tooltip.description }}</div>
+          <div v-if="tooltip.modules" class="stack-tooltip-desc">{{ tooltip.modules }}</div>
           <div v-if="tooltip.hint" class="stack-tooltip-hint">{{ tooltip.hint }}</div>
         </div>
       </div>
@@ -174,7 +220,7 @@ export default {
       default: () => []
     }
   },
-  emits: ['select-block'],
+  emits: ['select-block', 'select-module'],
   data: () => ({
     hoverBlockId: null,
     tooltip: null
@@ -208,17 +254,48 @@ export default {
     isBlockProbed(block) {
       return (block?.nodeIds ?? []).some((nodeId) => this.activeNodeIdSet.has(nodeId));
     },
+    isModuleProbed(mod) {
+      return this.activeNodeIdSet.has(mod?.id);
+    },
+    /**
+     * Graph node title for a block that maps to exactly one node; blocks that
+     * decompose into several nodes name them in their own sub-rows instead.
+     */
+    soleModuleTitle(block) {
+      const modules = block?.modules ?? [];
+      return modules.length === 1 ? modules[0].title : '';
+    },
+    submodules(block) {
+      const modules = block?.modules ?? [];
+      return modules.length > 1 ? modules : [];
+    },
+    blockFullName(block) {
+      const sole = this.soleModuleTitle(block);
+      return sole ? `${block.name} · ${sole}` : block.name;
+    },
+    plotHint(channelCount) {
+      return `${this.labels.plot} · ${channelCount} ${this.labels.channels}`;
+    },
     blockHint(block) {
       if (!this.isBlockProbeable(block)) {
         return '';
       }
-      return `${this.labels.plot} · ${block.channelCount} ${this.labels.channels}`;
+      return this.plotHint(block.channelCount);
+    },
+    moduleHint(mod) {
+      return this.plotHint(mod?.channelCount ?? 0);
     },
     selectBlock(block) {
       if (!this.isBlockProbeable(block)) {
         return;
       }
       this.$emit('select-block', block);
+    },
+    selectModule(mod) {
+      if (!mod?.id) {
+        return;
+      }
+      this.$emit('select-module', mod);
     },
     barWidth(block) {
       if (!this.maxBlockSize) {
@@ -231,13 +308,32 @@ export default {
     onHoverBlock(block, event, frame = null) {
       this.hoverBlockId = block.id;
       const offset = (frame?.offset ?? 0) + block.offset;
+      const modules = block.modules ?? [];
       this.tooltip = {
-        title: `${block.name} · ${block.size}D`,
+        title: `${this.blockFullName(block)} · ${block.size}D`,
         range: frame
           ? `${frame.label} · [${offset}, ${offset + block.size})`
           : `[${block.offset}, ${block.end})`,
         description: block.description,
+        // Name the graph nodes inside the block so the strip says which module
+        // sits where, not just which observation block.
+        modules: modules.length > 1
+          ? `${this.labels.colModule}: ${modules.map((mod) => mod.title).join(' / ')}`
+          : '',
         hint: this.blockHint(block),
+        x: 0,
+        y: 0
+      };
+      this.moveTooltip(event);
+    },
+    onHoverModule(block, mod, event) {
+      this.hoverBlockId = block.id;
+      this.tooltip = {
+        title: `${mod.title} · ${mod.size}D`,
+        range: `${block.name} · [${mod.offset}, ${mod.end})`,
+        description: '',
+        modules: '',
+        hint: this.moduleHint(mod),
         x: 0,
         y: 0
       };
@@ -401,6 +497,50 @@ export default {
   background: var(--stack-probe);
 }
 
+.stack-subrow {
+  cursor: pointer;
+  color: var(--stack-ink-muted);
+}
+
+.stack-subrow > * {
+  padding: 1px 0;
+  vertical-align: middle;
+}
+
+.stack-subrow .stack-bar-fill {
+  height: 6px;
+  opacity: 0.75;
+}
+
+.stack-subrow-probed {
+  color: var(--stack-probe);
+}
+
+.stack-subrow-probed .stack-bar-fill,
+.stack-subrow:hover .stack-bar-fill {
+  background: var(--stack-probe);
+  opacity: 1;
+}
+
+.stack-subrow-probed .stack-name-icon,
+.stack-subrow:hover .stack-name-icon {
+  opacity: 1;
+  color: var(--stack-probe);
+}
+
+.stack-subrow:hover {
+  color: var(--stack-probe);
+}
+
+.stack-cell-subname {
+  padding-left: 8px;
+}
+
+.stack-subrow-branch {
+  flex: 0 0 auto;
+  opacity: 0.55;
+}
+
 .stack-cell-name {
   width: 30%;
   max-width: 0;
@@ -431,6 +571,20 @@ export default {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* The graph node title next to the raw observation module name. */
+.stack-name-node {
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--stack-ink-muted);
+}
+
+.stack-row-probed .stack-name-node,
+.stack-row-clickable:hover .stack-name-node {
+  color: var(--stack-probe);
 }
 
 .stack-name-icon {
