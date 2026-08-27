@@ -2,14 +2,14 @@
   <v-app>
     <header class="site-header">
       <div class="header-inner">
-        <h1 class="site-title" aria-label="Robotics RL Sim2Sim Demo | 机器人强化学习效果在线演示">
-          🤖 Robotics RL Sim2Sim Demo | 机器人强化学习效果在线演示
+        <h1 class="site-title" aria-label="Robot Learning Sim2Sim Online | 人形机器人强化学习在线推理">
+          🤖 Robot Learning Sim2Sim Online | 人形机器人强化学习在线推理
         </h1>
         <div class="header-spacer"></div>
         <div class="header-right">
           <a
             v-if="showExternalSourceLinks"
-            href="https://github.com/ImChong/RL_Sim2Sim_Demo_Website"
+            href="https://github.com/ImChong/Robot_Learning_Sim2Sim_Online"
             class="github-link"
             target="_blank"
             rel="noopener noreferrer"

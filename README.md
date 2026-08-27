@@ -1,19 +1,19 @@
-# RL Sim2Sim Demo Website
+# Robot_Learning_Sim2Sim_Online
 
-[![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-Live-brightgreen?logo=github)](https://imchong.github.io/RL_Sim2Sim_Demo_Website/)
-[![Deploy to GitHub Pages](https://github.com/ImChong/RL_Sim2Sim_Demo_Website/actions/workflows/deploy.yml/badge.svg)](https://github.com/ImChong/RL_Sim2Sim_Demo_Website/actions/workflows/deploy.yml)
+[![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-Live-brightgreen?logo=github)](https://imchong.github.io/Robot_Learning_Sim2Sim_Online/)
+[![Deploy to GitHub Pages](https://github.com/ImChong/Robot_Learning_Sim2Sim_Online/actions/workflows/deploy.yml/badge.svg)](https://github.com/ImChong/Robot_Learning_Sim2Sim_Online/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 这是一个基于 Vue 3 + Vuetify 的单页演示网站，用于在浏览器中运行 MuJoCo WebAssembly 场景，并使用 ONNX policy 驱动人形机器人运动。当前默认配置会从 `public/examples` 加载 G1 场景、policy 和 motion 数据。
 
-在线地址：<https://imchong.github.io/RL_Sim2Sim_Demo_Website/>
+在线地址：<https://imchong.github.io/Robot_Learning_Sim2Sim_Online/>
 
 ## 仓库说明
 本仓库在实现上**引用并改造了**以下开源项目源码：
 - 上游仓库：<https://github.com/Axellwppr/humanoid-policy-viewer>
 
 当前仓库的主要工作包括：
-- 将项目迁移到 `ImChong/RL_Sim2Sim_Demo_Website`
+- 将项目迁移到 `ImChong/Robot_Learning_Sim2Sim_Online`
 - 适配 GitHub Pages 部署
 - 保留原始网页演示能力，便于后续继续扩展 sim2sim demo
 
