@@ -6,7 +6,7 @@ import {
 } from '../src/utils/resolveModelAssetUrl.js';
 
 const ORIGIN = 'https://example.test';
-const BASE = '/RL_Sim2Sim_Demo_Website/';
+const BASE = '/Robot_Learning_Sim2Sim_Online/';
 
 test('resolveModelAssetUrl resolves relative policy paths against site base', () => {
   const url = resolveModelAssetUrl(
@@ -16,7 +16,7 @@ test('resolveModelAssetUrl resolves relative policy paths against site base', ()
   );
   assert.equal(
     url,
-    'https://example.test/RL_Sim2Sim_Demo_Website/examples/checkpoints/g1/tracking/policy_latest.onnx'
+    'https://example.test/Robot_Learning_Sim2Sim_Online/examples/checkpoints/g1/tracking/policy_latest.onnx'
   );
 });
 
@@ -31,10 +31,10 @@ test('buildNetronViewerUrl points to vendored Netron with encoded model url', ()
     BASE,
     ORIGIN
   );
-  assert.match(viewer, /^https:\/\/example\.test\/RL_Sim2Sim_Demo_Website\/netron\/index\.html\?url=/);
+  assert.match(viewer, /^https:\/\/example\.test\/Robot_Learning_Sim2Sim_Online\/netron\/index\.html\?url=/);
   const modelParam = decodeURIComponent(viewer.split('?url=')[1]);
   assert.equal(
     modelParam,
-    'https://example.test/RL_Sim2Sim_Demo_Website/examples/checkpoints/g1/tracking/policy_latest.onnx'
+    'https://example.test/Robot_Learning_Sim2Sim_Online/examples/checkpoints/g1/tracking/policy_latest.onnx'
   );
 });

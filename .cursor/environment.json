@@ -1,5 +1,5 @@
 {
-  "name": "RL Sim2Sim Demo Website",
+  "name": "Robot Learning Sim2Sim Online",
   "install": "npm ci",
   "terminals": [
     {
