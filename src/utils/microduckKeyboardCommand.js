@@ -21,6 +21,13 @@ export const MICRODUCK_CMD_SPRINT = {
   yaw: MICRODUCK_CMD_LIMITS.cmdYaw.max
 };
 
+/** Speed / limit table for the shared mobile joystick (see ampJoystickCommand.js). */
+export const MICRODUCK_JOYSTICK_PROFILE = {
+  limits: MICRODUCK_CMD_LIMITS,
+  walk: MICRODUCK_CMD_WALK,
+  sprint: MICRODUCK_CMD_SPRINT
+};
+
 const MICRODUCK_MOVEMENT_KEY_CODES = new Set([
   'KeyW',
   'KeyA',

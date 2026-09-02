@@ -2,7 +2,8 @@
 /**
  * Record the Microduck state machine: the Policy dropdown keeps a single
  * "Microduck" entry, and the walk / stand / sit-stand / roulade policies are
- * switched by the state-machine buttons inside the control panel.
+ * switched by the state-machine buttons in the control panel and next to the
+ * mobile joystick. The joystick itself drives the walking command.
  *
  * 无 GPU 的机器上软件光栅化只有 1~2 fps，实时录屏几乎看不到动作。
  * 这里改成「按仿真时间取帧」：关闭渲染循环让物理跑到 50Hz，每推进固定的
@@ -252,6 +253,33 @@ function stateSelector(stateValue) {
   return `[data-test="microduck-state-${stateValue}"]`;
 }
 
+function joystickStateSelector(stateValue) {
+  return `[data-test="microduck-joystick-state-${stateValue}"]`;
+}
+
+async function elementCenter(page, selector) {
+  const box = await page.evaluate((sel) => {
+    const rect = document.querySelector(sel)?.getBoundingClientRect();
+    return rect ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height } : null;
+  }, selector);
+  if (!box) {
+    throw new Error(`Element not found: ${selector}`);
+  }
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+}
+
+/** Push the mobile joystick and keep it held; the caller releases it. */
+async function holdJoystick(page, offsetX, offsetY) {
+  const center = await elementCenter(page, '.amp-mobile-controls__stick-base');
+  await page.mouse.move(center.x, center.y);
+  await page.mouse.down();
+  await page.mouse.move(center.x + offsetX, center.y + offsetY, { steps: 6 });
+}
+
+async function releaseJoystick(page) {
+  await page.mouse.up();
+}
+
 async function isMicroduckStateSettled(page, stateValue) {
   return page.evaluate((sel) => {
     const btn = document.querySelector(sel);
@@ -261,21 +289,30 @@ async function isMicroduckStateSettled(page, stateValue) {
   }, stateSelector(stateValue));
 }
 
-/** 点状态机按钮切换策略，切换过程中继续取帧。 */
+/** 点摇杆旁的状态机按钮切换策略，切换过程中继续取帧。 */
 async function switchState(page, sink, stateValue) {
   await setSimPaused(page, false);
+  const selector = joystickStateSelector(stateValue);
   await page.waitForFunction(
     (sel) => {
       const btn = document.querySelector(sel);
       return Boolean(btn) && !btn.disabled;
     },
     { timeout: 60000 },
-    stateSelector(stateValue)
+    selector
   );
-  await page.click(stateSelector(stateValue));
+  await page.click(selector);
   const settled = await sink.captureUntil(() => isMicroduckStateSettled(page, stateValue), { maxFrames: 80 });
   if (!settled) {
     throw new Error(`Microduck state "${stateValue}" did not settle`);
+  }
+  // 面板与摇杆两处按钮应指向同一个状态。
+  const joystickPressed = await page.evaluate(
+    (sel) => document.querySelector(sel)?.getAttribute('aria-pressed') === 'true',
+    selector
+  );
+  if (!joystickPressed) {
+    throw new Error(`Joystick button for "${stateValue}" is not marked active`);
   }
   await page.evaluate(() => document.activeElement?.blur?.());
   await setSimPaused(page, true);
@@ -324,23 +361,23 @@ async function main() {
     await enterCaptureMode(page);
     await setSimPaused(page, true);
 
-    // 1) walk：键盘 W 前进
-    await page.keyboard.down('KeyW');
+    // 1) walk：推摇杆前进（略带左转）
+    await holdJoystick(page, -22, -46);
     await sink.captureSimSeconds(3.5);
-    await page.keyboard.up('KeyW');
+    await releaseJoystick(page);
     await sink.captureSimSeconds(0.6);
-    logSnap('after-walk-W', await readRobotSnapshot(page));
+    logSnap('after-walk-joystick', await readRobotSnapshot(page));
 
     // 2) 状态机按钮 -> stand
     await switchState(page, sink, 'stand');
     await sink.captureSimSeconds(1.5);
     logSnap('after-stand', await readRobotSnapshot(page));
 
-    // 3) 状态机按钮 -> sitstand，再用坐下按钮翻转姿态
+    // 3) 状态机按钮 -> sitstand；再次点同一个摇杆按钮翻转坐/站姿态
     await switchState(page, sink, 'sitstand');
     await sink.captureSimSeconds(1);
     await setSimPaused(page, false);
-    await page.click('[data-test="microduck-sit-toggle"]');
+    await page.click(joystickStateSelector('sitstand'));
     await setSimPaused(page, true);
     await sink.captureSimSeconds(2.5);
     logSnap('after-sit', await readRobotSnapshot(page));

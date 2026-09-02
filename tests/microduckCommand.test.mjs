@@ -6,10 +6,17 @@ import { fileURLToPath } from 'node:url';
 import { Observations } from '../src/simulation/observationHelpers.js';
 import {
   MICRODUCK_CMD_LIMITS,
+  MICRODUCK_CMD_WALK,
+  MICRODUCK_JOYSTICK_PROFILE,
   computeMicroduckCommandFromKeys,
   isMicroduckMovementKey,
   isMicroduckSitKey
 } from '../src/utils/microduckKeyboardCommand.js';
+import {
+  AMP_JOYSTICK_PROFILE,
+  computeAmpCommandFromJoystick,
+  stickVisualFromAmpCommand
+} from '../src/utils/ampJoystickCommand.js';
 import {
   MICRODUCK_DEFAULT_STATE,
   MICRODUCK_POLICY_VALUE,
@@ -124,4 +131,36 @@ test('every microduck state points at a shipped policy config and onnx', () => {
     assert.equal(config.policy_kind, 'microduck');
     readFileSync(join(root, 'public', state.onnxPath.replace('./', '')));
   }
+});
+
+test('the shared joystick honours the Microduck speed profile', () => {
+  const full = computeAmpCommandFromJoystick(0, 1, 0, false, true, MICRODUCK_JOYSTICK_PROFILE);
+  assert.equal(full.cmdX, MICRODUCK_CMD_LIMITS.cmdX.max);
+
+  const half = computeAmpCommandFromJoystick(0, 0.5, 0, false, true, MICRODUCK_JOYSTICK_PROFILE);
+  assert.ok(half.cmdX > 0 && half.cmdX < MICRODUCK_CMD_LIMITS.cmdX.max);
+
+  const strafe = computeAmpCommandFromJoystick(0, 0, 1, false, true, MICRODUCK_JOYSTICK_PROFILE);
+  assert.equal(strafe.cmdY, MICRODUCK_CMD_LIMITS.cmdY.max);
+
+  const turn = computeAmpCommandFromJoystick(1, 0, 0, false, true, MICRODUCK_JOYSTICK_PROFILE);
+  assert.equal(turn.cmdYaw, MICRODUCK_CMD_LIMITS.cmdYaw.min);
+
+  // 同样的推杆量在 AMP 档位上应该更快，说明 profile 真的生效了。
+  const ampFull = computeAmpCommandFromJoystick(0, 1, 0, false, true, AMP_JOYSTICK_PROFILE);
+  assert.ok(ampFull.cmdX > full.cmdX);
+});
+
+test('slider / keyboard commands sync the stick under the Microduck profile', () => {
+  const visual = stickVisualFromAmpCommand(
+    MICRODUCK_CMD_WALK.vx,
+    0,
+    0,
+    MICRODUCK_JOYSTICK_PROFILE
+  );
+  assert.ok(visual.normY > 0);
+  assert.equal(visual.normX, 0);
+
+  const strafeVisual = stickVisualFromAmpCommand(0, -0.1, 0, MICRODUCK_JOYSTICK_PROFILE);
+  assert.equal(strafeVisual.yawDirection, -1);
 });

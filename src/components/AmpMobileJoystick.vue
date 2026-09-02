@@ -8,10 +8,27 @@
     role="group"
     :aria-label="labels.group"
   >
-    <div class="amp-mobile-controls__pad">
+    <div class="amp-mobile-controls__pad" :class="{ 'amp-mobile-controls__pad--with-states': hasStateButtons }">
+      <div v-if="hasStateButtons" class="amp-mobile-controls__state-grid">
+        <button
+          v-for="item in stateButtons"
+          :key="item.value"
+          type="button"
+          class="amp-mobile-controls__action-btn amp-mobile-controls__state-btn"
+          :class="{ 'amp-mobile-controls__action-btn--active': item.active }"
+          :aria-label="item.label"
+          :aria-pressed="item.active ? 'true' : 'false'"
+          :disabled="disabled"
+          :data-test="`microduck-joystick-state-${item.value}`"
+          @click.stop="$emit('state', item.value)"
+        >
+          <v-icon :icon="item.icon" size="20" />
+        </button>
+      </div>
       <div
         ref="moveBase"
         class="amp-mobile-controls__stick-base"
+        :class="{ 'amp-mobile-controls__stick-base--disabled': stickDisabled }"
         :aria-label="labels.move"
         @pointerdown.prevent="onMoveDown"
         @pointermove.prevent="onMoveMove"
@@ -25,6 +42,7 @@
       </div>
       <div class="amp-mobile-controls__orbit-anchor" aria-hidden="true">
         <button
+          v-if="showKnockdown"
           type="button"
           class="amp-mobile-controls__action-btn amp-mobile-controls__knockdown-btn amp-mobile-controls__orbit-btn amp-mobile-controls__orbit-btn--knockdown"
           :class="{ 'amp-mobile-controls__knockdown-btn--pressed': knockdownPressed }"
@@ -43,7 +61,7 @@
           class="amp-mobile-controls__action-btn amp-mobile-controls__orbit-btn amp-mobile-controls__orbit-btn--yaw-left"
           :class="{ 'amp-mobile-controls__action-btn--active': strafeDirection === 1 }"
           :aria-label="labels.strafeLeft"
-          :disabled="disabled"
+          :disabled="disabled || stickDisabled"
           @pointerdown.prevent="onStrafeDown(1, $event)"
           @pointerup.prevent="onStrafeUp($event)"
           @pointercancel.prevent="onStrafeUp($event)"
@@ -56,7 +74,7 @@
           class="amp-mobile-controls__action-btn amp-mobile-controls__orbit-btn amp-mobile-controls__orbit-btn--yaw-right"
           :class="{ 'amp-mobile-controls__action-btn--active': strafeDirection === -1 }"
           :aria-label="labels.strafeRight"
-          :disabled="disabled"
+          :disabled="disabled || stickDisabled"
           @pointerdown.prevent="onStrafeDown(-1, $event)"
           @pointerup.prevent="onStrafeUp($event)"
           @pointercancel.prevent="onStrafeUp($event)"
@@ -71,6 +89,7 @@
 
 <script>
 import {
+  AMP_JOYSTICK_PROFILE,
   computeAmpCommandFromJoystick,
   stickVisualFromAmpCommand
 } from '@/utils/ampJoystickCommand.js';
@@ -105,9 +124,29 @@ export default {
     cmdYaw: {
       type: Number,
       default: 0
+    },
+    /** Speed / limit table for the stick math (AMP by default, Microduck passes its own). */
+    profile: {
+      type: Object,
+      default: () => AMP_JOYSTICK_PROFILE
+    },
+    /** AMP-only knockdown test button. */
+    showKnockdown: {
+      type: Boolean,
+      default: true
+    },
+    /** Dim the stick when the active policy takes no velocity command. */
+    stickDisabled: {
+      type: Boolean,
+      default: false
+    },
+    /** Optional state-machine buttons beside the stick: { value, icon, label, active }. */
+    stateButtons: {
+      type: Array,
+      default: () => []
     }
   },
-  emits: ['command', 'knockdown'],
+  emits: ['command', 'knockdown', 'state'],
   data: () => ({
     moveNormX: 0,
     moveNormY: 0,
@@ -120,6 +159,9 @@ export default {
     maxRadius: 1
   }),
   computed: {
+    hasStateButtons() {
+      return this.stateButtons.length > 0;
+    },
     knobStyle() {
       return {
         transform: `translate(calc(-50% + ${this.knobOffsetX}px), calc(-50% + ${this.knobOffsetY}px))`
@@ -156,7 +198,8 @@ export default {
       const { normX, normY, yawDirection: strafeDirection } = stickVisualFromAmpCommand(
         this.cmdX,
         this.cmdY,
-        this.cmdYaw
+        this.cmdYaw,
+        this.profile
       );
       if (this.movePointerId === null) {
         this.moveNormX = normX;
@@ -169,7 +212,7 @@ export default {
       }
     },
     emitCommand() {
-      if (this.disabled) {
+      if (this.disabled || this.stickDisabled) {
         return;
       }
       const { cmdX, cmdY, cmdYaw } = computeAmpCommandFromJoystick(
@@ -177,7 +220,8 @@ export default {
         this.moveNormY,
         this.strafeDirection,
         false,
-        true
+        true,
+        this.profile
       );
       this.$emit('command', { cmdX, cmdY, cmdYaw });
     },
@@ -240,7 +284,7 @@ export default {
       this.emitCommand();
     },
     onMoveDown(event) {
-      if (this.disabled) {
+      if (this.disabled || this.stickDisabled) {
         return;
       }
       this.measureBase();
@@ -249,7 +293,7 @@ export default {
       this.updateMoveFromClient(event.clientX, event.clientY);
     },
     onMoveMove(event) {
-      if (this.disabled || this.movePointerId !== event.pointerId) {
+      if (this.disabled || this.stickDisabled || this.movePointerId !== event.pointerId) {
         return;
       }
       this.updateMoveFromClient(event.clientX, event.clientY);
@@ -280,7 +324,7 @@ export default {
       this.resetMove();
     },
     onStrafeDown(direction, event) {
-      if (this.disabled) {
+      if (this.disabled || this.stickDisabled) {
         return;
       }
       this.strafePointerActive = true;
@@ -310,6 +354,11 @@ export default {
   --amp-mobile-knockdown: rgba(var(--v-theme-secondary), 0.24);
   --amp-stick-size: 128px;
   --amp-btn-size: 48px;
+  --amp-state-btn-size: 40px;
+  /* Keep the state column clear of the strafe buttons orbiting the stick. */
+  --amp-state-offset: calc(
+    var(--amp-stick-size) / 2 + var(--amp-orbit-radius) + var(--amp-btn-size) / 2 + 10px
+  );
   --amp-orbit-radius: calc(var(--amp-stick-size) / 2 + var(--amp-btn-size) / 2 + 14px);
 
   position: fixed;
@@ -345,6 +394,26 @@ export default {
   height: calc(var(--amp-stick-size) + var(--amp-orbit-radius) * 0.52);
 }
 
+.amp-mobile-controls__pad--with-states {
+  width: calc(var(--amp-state-offset) + var(--amp-state-btn-size) * 2 + 8px);
+}
+
+/* State-machine buttons sit left of the stick, clear of the strafe orbit. */
+.amp-mobile-controls__state-grid {
+  position: absolute;
+  right: var(--amp-state-offset);
+  bottom: 0;
+  display: grid;
+  grid-template-columns: repeat(2, var(--amp-state-btn-size));
+  gap: 8px;
+  z-index: 3;
+}
+
+.amp-mobile-controls__state-btn {
+  width: var(--amp-state-btn-size);
+  height: var(--amp-state-btn-size);
+}
+
 .amp-mobile-controls__stick-base {
   position: absolute;
   right: 0;
@@ -358,6 +427,11 @@ export default {
   -webkit-backdrop-filter: blur(8px);
   touch-action: none;
   z-index: 1;
+}
+
+.amp-mobile-controls__stick-base--disabled {
+  opacity: 0.4;
+  pointer-events: none;
 }
 
 .amp-mobile-controls__orbit-anchor {
@@ -433,6 +507,10 @@ export default {
 .amp-mobile-controls__action-btn--active {
   background: var(--amp-mobile-glass-active);
   border-color: rgba(var(--v-theme-primary), 0.4);
+}
+
+.amp-mobile-controls__orbit-btn:disabled {
+  opacity: 0.4;
 }
 
 .amp-mobile-controls__knockdown-btn {

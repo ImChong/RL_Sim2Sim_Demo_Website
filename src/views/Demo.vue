@@ -1,6 +1,6 @@
 <template>
   <AmpMobileJoystick
-    v-if="showAmpJoystick"
+    v-if="showMobileJoystick"
     ref="ampJoystick"
     :disabled="state !== 1"
     :dock-above-mobile-panel="isSmallScreen"
@@ -8,8 +8,13 @@
     :cmd-x="cmdX"
     :cmd-y="cmdY"
     :cmd-yaw="cmdYaw"
+    :profile="joystickProfile"
+    :show-knockdown="isAmpPolicy"
+    :stick-disabled="isMicroduckPolicy && !isMicroduckWalk"
+    :state-buttons="microduckJoystickStates"
     @command="onAmpJoystickCommand"
     @knockdown="onKnockdownTest"
+    @state="onMicroduckJoystickState"
   />
   <ParkourMobileJoystick
     v-if="showParkourJoystick"
@@ -774,6 +779,7 @@ import {
 } from '@/utils/ampKeyboardCommand.js';
 import {
   MICRODUCK_CMD_LIMITS,
+  MICRODUCK_JOYSTICK_PROFILE,
   MICRODUCK_KEYBOARD_CONTROL_ROWS,
   computeMicroduckCommandFromKeys,
   isMicroduckMovementKey,
@@ -789,6 +795,7 @@ import {
   microduckDefaultPolicyPaths,
   microduckStateOrDefault
 } from '@/utils/microduckStateMachine.js';
+import { AMP_JOYSTICK_PROFILE } from '@/utils/ampJoystickCommand.js';
 import {
   computeParkourMobileDepthLayout,
   computeParkourMobileDepthLayoutFromMetrics,
@@ -876,6 +883,7 @@ const translations = {
     ampKeyKnockdown: 'Knockdown test',
     ampKeyboardFocusHint: 'Click the demo view first, then use the keys. Sliders update while keys are held.',
     ampJoystickGroup: 'AMP movement controls',
+    microduckJoystickGroup: 'Microduck movement and state controls',
     ampJoystickMove: 'Move (up/down = forward/back, left/right = turn in place)',
     ampJoystickStrafeLeft: 'Strafe left',
     ampJoystickStrafeRight: 'Strafe right',
@@ -1031,6 +1039,7 @@ const translations = {
     ampKeyKnockdown: '击倒测试',
     ampKeyboardFocusHint: '请先点击演示画面，再使用键盘。按住按键时滑块会同步显示当前速度。',
     ampJoystickGroup: 'AMP 移动控制',
+    microduckJoystickGroup: 'Microduck 移动与状态控制',
     ampJoystickMove: '移动（上/下=前进/后退，左/右=原地转向）',
     ampJoystickStrafeLeft: '向左平移',
     ampJoystickStrafeRight: '向右平移',
@@ -1418,15 +1427,30 @@ export default {
     velocitySliderStep() {
       return this.isMicroduckWalk ? 0.05 : 0.1;
     },
-    showAmpJoystick() {
-      return this.isAmpPolicy && !this.isExternalDemoPolicy;
+    // Microduck 复用同一个摇杆：行走状态推杆，其它状态只留状态机按钮。
+    showMobileJoystick() {
+      return (this.isAmpPolicy || this.isMicroduckPolicy) && !this.isExternalDemoPolicy;
+    },
+    joystickProfile() {
+      return this.isMicroduckPolicy ? MICRODUCK_JOYSTICK_PROFILE : AMP_JOYSTICK_PROFILE;
+    },
+    microduckJoystickStates() {
+      if (!this.isMicroduckPolicy) {
+        return [];
+      }
+      return this.microduckStateItems.map((item) => ({
+        ...item,
+        label: item.value === 'sitstand' && this.isMicroduckSitstand
+          ? (this.microduckSitMode ? this.t.microduckStandAction : this.t.microduckSitAction)
+          : item.title
+      }));
     },
     showParkourJoystick() {
       return this.isParkourPolicy && this.parkourFrameMounted;
     },
     ampJoystickLabels() {
       return {
-        group: this.t.ampJoystickGroup,
+        group: this.isMicroduckPolicy ? this.t.microduckJoystickGroup : this.t.ampJoystickGroup,
         move: this.t.ampJoystickMove,
         strafeLeft: this.t.ampJoystickStrafeLeft,
         strafeRight: this.t.ampJoystickStrafeRight,
@@ -2333,15 +2357,20 @@ export default {
       this.demo.params.cmdYaw = this.cmdYaw;
     },
     onAmpJoystickCommand({ cmdX, cmdY, cmdYaw }) {
-      if (!this.isAmpPolicy || this.state !== 1) {
+      if (!(this.isAmpPolicy || this.isMicroduckWalk) || this.state !== 1) {
         return;
       }
       this.cmdX = cmdX;
       this.cmdY = cmdY;
       this.cmdYaw = cmdYaw;
       this.onCmdChange();
+      // 键盘仍按住时以键盘指令为准，避免摇杆回中把 WASD 覆盖掉。
       if (this.ampKeysHeld.size > 0) {
-        this.applyAmpKeyboardCommand();
+        if (this.isMicroduckWalk) {
+          this.applyMicroduckKeyboardCommand();
+        } else {
+          this.applyAmpKeyboardCommand();
+        }
       }
     },
     shouldIgnoreAmpKeyboard(event) {
@@ -2705,6 +2734,14 @@ export default {
           }
         }
       }
+    },
+    // 摇杆旁的状态机按钮：再次点击当前的坐下/站起状态即翻转姿态。
+    onMicroduckJoystickState(value) {
+      if (value === 'sitstand' && this.isMicroduckSitstand) {
+        this.toggleMicroduckSit();
+        return;
+      }
+      this.switchMicroduckState(value);
     },
     toggleMicroduckSit() {
       if (!this.isMicroduckSitstand || this.state !== 1) {
