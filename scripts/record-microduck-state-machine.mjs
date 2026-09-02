@@ -11,6 +11,8 @@
  *
  * Usage:
  *   VITE_URL=http://127.0.0.1:3000/ node scripts/record-microduck-state-machine.mjs
+ *
+ * 脚本会自动在网址后追加 ?unlock=microduck 解锁隐藏的 Microduck 下拉项。
  */
 import puppeteer from 'puppeteer-core';
 import fs from 'node:fs';
@@ -20,6 +22,12 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 
 const BASE = process.env.VITE_URL ?? 'http://127.0.0.1:3000/';
+/** Microduck 是隐藏项，必须带解锁指令打开页面才会出现在下拉栏里。 */
+const PAGE_URL = (() => {
+  const url = new URL(BASE);
+  url.searchParams.set('unlock', 'microduck');
+  return url.toString();
+})();
 const CHROME = process.env.CHROME_PATH ?? '/usr/local/bin/google-chrome';
 const FFMPEG = process.env.FFMPEG_PATH ?? 'ffmpeg';
 const OUT_DIR = process.env.VIDEO_DIR ?? '/opt/cursor/artifacts';
@@ -333,7 +341,7 @@ async function main() {
   const sink = new FrameSink(page, frameDir);
 
   try {
-    await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
     await waitForPolicyReady(page);
     await sleep(400);
 

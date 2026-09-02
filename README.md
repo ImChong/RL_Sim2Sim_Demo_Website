@@ -76,7 +76,7 @@ npm run dev
 - `demo.reloadScene(...)`
 - `demo.reloadPolicy(...)`
 
-当前控制面板的 Policy 下拉栏已接入 [Microduck](https://github.com/pollen-robotics/microduck) 的 sim2sim 策略。下拉栏里 Microduck 只有一个选项，选中后由控制面板内的状态机按钮切换行走 / 站立 / 坐下起立 / 前滚翻四种状态（前滚翻结束后自动回到行走）。四个状态共用 `microduck/scene.xml` 与 61 维观测合同，切换时只热替换 ONNX，与 G1 AMP / Tracking 的 `switchSceneAndPolicy` 路径相同。Microduck 同样复用 AMP 的摇杆：摇杆按 Microduck 的速度上限输出行走指令，摇杆左侧另有一组同样的状态机按钮（坐下/站起状态下再按一次即翻转姿态）。
+当前控制面板的 Policy 下拉栏已接入 [Microduck](https://github.com/pollen-robotics/microduck) 的 sim2sim 策略，但它默认是隐藏项：只有用带解锁指令的网址打开页面（`https://<站点>/?unlock=microduck`，也支持 `#unlock=microduck`）时才会出现在下拉栏里，解锁状态记在 `sessionStorage`，当前标签页内重载页面依然有效。解锁后下拉栏里 Microduck 只有一个选项，选中后由控制面板内的状态机按钮切换行走 / 站立 / 坐下起立 / 前滚翻四种状态（前滚翻结束后自动回到行走）。四个状态共用 `microduck/scene.xml` 与 61 维观测合同，切换时只热替换 ONNX，与 G1 AMP / Tracking 的 `switchSceneAndPolicy` 路径相同。Microduck 同样复用 AMP 的摇杆：摇杆按 Microduck 的速度上限输出行走指令，摇杆左侧另有一组同样的状态机按钮（坐下/站起状态下再按一次即翻转姿态）。
 
 ![Microduck 状态机控制面板](docs/screenshots/microduck-state-machine-panel.png)
 
