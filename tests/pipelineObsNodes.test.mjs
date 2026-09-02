@@ -97,7 +97,7 @@ test('inferPolicyFamily detects tracking, amp, and parkour', () => {
   }), 'parkour');
   assert.equal(policyFamilyLabel('parkour', 'zh'), '跑酷 (PHP)');
   assert.equal(inferPolicyFamily({
-    policyId: 'microduck-walk'
+    policyId: 'microduck'
   }), 'microduck');
   assert.equal(inferPolicyFamily({
     config: { policy_kind: 'microduck' }

@@ -10,6 +10,15 @@ import {
   isMicroduckMovementKey,
   isMicroduckSitKey
 } from '../src/utils/microduckKeyboardCommand.js';
+import {
+  MICRODUCK_DEFAULT_STATE,
+  MICRODUCK_POLICY_VALUE,
+  MICRODUCK_SCENE_PATH,
+  MICRODUCK_STATES,
+  findMicroduckState,
+  microduckDefaultPolicyPaths,
+  microduckStateOrDefault
+} from '../src/utils/microduckStateMachine.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -69,5 +78,50 @@ test('microduck policy configs share the 61D contract and position control', () 
       'PrevActions',
       'Command13'
     ]);
+  }
+});
+
+test('microduck state machine exposes one dropdown value and four states', () => {
+  assert.equal(MICRODUCK_POLICY_VALUE, 'microduck');
+  assert.deepEqual(
+    MICRODUCK_STATES.map((state) => state.value),
+    ['walk', 'stand', 'sitstand', 'roulade']
+  );
+  for (const state of MICRODUCK_STATES) {
+    assert.ok(state.policyPath.endsWith('.json'));
+    assert.ok(state.onnxPath.endsWith('.onnx'));
+    assert.ok(state.labelKey && state.hintKey && state.icon);
+  }
+});
+
+test('microduck state lookup falls back to the default walking state', () => {
+  assert.equal(findMicroduckState('roulade')?.commandMode, 'zeros');
+  assert.equal(findMicroduckState('nope'), null);
+  assert.equal(microduckStateOrDefault('nope').value, MICRODUCK_DEFAULT_STATE);
+  assert.equal(microduckStateOrDefault(undefined).value, 'walk');
+});
+
+test('roulade is the only transient state and returns to walk', () => {
+  const transient = MICRODUCK_STATES.filter((state) => state.autoNext);
+  assert.equal(transient.length, 1);
+  assert.equal(transient[0].value, 'roulade');
+  assert.equal(transient[0].autoNext, 'walk');
+  assert.ok(transient[0].autoNextSimSeconds > 0);
+});
+
+test('the single microduck dropdown entry defaults to the walking policy', () => {
+  const paths = microduckDefaultPolicyPaths();
+  const walk = findMicroduckState('walk');
+  assert.equal(paths.policyPath, walk.policyPath);
+  assert.equal(paths.onnxPath, walk.onnxPath);
+  assert.equal(paths.scenePath, MICRODUCK_SCENE_PATH);
+});
+
+test('every microduck state points at a shipped policy config and onnx', () => {
+  for (const state of MICRODUCK_STATES) {
+    const policyFile = join(root, 'public', state.policyPath.replace('./', ''));
+    const config = JSON.parse(readFileSync(policyFile, 'utf8'));
+    assert.equal(config.policy_kind, 'microduck');
+    readFileSync(join(root, 'public', state.onnxPath.replace('./', '')));
   }
 });
