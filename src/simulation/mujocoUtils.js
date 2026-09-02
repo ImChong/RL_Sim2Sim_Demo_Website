@@ -364,6 +364,7 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
   const meshes = {};
   const lights = [];
   parent.bodyIdByName = Object.create(null);
+  parent.pelvis_body_id = undefined;
 
   let material = new THREE.MeshPhysicalMaterial();
   material.color = new THREE.Color(1, 1, 1);
@@ -394,7 +395,7 @@ export async function loadSceneFromURL(mujoco, filename, parent) {
       bodies[b].bodyID = b;
       bodies[b].has_custom_mesh = false;
 
-      if (bodies[b].name === 'base' || bodies[b].name === 'pelvis') {
+      if (bodies[b].name === 'base' || bodies[b].name === 'pelvis' || bodies[b].name === 'trunk_base') {
         parent.pelvis_body_id = b;
       }
     }

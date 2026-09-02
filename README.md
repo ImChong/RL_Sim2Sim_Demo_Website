@@ -76,6 +76,8 @@ npm run dev
 - `demo.reloadScene(...)`
 - `demo.reloadPolicy(...)`
 
+当前控制面板的 Policy 下拉栏已接入 [Microduck](https://github.com/pollen-robotics/microduck) 的 sim2sim 策略（Walk / Sit-Stand / Stand / Roulade）。它们共用 `microduck/scene.xml` 与 61 维观测合同，切换时只热替换 ONNX，与 G1 AMP / Tracking 的 `switchSceneAndPolicy` 路径相同。
+
 ## 部署说明
 本仓库已经接入 GitHub Pages，推送到 `main` 分支后会通过 GitHub Actions 自动构建并部署。
 

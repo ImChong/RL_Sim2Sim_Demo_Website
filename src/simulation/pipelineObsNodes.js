@@ -72,6 +72,13 @@ export function inferPolicyFamily(runner) {
   if (obsNames.some((name) => name === 'BootIndicator' || String(name).startsWith('Tracking') || String(name).startsWith('Target'))) {
     return 'tracking';
   }
+  if (
+    policyId.startsWith('microduck')
+    || policyPath.includes('microduck')
+    || runner.config?.policy_kind === 'microduck'
+  ) {
+    return 'microduck';
+  }
   if ((runner.historyLength ?? runner.config?.obs_config?.history_length ?? 1) > 1) {
     return 'amp';
   }
@@ -87,6 +94,8 @@ export function policyFamilyLabel(family, lang = 'zh') {
       return zh ? 'Tracking' : 'Tracking';
     case 'parkour':
       return zh ? '跑酷 (PHP)' : 'Parkour (PHP)';
+    case 'microduck':
+      return zh ? 'Microduck' : 'Microduck';
     default:
       return zh ? '策略' : 'Policy';
   }
@@ -155,6 +164,43 @@ export function decomposeObsBlockNodes(block, slice, jointNames, lang = 'zh', nu
         concatOffset: block.offset,
         concatSize: block.size
       }];
+    case 'Command13':
+      return [
+        {
+          id: `${idBase}-twist`,
+          kind: 'signal',
+          group: 'obs',
+          signalKind: 'indexed',
+          title: zh ? '指令 twist' : 'Cmd twist',
+          subtitle: 'vx vy yaw',
+          lines: dimLine(3, zh),
+          probeKeys: ['vx', 'vy', 'yaw'],
+          concatOffset: block.offset,
+          concatSize: 3
+        },
+        {
+          id: `${idBase}-head`,
+          kind: 'signal',
+          group: 'obs',
+          signalKind: 'indexed',
+          title: zh ? '指令头部' : 'Cmd head',
+          lines: dimLine(4, zh),
+          probeKeys: indexProbeKeys(4),
+          concatOffset: block.offset + 3,
+          concatSize: 4
+        },
+        {
+          id: `${idBase}-body`,
+          kind: 'signal',
+          group: 'obs',
+          signalKind: 'indexed',
+          title: zh ? '指令躯干' : 'Cmd body',
+          lines: dimLine(6, zh),
+          probeKeys: indexProbeKeys(6),
+          concatOffset: block.offset + 7,
+          concatSize: 6
+        }
+      ];
     case 'Command':
       return [
         {

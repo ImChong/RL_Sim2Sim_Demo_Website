@@ -44,6 +44,21 @@ test('decomposeObsBlockNodes splits TrackingCommandObsRaw', () => {
   assert.ok(nodes.find((n) => n.id === 'obs-TrackingCommandObsRaw-r6'));
 });
 
+test('decomposeObsBlockNodes splits Command13 into twist/head/body', () => {
+  const nodes = decomposeObsBlockNodes(
+    { name: 'Command13', offset: 48, size: 13 },
+    null,
+    [],
+    'en',
+    14
+  );
+  assert.equal(nodes.length, 3);
+  assert.equal(nodes[0].id, 'obs-Command13-twist');
+  assert.equal(nodes[0].concatOffset, 48);
+  assert.equal(nodes[1].concatOffset, 51);
+  assert.equal(nodes[2].concatOffset, 55);
+});
+
 test('decomposeObsBlockNodes exposes every channel of a block', () => {
   const [prevActions] = decomposeObsBlockNodes(
     { name: 'PrevActions', offset: 0, size: 2, kwargs: { history_steps: 1 } },
@@ -81,6 +96,13 @@ test('inferPolicyFamily detects tracking, amp, and parkour', () => {
     config: { onnx: { path: './examples/parkour/policy.onnx' } }
   }), 'parkour');
   assert.equal(policyFamilyLabel('parkour', 'zh'), '跑酷 (PHP)');
+  assert.equal(inferPolicyFamily({
+    policyId: 'microduck-walk'
+  }), 'microduck');
+  assert.equal(inferPolicyFamily({
+    config: { policy_kind: 'microduck' }
+  }), 'microduck');
+  assert.equal(policyFamilyLabel('microduck', 'en'), 'Microduck');
 });
 
 test('buildPipelineGraph adds dashed loopback from action to last action', () => {

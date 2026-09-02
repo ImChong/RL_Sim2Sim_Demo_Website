@@ -421,9 +421,31 @@ class Command {
   }
 }
 
+/** Microduck unified 13D command: [twist(3), head_pose(4), body_pose(6)]. */
+class Command13 {
+  constructor() {
+    this.out = new Float32Array(13);
+    this.fallbackCmd = new Float32Array([0, 0, 0]);
+  }
+
+  get size() {
+    return 13;
+  }
+
+  compute(state) {
+    const cmd = state?.cmd ?? this.fallbackCmd;
+    this.out.fill(0);
+    this.out[0] = Number(cmd[0]) || 0;
+    this.out[1] = Number(cmd[1]) || 0;
+    this.out[2] = Number(cmd[2]) || 0;
+    return this.out;
+  }
+}
+
 // Export a dictionary of all observation classes
 export const Observations = {
   Command,
+  Command13,
   JointVel,
   PrevActions,
   BootIndicator,
