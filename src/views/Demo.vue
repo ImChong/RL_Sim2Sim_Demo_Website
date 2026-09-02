@@ -797,6 +797,11 @@ import {
 } from '@/utils/microduckStateMachine.js';
 import { AMP_JOYSTICK_PROFILE } from '@/utils/ampJoystickCommand.js';
 import {
+  MICRODUCK_UNLOCK_CODE,
+  isPolicyUnlocked,
+  resolveUnlockedPolicyCodes
+} from '@/utils/hiddenPolicyUnlock.js';
+import {
   computeParkourMobileDepthLayout,
   computeParkourMobileDepthLayoutFromMetrics,
   computeParkourMobileDepthLayoutWithClearance
@@ -1210,11 +1215,14 @@ export default {
         value: MICRODUCK_POLICY_VALUE,
         title: 'Microduck',
         descriptionKey: 'microduckDescription',
+        // 隐藏项：网址带 ?unlock=microduck 时才出现在下拉栏里。
+        unlockCode: MICRODUCK_UNLOCK_CODE,
         policyPath: microduckDefaultPolicyPaths().policyPath,
         onnxPath: microduckDefaultPolicyPaths().onnxPath,
         scenePath: MICRODUCK_SCENE_PATH
       }
     ],
+    unlockedPolicyCodes: resolveUnlockedPolicyCodes(),
     currentPolicy: 'g1-amp-walk-run-getup',
     policyLabel: '',
     policyLoadError: '',
@@ -1380,6 +1388,7 @@ export default {
     policyItems() {
       return this.policies
         .filter((policy) => !(policy.desktopOnly && isBfmDesktopRequired()))
+        .filter((policy) => isPolicyUnlocked(policy, this.unlockedPolicyCodes))
         .map((policy) => ({
           title: policy.title,
           value: policy.value
@@ -1733,7 +1742,12 @@ export default {
         }
 
         const bootHostPolicy = iosBootPolicy
-          ? this.policies.find((policy) => policy.value === iosBootPolicy && !policy.isExternalDemo)
+          ? this.policies.find(
+            (policy) =>
+              policy.value === iosBootPolicy &&
+              !policy.isExternalDemo &&
+              isPolicyUnlocked(policy, this.unlockedPolicyCodes)
+          )
           : null;
         const defaultPolicy = this.policies.find((policy) => policy.value === 'g1-amp-walk-run-getup');
         const selected = bootHostPolicy ?? defaultPolicy;
@@ -2516,7 +2530,7 @@ export default {
         return;
       }
       const selected = this.policies.find((policy) => policy.value === value);
-      if (!selected) {
+      if (!selected || !isPolicyUnlocked(selected, this.unlockedPolicyCodes)) {
         return;
       }
       const generation = ++this.policyChangeGeneration;
