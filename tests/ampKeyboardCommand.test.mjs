@@ -6,7 +6,8 @@ import {
   AMP_CMD_WALK,
   computeAmpCommandFromKeys,
   isAmpKnockdownKey,
-  isAmpMovementKey
+  isAmpMovementKey,
+  shouldIgnoreAmpKeyboardTarget
 } from '../src/utils/ampKeyboardCommand.js';
 
 describe('ampKeyboardCommand', () => {
@@ -63,5 +64,20 @@ describe('ampKeyboardCommand', () => {
     assert.equal(cmd.cmdX, AMP_CMD_LIMITS.cmdX.max);
     assert.equal(cmd.cmdY, AMP_CMD_LIMITS.cmdY.max);
     assert.equal(cmd.cmdYaw, AMP_CMD_LIMITS.cmdYaw.max);
+  });
+
+  test('policy v-select and readonly inputs do not swallow WASD', () => {
+    assert.equal(shouldIgnoreAmpKeyboardTarget({ tagName: 'TEXTAREA' }), true);
+    assert.equal(shouldIgnoreAmpKeyboardTarget({ tagName: 'INPUT', readOnly: false }), true);
+    assert.equal(shouldIgnoreAmpKeyboardTarget({ tagName: 'INPUT', readOnly: true }), false);
+    assert.equal(
+      shouldIgnoreAmpKeyboardTarget({
+        tagName: 'INPUT',
+        readOnly: false,
+        closest: (sel) => (sel === '[data-test="policy-select"]' ? {} : null)
+      }),
+      false
+    );
+    assert.equal(shouldIgnoreAmpKeyboardTarget({ tagName: 'CANVAS' }), false);
   });
 });

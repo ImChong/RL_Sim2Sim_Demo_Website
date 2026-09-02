@@ -749,7 +749,8 @@ import {
   AMP_KEYBOARD_CONTROL_ROWS,
   computeAmpCommandFromKeys,
   isAmpKnockdownKey,
-  isAmpMovementKey
+  isAmpMovementKey,
+  shouldIgnoreAmpKeyboardTarget
 } from '@/utils/ampKeyboardCommand.js';
 import {
   MICRODUCK_CMD_LIMITS,
@@ -1193,7 +1194,7 @@ export default {
         scenePath: 'microduck/scene.xml',
         commandMode: 'zeros',
         ephemeralReturn: 'microduck-walk',
-        ephemeralMs: 4000
+        ephemeralMs: 8000
       }
     ],
     currentPolicy: 'g1-amp-walk-run-getup',
@@ -2318,11 +2319,7 @@ export default {
       }
     },
     shouldIgnoreAmpKeyboard(event) {
-      const tag = event.target?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
-        return true;
-      }
-      return event.target?.isContentEditable === true;
+      return shouldIgnoreAmpKeyboardTarget(event.target);
     },
     clearAmpKeyboardState() {
       this.ampKeysHeld.clear();
