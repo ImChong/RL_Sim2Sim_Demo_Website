@@ -9,6 +9,7 @@ import {
 test('sceneAssetPrefixesForPath returns top-level folder prefix', () => {
   assert.deepEqual(sceneAssetPrefixesForPath('g1/g1.xml'), ['g1/']);
   assert.deepEqual(sceneAssetPrefixesForPath('g1_amp/scene_g1.xml'), ['g1_amp/']);
+  assert.deepEqual(sceneAssetPrefixesForPath('microduck/scene.xml'), ['microduck/']);
   assert.deepEqual(sceneAssetPrefixesForPath('scene.xml'), []);
 });
 

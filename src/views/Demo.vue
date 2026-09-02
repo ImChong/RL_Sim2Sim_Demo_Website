@@ -1,6 +1,6 @@
 <template>
   <AmpMobileJoystick
-    v-if="showAmpJoystick"
+    v-if="showMobileJoystick"
     ref="ampJoystick"
     :disabled="state !== 1"
     :dock-above-mobile-panel="isSmallScreen"
@@ -8,8 +8,13 @@
     :cmd-x="cmdX"
     :cmd-y="cmdY"
     :cmd-yaw="cmdYaw"
+    :profile="joystickProfile"
+    :show-knockdown="isAmpPolicy"
+    :stick-disabled="isMicroduckPolicy && !isMicroduckWalk"
+    :state-buttons="microduckJoystickStates"
     @command="onAmpJoystickCommand"
     @knockdown="onKnockdownTest"
+    @state="onMicroduckJoystickState"
   />
   <ParkourMobileJoystick
     v-if="showParkourJoystick"
@@ -160,6 +165,7 @@
           item-title="title"
           item-value="value"
           :disabled="state !== 1"
+          data-test="policy-select"
           @update:modelValue="onPolicyChange"
         ></v-select>
 
@@ -295,16 +301,77 @@
           <div v-if="!isSmallScreen" class="text-caption mt-2 text-medium-emphasis">{{ t.bfmSource }}</div>
         </div>
 
-        <div v-if="isAmpPolicy" class="mt-4">
+        <div v-if="isMicroduckPolicy" class="microduck-controls mt-4">
+          <v-btn
+            v-if="showExternalSourceLinks"
+            href="https://github.com/pollen-robotics/microduck_rl"
+            target="_blank"
+            rel="noopener noreferrer"
+            variant="text"
+            size="small"
+            color="primary"
+            class="text-capitalize mb-2"
+          >
+            <v-icon icon="mdi-github" class="mr-1"></v-icon>
+            Microduck Sim2Sim Training Code
+          </v-btn>
+          <span class="status-name">{{ t.microduckStateMachine }}</span>
+          <div class="microduck-state-grid mt-2" role="group" :aria-label="t.microduckStateMachine">
+            <v-btn
+              v-for="item in microduckStateItems"
+              :key="item.value"
+              :color="item.active ? 'primary' : 'secondary'"
+              :variant="item.active ? 'flat' : 'tonal'"
+              size="small"
+              class="text-capitalize"
+              :data-test="`microduck-state-${item.value}`"
+              :aria-pressed="item.active ? 'true' : 'false'"
+              :disabled="state !== 1 || microduckStateSwitching"
+              @click="switchMicroduckState(item.value)"
+            >
+              <v-icon :icon="item.icon" class="mr-1"></v-icon>
+              {{ item.title }}
+            </v-btn>
+          </div>
+          <div v-if="microduckStateHint" class="text-caption mt-2">{{ microduckStateHint }}</div>
+          <v-btn
+            v-if="isMicroduckSitstand"
+            class="mt-1"
+            color="secondary"
+            variant="tonal"
+            block
+            size="small"
+            data-test="microduck-sit-toggle"
+            :disabled="state !== 1"
+            @click="toggleMicroduckSit"
+          >
+            {{ microduckSitMode ? t.microduckStandAction : t.microduckSitAction }}
+          </v-btn>
+          <div v-if="isMicroduckSitstand" class="text-caption mt-1">{{ t.microduckSitHint }}</div>
+          <div class="text-caption mt-2 text-medium-emphasis">{{ t.microduckStateSwitchHint }}</div>
+          <div v-if="!isSmallScreen && microduckKeyboardControls.length" class="amp-keyboard-controls mt-3">
+            <span class="status-name">{{ t.microduckHowToPlay }}</span>
+            <div class="parkour-keys mt-2">
+              <template v-for="row in microduckKeyboardControls" :key="row.key">
+                <kbd class="parkour-key">{{ row.key }}</kbd>
+                <span class="text-caption">{{ row.label }}</span>
+              </template>
+            </div>
+            <div class="text-caption mt-2 text-medium-emphasis">{{ t.microduckKeyboardFocusHint }}</div>
+          </div>
+          <div v-if="!isSmallScreen" class="text-caption mt-2 text-medium-emphasis">{{ t.microduckSource }}</div>
+        </div>
+
+        <div v-if="isVelocityCommandPolicy" class="mt-4">
           <div class="status-legend follow-controls mt-2">
             <span class="status-name">{{ t.velocityX }}</span>
             <span class="text-caption">{{ cmdX.toFixed(2) }}</span>
           </div>
           <v-slider
             v-model="cmdX"
-            min="-1.5"
-            max="3.0"
-            step="0.1"
+            :min="velocityLimits.cmdX.min"
+            :max="velocityLimits.cmdX.max"
+            :step="velocitySliderStep"
             density="compact"
             hide-details
             :aria-label="t.velocityX"
@@ -316,9 +383,9 @@
           </div>
           <v-slider
             v-model="cmdY"
-            min="-1.0"
-            max="1.0"
-            step="0.1"
+            :min="velocityLimits.cmdY.min"
+            :max="velocityLimits.cmdY.max"
+            :step="velocitySliderStep"
             density="compact"
             hide-details
             :aria-label="t.velocityY"
@@ -330,37 +397,39 @@
           </div>
           <v-slider
             v-model="cmdYaw"
-            min="-1.57"
-            max="1.57"
-            step="0.1"
+            :min="velocityLimits.cmdYaw.min"
+            :max="velocityLimits.cmdYaw.max"
+            :step="velocitySliderStep"
             density="compact"
             hide-details
             :aria-label="t.yawRate"
             @update:modelValue="onCmdChange"
           ></v-slider>
-          <v-btn
-            class="mt-3"
-            color="secondary"
-            variant="tonal"
-            block
-            size="small"
-            data-test="knockdown-test"
-            :disabled="state !== 1"
-            @click.stop="onKnockdownTest"
-          >
-            {{ t.knockdownTest }}
-          </v-btn>
-          <div class="text-caption mt-1">{{ t.knockdownTestHint }}</div>
-          <div v-if="!isSmallScreen" class="amp-keyboard-controls mt-3">
-            <span class="status-name">{{ t.ampKeyboardHowToPlay }}</span>
-            <div class="parkour-keys mt-2">
-              <template v-for="row in ampKeyboardControls" :key="row.key">
-                <kbd class="parkour-key">{{ row.key }}</kbd>
-                <span class="text-caption">{{ row.label }}</span>
-              </template>
+          <template v-if="isAmpPolicy">
+            <v-btn
+              class="mt-3"
+              color="secondary"
+              variant="tonal"
+              block
+              size="small"
+              data-test="knockdown-test"
+              :disabled="state !== 1"
+              @click.stop="onKnockdownTest"
+            >
+              {{ t.knockdownTest }}
+            </v-btn>
+            <div class="text-caption mt-1">{{ t.knockdownTestHint }}</div>
+            <div v-if="!isSmallScreen" class="amp-keyboard-controls mt-3">
+              <span class="status-name">{{ t.ampKeyboardHowToPlay }}</span>
+              <div class="parkour-keys mt-2">
+                <template v-for="row in ampKeyboardControls" :key="row.key">
+                  <kbd class="parkour-key">{{ row.key }}</kbd>
+                  <span class="text-caption">{{ row.label }}</span>
+                </template>
+              </div>
+              <div class="text-caption mt-2 text-medium-emphasis">{{ t.ampKeyboardFocusHint }}</div>
             </div>
-            <div class="text-caption mt-2 text-medium-emphasis">{{ t.ampKeyboardFocusHint }}</div>
-          </div>
+          </template>
         </div>
 
         <v-alert
@@ -373,7 +442,7 @@
           {{ policyLoadError }}
         </v-alert>
 
-        <div v-if="!isAmpPolicy && !isExternalDemoPolicy" class="status-legend follow-controls mt-2">
+        <div v-if="isTrackingPolicy" class="status-legend follow-controls mt-2">
           <span class="status-name">{{ t.compliance }}</span>
           <v-btn
             size="x-small"
@@ -388,7 +457,7 @@
           <span class="text-caption">{{ complianceThresholdLabel }}</span>
         </div>
         <v-slider
-          v-if="!isAmpPolicy && !isExternalDemoPolicy"
+          v-if="isTrackingPolicy"
           v-model="complianceThreshold"
           min="10"
           max="20"
@@ -400,7 +469,7 @@
           @update:modelValue="onComplianceThresholdChange"
         ></v-slider>
 
-        <template v-if="!isAmpPolicy && !isExternalDemoPolicy">
+        <template v-if="isTrackingPolicy">
         <v-divider class="my-2"/>
         <div class="motion-status" v-if="trackingState" role="status" aria-live="polite">
           <div class="status-legend" v-if="trackingState.available">
@@ -701,11 +770,32 @@ import {
   saveControlPanelSize
 } from '@/utils/controlPanelSize.js';
 import {
+  AMP_CMD_LIMITS,
   AMP_KEYBOARD_CONTROL_ROWS,
   computeAmpCommandFromKeys,
   isAmpKnockdownKey,
-  isAmpMovementKey
+  isAmpMovementKey,
+  shouldIgnoreAmpKeyboardTarget
 } from '@/utils/ampKeyboardCommand.js';
+import {
+  MICRODUCK_CMD_LIMITS,
+  MICRODUCK_JOYSTICK_PROFILE,
+  MICRODUCK_KEYBOARD_CONTROL_ROWS,
+  computeMicroduckCommandFromKeys,
+  isMicroduckMovementKey,
+  isMicroduckSitKey
+} from '@/utils/microduckKeyboardCommand.js';
+import {
+  MICRODUCK_AUTO_NEXT_POLL_MS,
+  MICRODUCK_DEFAULT_STATE,
+  MICRODUCK_POLICY_VALUE,
+  MICRODUCK_SCENE_PATH,
+  MICRODUCK_STATES,
+  findMicroduckState,
+  microduckDefaultPolicyPaths,
+  microduckStateOrDefault
+} from '@/utils/microduckStateMachine.js';
+import { AMP_JOYSTICK_PROFILE } from '@/utils/ampJoystickCommand.js';
 import {
   computeParkourMobileDepthLayout,
   computeParkourMobileDepthLayoutFromMetrics,
@@ -793,6 +883,7 @@ const translations = {
     ampKeyKnockdown: 'Knockdown test',
     ampKeyboardFocusHint: 'Click the demo view first, then use the keys. Sliders update while keys are held.',
     ampJoystickGroup: 'AMP movement controls',
+    microduckJoystickGroup: 'Microduck movement and state controls',
     ampJoystickMove: 'Move (up/down = forward/back, left/right = turn in place)',
     ampJoystickStrafeLeft: 'Strafe left',
     ampJoystickStrafeRight: 'Strafe right',
@@ -859,7 +950,34 @@ const translations = {
       'Perceptive BFM needs a desktop browser with WebGL and SharedArrayBuffer. Open this page on a computer to use the embedded demo.',
     resizeControlWidth: 'Resize control panel width (left edge)',
     resizeControlHeight: 'Resize control panel height (bottom edge)',
-    resizeControlBoth: 'Resize control panel (bottom-left corner)'
+    resizeControlBoth: 'Resize control panel (bottom-left corner)',
+    microduckDescription:
+      'Microduck sim2sim policies sharing one 61D observation contract. Pick the behavior with the state-machine buttons below.',
+    microduckStateMachine: 'Microduck state machine',
+    microduckStateWalk: 'Walk',
+    microduckStateWalkHint: 'Walking policy. Steer with WASD / QE or the velocity sliders.',
+    microduckStateStand: 'Stand',
+    microduckStateStandHint: 'Standing hold policy with an all-zero command.',
+    microduckStateSitstand: 'Sit / Stand',
+    microduckStateSitstandHint: 'Sit ↔ stand on one policy. Y or the button flips the posture flag.',
+    microduckStateRoulade: 'Roulade',
+    microduckStateRouladeHint: 'Forward roll. The state machine returns to Walk once the roll finishes.',
+    microduckStateSwitchHint:
+      'Switching states reloads the ONNX policy only — the robot and the scene stay loaded.',
+    microduckHowToPlay: 'PC keyboard (Microduck)',
+    microduckKeyForward: 'Walk forward',
+    microduckKeyBackward: 'Walk backward',
+    microduckKeyLeft: 'Strafe left',
+    microduckKeyRight: 'Strafe right',
+    microduckKeyRotateLeft: 'Turn in place left',
+    microduckKeyRotateRight: 'Turn in place right',
+    microduckKeySprint: 'Hold for maximum speed',
+    microduckKeySit: 'Sit / stand (sitstand policy)',
+    microduckKeyboardFocusHint: 'Click the demo view first, then use the keys. Sliders update while keys are held.',
+    microduckSitAction: 'Sit down',
+    microduckStandAction: 'Stand up',
+    microduckSitHint: 'The same sitstand policy sits and stands.',
+    microduckSource: 'Policies and MJCF from pollen-robotics/microduck and microduck_rl.'
   },
   zh: {
     mobileModeAlert: '已启用移动端模式，控制面板已精简并停靠到底部，便于触控操作。',
@@ -921,6 +1039,7 @@ const translations = {
     ampKeyKnockdown: '击倒测试',
     ampKeyboardFocusHint: '请先点击演示画面，再使用键盘。按住按键时滑块会同步显示当前速度。',
     ampJoystickGroup: 'AMP 移动控制',
+    microduckJoystickGroup: 'Microduck 移动与状态控制',
     ampJoystickMove: '移动（上/下=前进/后退，左/右=原地转向）',
     ampJoystickStrafeLeft: '向左平移',
     ampJoystickStrafeRight: '向右平移',
@@ -987,7 +1106,33 @@ const translations = {
       'Perceptive BFM 需要支持 WebGL 与 SharedArrayBuffer 的桌面浏览器，请在电脑上打开本页面体验内嵌演示。',
     resizeControlWidth: '拖拽左边框调整控制面板宽度',
     resizeControlHeight: '拖拽下边框调整控制面板高度',
-    resizeControlBoth: '拖拽左下角同时调整控制面板大小'
+    resizeControlBoth: '拖拽左下角同时调整控制面板大小',
+    microduckDescription:
+      'Microduck sim2sim 策略，共享同一套 61 维观测合同。具体行为由下方的状态机按钮切换。',
+    microduckStateMachine: 'Microduck 状态机',
+    microduckStateWalk: '行走',
+    microduckStateWalkHint: '行走策略。使用 WASD / QE 或速度滑块控制。',
+    microduckStateStand: '站立',
+    microduckStateStandHint: '全零指令的站立保持策略。',
+    microduckStateSitstand: '坐下 / 站起',
+    microduckStateSitstandHint: '同一个策略完成坐下与站起。按 Y 或按钮翻转姿态标志。',
+    microduckStateRoulade: '前滚翻',
+    microduckStateRouladeHint: '前滚翻（roulade）。滚完后状态机自动回到行走。',
+    microduckStateSwitchHint: '切换状态只重载 ONNX 策略，机器人与场景不会重新加载。',
+    microduckHowToPlay: 'PC 键盘（Microduck）',
+    microduckKeyForward: '向前行走',
+    microduckKeyBackward: '向后行走',
+    microduckKeyLeft: '向左平移',
+    microduckKeyRight: '向右平移',
+    microduckKeyRotateLeft: '原地向左旋转',
+    microduckKeyRotateRight: '原地向右旋转',
+    microduckKeySprint: '按住时以最大速度',
+    microduckKeySit: '坐下 / 站起（sitstand 策略）',
+    microduckKeyboardFocusHint: '请先点击演示画面，再使用键盘。按住按键时滑块会同步显示当前速度。',
+    microduckSitAction: '坐下',
+    microduckStandAction: '站起',
+    microduckSitHint: '同一个 sitstand 策略负责坐下和站起。',
+    microduckSource: '策略与 MJCF 来自 pollen-robotics/microduck 与 microduck_rl。'
   }
 };
 
@@ -1060,6 +1205,14 @@ export default {
         isExternalDemo: true,
         desktopOnly: true,
         iframePath: 'perceptive-bfm/dist-desktop/index.html'
+      },
+      {
+        value: MICRODUCK_POLICY_VALUE,
+        title: 'Microduck',
+        descriptionKey: 'microduckDescription',
+        policyPath: microduckDefaultPolicyPaths().policyPath,
+        onnxPath: microduckDefaultPolicyPaths().onnxPath,
+        scenePath: MICRODUCK_SCENE_PATH
       }
     ],
     currentPolicy: 'g1-amp-walk-run-getup',
@@ -1112,7 +1265,11 @@ export default {
     bfmTerrainSeed: 1,
     policyBeforeChange: 'g1-amp-walk-run-getup',
     policyChangeGeneration: 0,
-    pendingHostTeardown: null
+    pendingHostTeardown: null,
+    microduckSitMode: false,
+    microduckReturnTimer: null,
+    microduckState: MICRODUCK_DEFAULT_STATE,
+    microduckStateSwitching: false
   }),
   computed: {
     desktopControlsPanelStyle() {
@@ -1234,15 +1391,66 @@ export default {
     isAmpPolicy() {
       return this.currentPolicy?.startsWith('g1-amp');
     },
-    showAmpJoystick() {
-      return this.isAmpPolicy && !this.isExternalDemoPolicy;
+    isMicroduckPolicy() {
+      return this.currentPolicy === MICRODUCK_POLICY_VALUE;
+    },
+    microduckStateItems() {
+      return MICRODUCK_STATES.map((state) => ({
+        value: state.value,
+        icon: state.icon,
+        title: this.t[state.labelKey] ?? state.value,
+        active: this.microduckState === state.value
+      }));
+    },
+    activeMicroduckState() {
+      return this.isMicroduckPolicy ? microduckStateOrDefault(this.microduckState) : null;
+    },
+    microduckStateHint() {
+      const state = this.activeMicroduckState;
+      return state ? this.t[state.hintKey] ?? '' : '';
+    },
+    isMicroduckWalk() {
+      return this.activeMicroduckState?.commandMode === 'velocity';
+    },
+    isMicroduckSitstand() {
+      return this.activeMicroduckState?.commandMode === 'sitstand';
+    },
+    isVelocityCommandPolicy() {
+      return this.isAmpPolicy || this.isMicroduckWalk;
+    },
+    isTrackingPolicy() {
+      return !this.isAmpPolicy && !this.isExternalDemoPolicy && !this.isMicroduckPolicy;
+    },
+    velocityLimits() {
+      return this.isMicroduckWalk ? MICRODUCK_CMD_LIMITS : AMP_CMD_LIMITS;
+    },
+    velocitySliderStep() {
+      return this.isMicroduckWalk ? 0.05 : 0.1;
+    },
+    // Microduck 复用同一个摇杆：行走状态推杆，其它状态只留状态机按钮。
+    showMobileJoystick() {
+      return (this.isAmpPolicy || this.isMicroduckPolicy) && !this.isExternalDemoPolicy;
+    },
+    joystickProfile() {
+      return this.isMicroduckPolicy ? MICRODUCK_JOYSTICK_PROFILE : AMP_JOYSTICK_PROFILE;
+    },
+    microduckJoystickStates() {
+      if (!this.isMicroduckPolicy) {
+        return [];
+      }
+      return this.microduckStateItems.map((item) => ({
+        ...item,
+        label: item.value === 'sitstand' && this.isMicroduckSitstand
+          ? (this.microduckSitMode ? this.t.microduckStandAction : this.t.microduckSitAction)
+          : item.title
+      }));
     },
     showParkourJoystick() {
       return this.isParkourPolicy && this.parkourFrameMounted;
     },
     ampJoystickLabels() {
       return {
-        group: this.t.ampJoystickGroup,
+        group: this.isMicroduckPolicy ? this.t.microduckJoystickGroup : this.t.ampJoystickGroup,
         move: this.t.ampJoystickMove,
         strafeLeft: this.t.ampJoystickStrafeLeft,
         strafeRight: this.t.ampJoystickStrafeRight,
@@ -1343,6 +1551,22 @@ export default {
         key: row.key,
         label: this.t[row.labelKey] ?? row.labelKey
       }));
+    },
+    microduckKeyboardControls() {
+      return MICRODUCK_KEYBOARD_CONTROL_ROWS
+        .filter((row) => {
+          if (this.isMicroduckSitstand) {
+            return row.key === 'Y';
+          }
+          if (this.isMicroduckWalk) {
+            return row.key !== 'Y';
+          }
+          return false;
+        })
+        .map((row) => ({
+          key: row.key,
+          label: this.t[row.labelKey] ?? row.labelKey
+        }));
     },
     policyDescription() {
       if (!this.selectedPolicy) {
@@ -2133,23 +2357,24 @@ export default {
       this.demo.params.cmdYaw = this.cmdYaw;
     },
     onAmpJoystickCommand({ cmdX, cmdY, cmdYaw }) {
-      if (!this.isAmpPolicy || this.state !== 1) {
+      if (!(this.isAmpPolicy || this.isMicroduckWalk) || this.state !== 1) {
         return;
       }
       this.cmdX = cmdX;
       this.cmdY = cmdY;
       this.cmdYaw = cmdYaw;
       this.onCmdChange();
+      // 键盘仍按住时以键盘指令为准，避免摇杆回中把 WASD 覆盖掉。
       if (this.ampKeysHeld.size > 0) {
-        this.applyAmpKeyboardCommand();
+        if (this.isMicroduckWalk) {
+          this.applyMicroduckKeyboardCommand();
+        } else {
+          this.applyAmpKeyboardCommand();
+        }
       }
     },
     shouldIgnoreAmpKeyboard(event) {
-      const tag = event.target?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
-        return true;
-      }
-      return event.target?.isContentEditable === true;
+      return shouldIgnoreAmpKeyboardTarget(event.target);
     },
     clearAmpKeyboardState() {
       this.ampKeysHeld.clear();
@@ -2297,9 +2522,14 @@ export default {
       const generation = ++this.policyChangeGeneration;
       const previousPolicy = this.policies.find((policy) => policy.value === this.policyBeforeChange);
       try {
-      if (!value?.startsWith('g1-amp')) {
+      if (!value?.startsWith('g1-amp') && value !== MICRODUCK_POLICY_VALUE) {
         this.clearAmpKeyboardState();
       }
+      this.clearMicroduckReturnTimer();
+      this.microduckSitMode = false;
+      this.microduckStateSwitching = false;
+      // 重新选中 Microduck 时统一从默认状态（行走）进入，后续由状态机按钮切换。
+      this.microduckState = MICRODUCK_DEFAULT_STATE;
       if (!selected?.isExternalDemo) {
         this.clearParkourKeyboardState();
       }
@@ -2357,7 +2587,7 @@ export default {
             return;
           }
           this.parkourHostTeardown = false;
-          if (this.isAmpPolicy) {
+          if (this.isAmpPolicy || this.isMicroduckPolicy) {
             this.resetAmpCommandSliders();
           }
         } catch (error) {
@@ -2392,7 +2622,7 @@ export default {
         if (this.isStalePolicyChange(generation)) {
           return;
         }
-        if (this.isAmpPolicy) {
+        if (this.isAmpPolicy || this.isMicroduckPolicy) {
           this.resetAmpCommandSliders();
         }
         this.policyLabel = selected.policyPath?.split('/').pop() ?? this.policyLabel;
@@ -2424,6 +2654,171 @@ export default {
       this.cmdYaw = 0.0;
       this.onCmdChange();
     },
+    clearMicroduckReturnTimer() {
+      if (this.microduckReturnTimer != null) {
+        clearTimeout(this.microduckReturnTimer);
+        this.microduckReturnTimer = null;
+      }
+    },
+    // 瞬态状态（roulade）按仿真时间计时：暂停或掉帧时不会提前切回。
+    scheduleMicroduckReturn(state) {
+      this.clearMicroduckReturnTimer();
+      if (!state?.autoNext || !state.autoNextSimSeconds || !this.demo) {
+        return;
+      }
+      const generation = this.policyChangeGeneration;
+      const startStep = this.demo.policyRunner?.stepCount ?? 0;
+      const stepSeconds = (this.demo.timestep ?? 0.002) * (this.demo.decimation ?? 1);
+      const targetSteps = Math.max(1, Math.round(state.autoNextSimSeconds / stepSeconds));
+      const poll = () => {
+        this.microduckReturnTimer = null;
+        if (this.isStalePolicyChange(generation) || this.microduckState !== state.value) {
+          return;
+        }
+        const elapsedSteps = (this.demo?.policyRunner?.stepCount ?? startStep) - startStep;
+        if (elapsedSteps >= targetSteps) {
+          this.switchMicroduckState(state.autoNext);
+          return;
+        }
+        this.microduckReturnTimer = setTimeout(poll, MICRODUCK_AUTO_NEXT_POLL_MS);
+      };
+      this.microduckReturnTimer = setTimeout(poll, MICRODUCK_AUTO_NEXT_POLL_MS);
+    },
+    // 状态机按钮：同一个 Microduck 下拉项内热切换策略，只重载 ONNX，不重载机器人网格。
+    async switchMicroduckState(value) {
+      const target = findMicroduckState(value);
+      if (!target || !this.isMicroduckPolicy || !this.demo) {
+        return;
+      }
+      if (this.microduckStateSwitching || this.state !== 1) {
+        return;
+      }
+      if (this.microduckState === value && this.demo.currentPolicyPath === target.policyPath) {
+        return;
+      }
+      const generation = ++this.policyChangeGeneration;
+      const previousState = this.microduckState;
+      this.clearMicroduckReturnTimer();
+      this.microduckStateSwitching = true;
+      this.microduckState = value;
+      this.microduckSitMode = false;
+      this.resetAmpCommandSliders();
+      const wasPaused = this.demo.params?.paused ?? false;
+      this.demo.params.paused = true;
+      this.policyLoadError = '';
+      try {
+        await this.runWithSimulationLoading((report) =>
+          this.demo.switchSceneAndPolicy(MICRODUCK_SCENE_PATH, target.policyPath, {
+            onnxPath: target.onnxPath,
+            onProgress: report
+          })
+        );
+        if (this.isStalePolicyChange(generation)) {
+          return;
+        }
+        this.resetAmpCommandSliders();
+        this.policyLabel = target.policyPath.split('/').pop() ?? this.policyLabel;
+        this.scheduleMicroduckReturn(target);
+      } catch (error) {
+        if (this.isStalePolicyChange(generation)) {
+          return;
+        }
+        console.error('Failed to switch Microduck state:', error);
+        this.microduckState = previousState;
+        this.policyLoadError = 'An unexpected error occurred';
+      } finally {
+        if (!this.isStalePolicyChange(generation)) {
+          this.microduckStateSwitching = false;
+          if (this.demo) {
+            this.demo.params.paused = wasPaused;
+          }
+        }
+      }
+    },
+    // 摇杆旁的状态机按钮：再次点击当前的坐下/站起状态即翻转姿态。
+    onMicroduckJoystickState(value) {
+      if (value === 'sitstand' && this.isMicroduckSitstand) {
+        this.toggleMicroduckSit();
+        return;
+      }
+      this.switchMicroduckState(value);
+    },
+    toggleMicroduckSit() {
+      if (!this.isMicroduckSitstand || this.state !== 1) {
+        return;
+      }
+      this.microduckSitMode = !this.microduckSitMode;
+      this.cmdX = this.microduckSitMode ? 1.0 : 0.0;
+      this.cmdY = 0.0;
+      this.cmdYaw = 0.0;
+      this.onCmdChange();
+    },
+    applyMicroduckKeyboardCommand() {
+      if (!this.isMicroduckWalk || this.state !== 1) {
+        return;
+      }
+      const { cmdX, cmdY, cmdYaw } = computeMicroduckCommandFromKeys(
+        this.ampKeysHeld,
+        this.ampShiftHeld
+      );
+      this.cmdX = cmdX;
+      this.cmdY = cmdY;
+      this.cmdYaw = cmdYaw;
+      this.onCmdChange();
+    },
+    handleMicroduckKeyDown(event) {
+      if (!this.isMicroduckPolicy || this.state !== 1 || this.shouldIgnoreAmpKeyboard(event)) {
+        return;
+      }
+      if (this.isMicroduckSitstand && isMicroduckSitKey(event.code)) {
+        if (event.repeat) {
+          return;
+        }
+        event.preventDefault();
+        this.toggleMicroduckSit();
+        return;
+      }
+      if (!this.isMicroduckWalk) {
+        return;
+      }
+      if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
+        this.ampShiftHeld = event.getModifierState('Shift');
+        this.applyMicroduckKeyboardCommand();
+        return;
+      }
+      if (!isMicroduckMovementKey(event.code)) {
+        return;
+      }
+      if (event.repeat && this.ampKeysHeld.has(event.code)) {
+        return;
+      }
+      event.preventDefault();
+      this.ampKeysHeld.add(event.code);
+      this.applyMicroduckKeyboardCommand();
+    },
+    handleMicroduckKeyUp(event) {
+      if (!this.isMicroduckWalk) {
+        return;
+      }
+      if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
+        this.ampShiftHeld = event.getModifierState('Shift');
+        this.applyMicroduckKeyboardCommand();
+        return;
+      }
+      if (!isMicroduckMovementKey(event.code)) {
+        return;
+      }
+      event.preventDefault();
+      this.ampKeysHeld.delete(event.code);
+      this.applyMicroduckKeyboardCommand();
+    },
+    onMicroduckKeyboardBlur() {
+      if (!this.isMicroduckWalk) {
+        return;
+      }
+      this.clearAmpKeyboardState();
+      this.applyMicroduckKeyboardCommand();
+    },
     reset() {
       if (this.isExternalDemoPolicy) {
         if (this.isParkourPolicy) {
@@ -2437,8 +2832,11 @@ export default {
       if (!this.demo) {
         return;
       }
-      if (this.isAmpPolicy) {
+      if (this.isAmpPolicy || this.isMicroduckPolicy) {
         this.resetAmpCommandSliders();
+      }
+      if (this.isMicroduckSitstand) {
+        this.microduckSitMode = false;
       }
       this.demo.resetSimulation();
       this.availableMotions = this.getAvailableMotions();
@@ -2770,6 +3168,7 @@ export default {
     this.keydown_listener = (event) => {
       this.handleParkourKeyDown(event);
       this.handleAmpKeyDown(event);
+      this.handleMicroduckKeyDown(event);
       if (event.code === 'Backspace' && !this.isParkourPolicy) {
         this.reset();
       }
@@ -2777,9 +3176,11 @@ export default {
     this.keyup_listener = (event) => {
       this.handleParkourKeyUp(event);
       this.handleAmpKeyUp(event);
+      this.handleMicroduckKeyUp(event);
     };
     this.amp_blur_listener = () => {
       this.onAmpKeyboardBlur();
+      this.onMicroduckKeyboardBlur();
       this.onParkourKeyboardBlur();
     };
     document.addEventListener('keydown', this.keydown_listener);
@@ -2803,6 +3204,7 @@ export default {
       this.demo.dispose?.();
       this.demo = null;
     }
+    this.clearMicroduckReturnTimer();
     this.clearParkourLoadTimers();
     if (this.parkour_message_listener) {
       window.removeEventListener('message', this.parkour_message_listener);
@@ -2897,6 +3299,17 @@ export default {
   grid-template-columns: auto 1fr;
   gap: 6px 10px;
   align-items: center;
+}
+
+.microduck-state-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.microduck-state-grid .v-btn {
+  min-width: 0;
+  justify-content: flex-start;
 }
 
 .parkour-key {

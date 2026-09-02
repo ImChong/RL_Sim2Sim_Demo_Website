@@ -20,7 +20,8 @@
     "verify:e2e-obs-stack-view": "node scripts/verify-obs-stack-view.mjs",
     "verify:e2e-parkour-cross": "node scripts/verify-parkour-cross-obstacle.mjs",
     "verify:e2e-parkour-depth": "node scripts/verify-parkour-depth.mjs",
-    "verify:record-parkour-ios": "node scripts/record-parkour-ios-verify.mjs"
+    "verify:record-parkour-ios": "node scripts/record-parkour-ios-verify.mjs",
+    "verify:record-microduck-state-machine": "node scripts/record-microduck-state-machine.mjs"
   },
   "dependencies": {
     "@fontsource/roboto": "5.2.5",

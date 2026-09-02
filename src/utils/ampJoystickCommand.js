@@ -1,5 +1,15 @@
 import { AMP_CMD_LIMITS, AMP_CMD_SPRINT, AMP_CMD_WALK } from './ampKeyboardCommand.js';
 
+/**
+ * Speed / limit table the stick math runs on. Defaults to AMP; Microduck passes
+ * MICRODUCK_JOYSTICK_PROFILE so the same joystick drives its slower gaits.
+ */
+export const AMP_JOYSTICK_PROFILE = {
+  limits: AMP_CMD_LIMITS,
+  walk: AMP_CMD_WALK,
+  sprint: AMP_CMD_SPRINT
+};
+
 export const AMP_JOYSTICK_DEADZONE = 0.12;
 export const AMP_JOYSTICK_SPRINT_THRESHOLD = 0.85;
 
@@ -27,12 +37,17 @@ export function applyJoystickDeadzone(value, zone = AMP_JOYSTICK_DEADZONE) {
  * Map a 2D stick (-1..1) to planar velocity.
  * Stick up (+normY) = forward (+cmdX); stick right (+normX) = turn right (-cmdYaw).
  */
-export function computeAmpCommandFromMoveStick(normX, normY, sprint = false) {
+export function computeAmpCommandFromMoveStick(
+  normX,
+  normY,
+  sprint = false,
+  profile = AMP_JOYSTICK_PROFILE
+) {
   const x = applyJoystickDeadzone(normX);
   const y = applyJoystickDeadzone(normY);
   const magnitude = Math.hypot(x, y);
   const useSprint = sprint || magnitude >= AMP_JOYSTICK_SPRINT_THRESHOLD;
-  const speed = useSprint ? AMP_CMD_SPRINT : AMP_CMD_WALK;
+  const speed = useSprint ? profile.sprint : profile.walk;
 
   let cmdX = 0;
   if (y > 0) {
@@ -44,20 +59,25 @@ export function computeAmpCommandFromMoveStick(normX, normY, sprint = false) {
   const cmdYaw = -x * speed.yaw;
 
   return {
-    cmdX: clamp(cmdX, AMP_CMD_LIMITS.cmdX.min, AMP_CMD_LIMITS.cmdX.max),
-    cmdYaw: clamp(cmdYaw, AMP_CMD_LIMITS.cmdYaw.min, AMP_CMD_LIMITS.cmdYaw.max),
+    cmdX: clamp(cmdX, profile.limits.cmdX.min, profile.limits.cmdX.max),
+    cmdYaw: clamp(cmdYaw, profile.limits.cmdYaw.min, profile.limits.cmdYaw.max),
     sprint: useSprint
   };
 }
 
 /** direction: +1 left, -1 right, 0 release. */
-export function computeAmpStrafeFromStick(direction, sprint = false, strafeAlwaysMax = false) {
+export function computeAmpStrafeFromStick(
+  direction,
+  sprint = false,
+  strafeAlwaysMax = false,
+  profile = AMP_JOYSTICK_PROFILE
+) {
   if (!direction) {
     return 0;
   }
-  const speed = sprint || strafeAlwaysMax ? AMP_CMD_SPRINT : AMP_CMD_WALK;
+  const speed = sprint || strafeAlwaysMax ? profile.sprint : profile.walk;
   const cmdY = direction * speed.vy;
-  return clamp(cmdY, AMP_CMD_LIMITS.cmdY.min, AMP_CMD_LIMITS.cmdY.max);
+  return clamp(cmdY, profile.limits.cmdY.min, profile.limits.cmdY.max);
 }
 
 export function computeAmpCommandFromJoystick(
@@ -65,13 +85,15 @@ export function computeAmpCommandFromJoystick(
   moveNormY,
   strafeDirection,
   sprint = false,
-  strafeAlwaysMax = false
+  strafeAlwaysMax = false,
+  profile = AMP_JOYSTICK_PROFILE
 ) {
-  const move = computeAmpCommandFromMoveStick(moveNormX, moveNormY, sprint);
+  const move = computeAmpCommandFromMoveStick(moveNormX, moveNormY, sprint, profile);
   const cmdY = computeAmpStrafeFromStick(
     strafeDirection,
     move.sprint || sprint,
-    strafeAlwaysMax
+    strafeAlwaysMax,
+    profile
   );
   return {
     cmdX: move.cmdX,
@@ -81,16 +103,16 @@ export function computeAmpCommandFromJoystick(
 }
 
 /** Approximate stick pose from velocity command (for keyboard / slider → joystick sync). */
-export function stickVisualFromAmpCommand(cmdX, cmdY, cmdYaw) {
+export function stickVisualFromAmpCommand(cmdX, cmdY, cmdYaw, profile = AMP_JOYSTICK_PROFILE) {
   const absX = Math.abs(cmdX);
   const absStrafe = Math.abs(cmdY);
   const absYaw = Math.abs(cmdYaw);
   const useSprint =
-    absX >= AMP_CMD_SPRINT.vx * AMP_JOYSTICK_SPRINT_THRESHOLD
-    || absStrafe >= AMP_CMD_SPRINT.vy * AMP_JOYSTICK_SPRINT_THRESHOLD
-    || absYaw >= AMP_CMD_SPRINT.yaw * AMP_JOYSTICK_SPRINT_THRESHOLD
-    || (cmdX < 0 && absX >= AMP_CMD_SPRINT.vxBack * AMP_JOYSTICK_SPRINT_THRESHOLD);
-  const speed = useSprint ? AMP_CMD_SPRINT : AMP_CMD_WALK;
+    absX >= profile.sprint.vx * AMP_JOYSTICK_SPRINT_THRESHOLD
+    || absStrafe >= profile.sprint.vy * AMP_JOYSTICK_SPRINT_THRESHOLD
+    || absYaw >= profile.sprint.yaw * AMP_JOYSTICK_SPRINT_THRESHOLD
+    || (cmdX < 0 && absX >= profile.sprint.vxBack * AMP_JOYSTICK_SPRINT_THRESHOLD);
+  const speed = useSprint ? profile.sprint : profile.walk;
 
   let normY = 0;
   if (cmdX > 1e-4) {

@@ -80,6 +80,30 @@ export function computeAmpCommandFromKeys(keys, shiftKey = false) {
   };
 }
 
+/** True when a key event originated in a real text field (not the policy v-select). */
+export function shouldIgnoreAmpKeyboardTarget(target) {
+  if (!target) {
+    return false;
+  }
+  if (target.isContentEditable === true) {
+    return true;
+  }
+  const tag = target.tagName;
+  if (tag === 'TEXTAREA' || tag === 'SELECT') {
+    return true;
+  }
+  if (tag !== 'INPUT') {
+    return false;
+  }
+  if (target.readOnly) {
+    return false;
+  }
+  if (typeof target.closest === 'function' && target.closest('[data-test="policy-select"]')) {
+    return false;
+  }
+  return true;
+}
+
 /** UI rows for the AMP keyboard hint panel (labels resolved in Demo.vue). */
 export const AMP_KEYBOARD_CONTROL_ROWS = [
   { key: 'W', labelKey: 'ampKeyForward' },

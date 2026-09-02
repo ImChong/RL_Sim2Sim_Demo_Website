@@ -1,0 +1,172 @@
+{
+  "onnx": {
+    "meta": {
+      "in_keys": [
+        "policy"
+      ],
+      "out_keys": [
+        "action"
+      ]
+    },
+    "path": "./examples/checkpoints/microduck/alpha_sitstand.onnx",
+    "source": {
+      "training_repo": "pollen-robotics/microduck_rl",
+      "runtime_repo": "pollen-robotics/microduck",
+      "checkpoint": "policies/alpha_sitstand.onnx",
+      "note": "sit \u2194 stand via twist[0] posture flag (0=stand, 1=sit)"
+    }
+  },
+  "obs_config": {
+    "history_length": 1,
+    "policy": [
+      {
+        "name": "RootAngVelB"
+      },
+      {
+        "name": "ProjectedGravityB"
+      },
+      {
+        "name": "JointPos",
+        "pos_steps": [
+          0
+        ]
+      },
+      {
+        "name": "JointVel",
+        "vel_steps": [
+          0
+        ]
+      },
+      {
+        "name": "PrevActions",
+        "history_steps": 1
+      },
+      {
+        "name": "Command13"
+      }
+    ]
+  },
+  "obs_joint_pos_relative": true,
+  "policy_kind": "microduck",
+  "policy_joint_names": [
+    "left_hip_yaw",
+    "left_hip_roll",
+    "left_hip_pitch",
+    "left_knee",
+    "left_ankle",
+    "neck_pitch",
+    "head_pitch",
+    "head_yaw",
+    "head_roll",
+    "right_hip_yaw",
+    "right_hip_roll",
+    "right_hip_pitch",
+    "right_knee",
+    "right_ankle"
+  ],
+  "action_scale": 1.0,
+  "action_clip": 10,
+  "control_type": "mujoco_position",
+  "default_joint_pos": [
+    0.0,
+    -0.08726646259971647,
+    -0.457924,
+    -0.00494,
+    0.452984,
+    0.3490658503988659,
+    0.3490658503988659,
+    0.0,
+    0.0,
+    0.0,
+    0.08726646259971647,
+    0.457924,
+    0.00494,
+    -0.452984
+  ],
+  "stiffness": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "damping": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "sim": {
+    "timestep": 0.005,
+    "decimation": 4,
+    "control_dt": 0.02
+  },
+  "view": {
+    "followHeight": 0.16,
+    "cameraPosition": [
+      0.55,
+      0.32,
+      0.55
+    ],
+    "target": [
+      0,
+      0.12,
+      0
+    ]
+  },
+  "initial_state": {
+    "root_pos": [
+      0,
+      0,
+      0.125
+    ],
+    "root_quat": [
+      1,
+      0,
+      0,
+      0
+    ],
+    "joint_pos_array": [
+      0.0,
+      -0.08726646259971647,
+      -0.457924,
+      -0.00494,
+      0.452984,
+      0.3490658503988659,
+      0.3490658503988659,
+      0.0,
+      0.0,
+      0.0,
+      0.08726646259971647,
+      0.457924,
+      0.00494,
+      -0.452984
+    ]
+  },
+  "sim2sim_alignment_notes": {
+    "source_task": "Mjlab-Velocity-Flat-MicroDuck / infer_policy.py --new-cmd-obs",
+    "actor_obs_order": "base_ang_vel(3), projected_gravity(3), joint_pos_rel(14), joint_vel(14), last_action(14), command(13) => 61",
+    "command": "twist[0] is sit flag; remaining command slots stay 0",
+    "action_target": "default_joint_pos + action (written to MuJoCo position actuators)",
+    "joint_order": "left leg (yaw/roll/pitch/knee/ankle), neck/head (4), right leg"
+  }
+}

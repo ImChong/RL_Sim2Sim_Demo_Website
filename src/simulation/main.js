@@ -150,6 +150,7 @@ export class MuJoCoDemo {
 
     this.followEnabled = false;
     this.followHeight = 0.75;
+    this._customViewApplied = false;
     this.followLerp = 0.05;
     this.followTarget = new THREE.Vector3();
     this.followTargetDesired = new THREE.Vector3();
@@ -248,15 +249,50 @@ export class MuJoCoDemo {
     }
 
     const { onProgress, ...policyOptions } = options;
-    await this.reloadPolicy(nextPolicyPath, {
+      await this.reloadPolicy(nextPolicyPath, {
       ...policyOptions,
       onInitProgress: (p) => {
         report(sceneDownload + sceneBuild + policyWeight * p);
       }
     });
+    if (shouldReloadScene) {
+      this.applySceneView(this.policyRunner?.config?.view);
+    }
     report(1);
     console.log('scene:', this.currentScenePath, 'timestep:', this.timestep, 'decimation:', this.decimation);
     this.alive = true;
+  }
+
+  applySceneView(view) {
+    const cameraPos = view?.cameraPosition;
+    const target = view?.target;
+    if (Array.isArray(cameraPos) && cameraPos.length >= 3) {
+      this.camera.position.set(
+        Number(cameraPos[0]) || 0,
+        Number(cameraPos[1]) || 0,
+        Number(cameraPos[2]) || 0
+      );
+    } else if (this._customViewApplied) {
+      this.camera.position.set(3.0, 2.2, 3.0);
+    }
+    if (Array.isArray(target) && target.length >= 3) {
+      this.controls.target.set(
+        Number(target[0]) || 0,
+        Number(target[1]) || 0,
+        Number(target[2]) || 0
+      );
+    } else if (this._customViewApplied) {
+      this.controls.target.set(0, 0.7, 0);
+    }
+    if (typeof view?.followHeight === 'number' && Number.isFinite(view.followHeight)) {
+      this.followHeight = view.followHeight;
+    } else if (this._customViewApplied) {
+      this.followHeight = 0.75;
+    }
+    this.followDistance = this.camera.position.distanceTo(this.controls.target);
+    this.followInitialized = false;
+    this._customViewApplied = Boolean(view);
+    this.controls.update();
   }
 
   setFollowEnabled(enabled) {
@@ -435,6 +471,22 @@ export class MuJoCoDemo {
     this.camera.position.add(this.followDelta);
   }
 
+  applyMujocoPositionControl(simCtrl) {
+    const actionTarget = this.actionTarget;
+    const ctrlMin = this.ctrlMinPolicy;
+    const ctrlMax = this.ctrlMaxPolicy;
+    for (let i = 0; i < this.numActions; i++) {
+      const ctrl_adr = this.ctrl_adr_policy[i];
+      let ctrlValue = actionTarget ? actionTarget[i] : 0.0;
+      const min = ctrlMin[i];
+      const max = ctrlMax[i];
+      if (min < max) {
+        ctrlValue = Math.min(Math.max(ctrlValue, min), max);
+      }
+      simCtrl[ctrl_adr] = ctrlValue;
+    }
+  }
+
   applyJointPositionControl(simQpos, simQvel, simCtrl) {
     const actionTarget = this.actionTarget;
     const kpPolicy = this.kpPolicy;
@@ -554,6 +606,8 @@ export class MuJoCoDemo {
             this.applyJointPositionControl(simQpos, simQvel, simCtrl);
           } else if (this.control_type === 'unitree_position') {
             this.applyUnitreePositionControl(simQpos, simQvel, simCtrl);
+          } else if (this.control_type === 'mujoco_position') {
+            this.applyMujocoPositionControl(simCtrl);
           } else if (this.control_type === 'torque') {
             console.error('Torque control not implemented yet.');
           }
