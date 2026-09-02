@@ -16,8 +16,9 @@ const BASE = process.env.VITE_URL ?? 'http://127.0.0.1:3000/';
 const CHROME = process.env.CHROME_PATH ?? '/usr/local/bin/google-chrome';
 const OUT_DIR = process.env.VIDEO_DIR ?? '/opt/cursor/artifacts';
 const MAX_LOAD_MS = Number(process.env.SCREENSHOT_MAX_LOAD_MS ?? 240000);
-const OUT_WEBM = path.join(OUT_DIR, 'microduck_policy_dropdown_hot_switch_demo.webm');
-const OUT_MP4 = path.join(OUT_DIR, 'microduck_policy_dropdown_hot_switch_demo.mp4');
+const OUT_WEBM = path.join(OUT_DIR, 'microduck_dropdown_hot_switch_walk_sit_roulade.webm');
+const OUT_MP4 = path.join(OUT_DIR, 'microduck_dropdown_hot_switch_walk_sit_roulade.mp4');
+const SHOT_DROPDOWN = path.join(OUT_DIR, 'microduck_policy_dropdown_open.png');
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -39,6 +40,26 @@ function encodeVideo(frameDir, outPath, fps, codecArgs) {
     throw new Error(`ffmpeg failed for ${outPath}: ${result.stderr}`);
   }
 }
+
+const FIND_DEMO_PROXY = `() => {
+  const app = document.querySelector('#app')?.__vue_app__;
+  const stack = app?._instance ? [app._instance] : [];
+  while (stack.length) {
+    const comp = stack.pop();
+    if (!comp) continue;
+    if (comp.proxy?.demo?.simulation?.qpos) return comp.proxy;
+    const queue = comp.subTree ? [comp.subTree] : [];
+    while (queue.length) {
+      const vnode = queue.pop();
+      if (!vnode) continue;
+      if (vnode.component) stack.push(vnode.component);
+      if (Array.isArray(vnode.children)) {
+        for (const child of vnode.children) queue.push(child);
+      }
+    }
+  }
+  return null;
+}`;
 
 async function waitForPolicyReady(page) {
   await page.waitForFunction(
@@ -69,35 +90,9 @@ async function currentPolicyTitle(page) {
 }
 
 async function readRobotSnapshot(page) {
-  return page.evaluate(() => {
-    const app = document.querySelector('#app')?.__vue_app__;
-    const stack = app?._instance ? [app._instance] : [];
-    let proxy = null;
-    while (stack.length) {
-      const comp = stack.pop();
-      if (!comp) {
-        continue;
-      }
-      if (comp.proxy?.demo?.simulation?.qpos) {
-        proxy = comp.proxy;
-        break;
-      }
-      const queue = comp.subTree ? [comp.subTree] : [];
-      while (queue.length) {
-        const vnode = queue.pop();
-        if (!vnode) {
-          continue;
-        }
-        if (vnode.component) {
-          stack.push(vnode.component);
-        }
-        if (Array.isArray(vnode.children)) {
-          for (const child of vnode.children) {
-            queue.push(child);
-          }
-        }
-      }
-    }
+  return page.evaluate((findDemoSrc) => {
+    const findDemoProxy = eval(findDemoSrc);
+    const proxy = findDemoProxy();
     if (!proxy) {
       return null;
     }
@@ -112,10 +107,24 @@ async function readRobotSnapshot(page) {
       y: Number(qpos[1]) || 0,
       z: Number(qpos[2]) || 0
     };
-  });
+  }, FIND_DEMO_PROXY);
 }
 
-async function selectPolicy(page, titlePart) {
+async function setWalkCommand(page, cmdX) {
+  await page.evaluate((findDemoSrc, vx) => {
+    const findDemoProxy = eval(findDemoSrc);
+    const proxy = findDemoProxy();
+    if (!proxy) {
+      return;
+    }
+    proxy.cmdX = vx;
+    proxy.cmdY = 0;
+    proxy.cmdYaw = 0;
+    proxy.onCmdChange();
+  }, FIND_DEMO_PROXY, cmdX);
+}
+
+async function openPolicyMenu(page) {
   await page.keyboard.press('Escape');
   await sleep(150);
   await page.evaluate(() => {
@@ -124,7 +133,10 @@ async function selectPolicy(page, titlePart) {
   await sleep(200);
   await page.click('.controls-card .v-select .v-field');
   await page.waitForSelector('.v-overlay-container .v-list-item', { timeout: 15000 });
-  await sleep(400);
+  await sleep(250);
+}
+
+async function clickPolicyItem(page, titlePart) {
   const clicked = await page.evaluate((wanted) => {
     const items = [...document.querySelectorAll('.v-overlay-container .v-list-item')];
     const match = items.find((el) => (el.textContent ?? '').includes(wanted));
@@ -148,13 +160,12 @@ async function selectPolicy(page, titlePart) {
     { timeout: 20000 },
     titlePart
   );
+  await page.evaluate(() => document.activeElement?.blur?.());
 }
 
-async function focusCanvas(page) {
-  await page.evaluate(() => {
-    document.getElementById('mujoco-container')?.click();
-    document.querySelector('#mujoco-container canvas')?.focus();
-  });
+async function selectPolicy(page, titlePart) {
+  await openPolicyMenu(page);
+  await clickPolicyItem(page, titlePart);
 }
 
 function logSnap(label, snap) {
@@ -204,7 +215,6 @@ async function main() {
     await waitForPolicyReady(page);
     await sleep(400);
 
-    // Warm the Microduck scene off-camera so the recorded clip starts at the dropdown.
     await selectPolicy(page, 'Microduck Walk');
     await sleep(800);
     if (!(await currentPolicyTitle(page)).includes('Microduck Walk')) {
@@ -215,36 +225,51 @@ async function main() {
     recording = true;
     await client.send('Page.startScreencast', {
       format: 'jpeg',
-      quality: 70,
+      quality: 72,
       everyNthFrame: 1
     });
     const recordStart = Date.now();
 
-    await focusCanvas(page);
+    await setWalkCommand(page, 0.3);
     await page.keyboard.down('KeyW');
-    await sleep(5500);
+    await sleep(4000);
     await page.keyboard.up('KeyW');
     logSnap('after-walk-W', await readRobotSnapshot(page));
-    await sleep(600);
+    await sleep(400);
 
-    await selectPolicy(page, 'Sit/Stand');
-    await sleep(500);
+    await openPolicyMenu(page);
+    await sleep(1200);
+    await page.screenshot({ path: SHOT_DROPDOWN, type: 'png' });
+    await clickPolicyItem(page, 'Sit/Stand');
+    await sleep(600);
     const sitBtn = await page.waitForSelector('[data-test="microduck-sit-toggle"]', { timeout: 15000 });
     if (await sitBtn.evaluate((n) => n.disabled)) {
       throw new Error('Sit/Stand toggle is disabled');
     }
     await sitBtn.click();
-    await sleep(5500);
+    await sleep(4000);
     logSnap('after-sit', await readRobotSnapshot(page));
 
     await selectPolicy(page, 'Roulade');
-    await sleep(400);
+    await sleep(500);
     if (!(await currentPolicyTitle(page)).includes('Roulade')) {
       throw new Error(`Roulade not selected: ${await currentPolicyTitle(page)}`);
     }
-    await sleep(3800);
+    await sleep(5500);
     logSnap('after-roulade', await readRobotSnapshot(page));
-    await sleep(1500);
+
+    await page.waitForFunction(
+      () => {
+        const selection = document.querySelector('.controls-card .v-select .v-select__selection-text');
+        const text = selection?.textContent?.trim() ?? '';
+        const dialogText = document.querySelector('.v-dialog')?.textContent ?? '';
+        const loadingVisible = /Loading Simulation|正在加载仿真环境/.test(dialogText);
+        return text.includes('Microduck Walk') && !loadingVisible;
+      },
+      { timeout: 60000 }
+    );
+    await sleep(1200);
+    logSnap('after-auto-walk', await readRobotSnapshot(page));
 
     recording = false;
     await client.send('Page.stopScreencast').catch(() => {});
@@ -262,6 +287,7 @@ async function main() {
     encodeVideo(frameDir, OUT_WEBM, fps, ['-c:v', 'libvpx-vp9', '-pix_fmt', 'yuv420p', '-auto-alt-ref', '0']);
     encodeVideo(frameDir, OUT_MP4, fps, ['-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-movflags', '+faststart']);
     console.log(`OK: ${frameCount} frames / ${elapsedSec.toFixed(1)}s @${fps}fps -> ${OUT_WEBM} ${OUT_MP4}`);
+    console.log(`dropdown shot: ${SHOT_DROPDOWN}`);
   } finally {
     recording = false;
     await browser.close();
