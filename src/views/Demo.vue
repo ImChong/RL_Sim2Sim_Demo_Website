@@ -1193,7 +1193,7 @@ export default {
         scenePath: 'microduck/scene.xml',
         commandMode: 'zeros',
         ephemeralReturn: 'microduck-walk',
-        ephemeralMs: 2500
+        ephemeralMs: 4000
       }
     ],
     currentPolicy: 'g1-amp-walk-run-getup',
